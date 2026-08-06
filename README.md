@@ -31,7 +31,6 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 "$SKILL_HOME/bin/skills" menu
 "$SKILL_HOME/bin/skills" doctor
-"$SKILL_HOME/bin/skills" switch --dry-run
 "$SKILL_HOME/bin/skills" add owner/repo --list
 ```
 

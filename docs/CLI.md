@@ -41,34 +41,6 @@ skills doctor
 "$SKILL_HOME/bin/skills" list --category coding
 ```
 
-### 切换线上入口
-
-预览，不执行：
-
-```zsh
-"$SKILL_HOME/bin/skills" switch --dry-run
-```
-
-直接执行，跳过确认：
-
-```zsh
-"$SKILL_HOME/bin/skills" switch --yes
-```
-
-### 回滚线上入口
-
-交互式选择备份：
-
-```zsh
-"$SKILL_HOME/bin/skills" rollback
-```
-
-指定时间戳：
-
-```zsh
-"$SKILL_HOME/bin/skills" rollback YYYYMMDD-HHMMSS --yes
-```
-
 ### 重建生成链接
 
 ```zsh
@@ -82,7 +54,6 @@ skills doctor
 "$SKILL_HOME/bin/skills" expose ask-matt agents claude
 "$SKILL_HOME/bin/skills" hide ask-matt claude
 ```
-
 
 ### 按来源发现并安装 skills（推荐）
 
@@ -114,16 +85,10 @@ skills doctor
 "$SKILL_HOME/bin/skills" add owner/repo --skill ask-matt --consumer agents claude
 ```
 
-支持 GitHub tree URL，会从指定子路径开始发现：
+支持 GitHub tree URL，会解析 URL 中的 branch/ref，并从指定子路径开始发现：
 
 ```zsh
 "$SKILL_HOME/bin/skills" add https://github.com/owner/repo/tree/main/skills --list
-```
-
-### 从 Git 安装（旧方式）
-
-```zsh
-"$SKILL_HOME/bin/skills" install-git   foo-skill   https://github.com/someone/some-skills.git   skills/foo-skill   agents claude
 ```
 
 ### 从 Git 更新
@@ -156,3 +121,8 @@ git diff
 git add .
 git commit -m "Describe skill change"
 ```
+
+## 说明
+
+- `install-git` 旧命令仍作为隐藏兼容命令存在，但不再出现在 help、菜单或文档主流程中；新安装请使用 `skills add <source>`。
+- live switch / rollback 不再暴露在 CLI 中，避免在正式切换前误操作 `~/.agents/skills` 或 `~/.claude/skills`。
