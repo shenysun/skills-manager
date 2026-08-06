@@ -55,6 +55,31 @@ skills doctor
 "$SKILL_HOME/bin/skills" hide ask-matt claude
 ```
 
+
+### 在菜单中更新 skills
+
+推荐日常通过菜单更新：
+
+```zsh
+"$SKILL_HOME/bin/skills" menu
+```
+
+进入 `更新 skills（单个 / 批量 / 按来源）` 后有四种方式：
+
+- `更新某一个 skill（从注册表来源）`：根据 `registry.yaml` 中该 skill 的 `source.url`、`source.subpath`、`source.ref` 更新单个 skill。
+- `批量选择 skills 更新（从注册表来源）`：在已安装且有来源记录的 skills 中多选更新。
+- `按来源仓库更新（自动匹配同仓库已安装 skills）`：先选择一个注册表中的来源仓库，再自动列出这个来源下已安装的 skills，默认勾选该仓库下全部 skill。
+- `输入 URL/Git 来源，发现后选择安装/覆盖`：输入新的 URL / GitHub owner/repo / 本地路径，扫描 `SKILL.md` 后选择安装或覆盖。
+
+更新后建议：
+
+```zsh
+"$SKILL_HOME/bin/skills" doctor
+git diff
+git add .
+git commit -m "Update selected skills"
+```
+
 ### 按来源发现并安装 skills（推荐）
 
 这种方式更接近 `npx skills` 的使用体验：先给 Git URL / GitHub 仓库 / 本地路径，CLI 自动发现 `SKILL.md`，再让你选择要安装的 skill。

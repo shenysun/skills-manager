@@ -34,4 +34,6 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 "$SKILL_HOME/bin/skills" add owner/repo --list
 ```
 
+更新入口在菜单里：`更新 skills（单个 / 批量 / 按来源）`。
+
 完整命令见 `docs/CLI.md`。
