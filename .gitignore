@@ -1,3 +1,5 @@
 .DS_Store
 *.tmp
 /tmp/
+__pycache__/
+*.py[cod]
