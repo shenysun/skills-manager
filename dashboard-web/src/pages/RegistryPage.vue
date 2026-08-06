@@ -14,6 +14,7 @@ const sourceUrl = ref('');
 const sourceSubpath = ref('');
 const sourceRef = ref('');
 const sourceCommit = ref('');
+const saving = ref(false);
 const names = computed(() => Object.keys(state.value?.registry?.skills || {}).sort());
 
 function load(name: string) {
@@ -29,19 +30,26 @@ function load(name: string) {
   sourceCommit.value = entry.source?.upstream_commit || '';
 }
 
-const save = () => runApi(() => api('/api/registry/edit', {
-  method: 'POST',
-  body: JSON.stringify({
-    skill: skill.value,
-    patch: {
-      title: title.value,
-      category: category.value,
-      tags: tags.value.split(',').map((item) => item.trim()).filter(Boolean),
-      consumers: consumers.value.split(',').map((item) => item.trim()).filter(Boolean),
-      source: { url: sourceUrl.value, subpath: sourceSubpath.value, ref: sourceRef.value, upstream_commit: sourceCommit.value },
-    },
-  }),
-}));
+async function save() {
+  saving.value = true;
+  try {
+    await runApi(() => api('/api/registry/edit', {
+      method: 'POST',
+      body: JSON.stringify({
+        skill: skill.value,
+        patch: {
+          title: title.value,
+          category: category.value,
+          tags: tags.value.split(',').map((item) => item.trim()).filter(Boolean),
+          consumers: consumers.value.split(',').map((item) => item.trim()).filter(Boolean),
+          source: { url: sourceUrl.value, subpath: sourceSubpath.value, ref: sourceRef.value, upstream_commit: sourceCommit.value },
+        },
+      }),
+    }), { label: t('loading.savingRegistry') });
+  } finally {
+    saving.value = false;
+  }
+}
 </script>
 
 <template>
@@ -73,7 +81,7 @@ const save = () => runApi(() => api('/api/registry/edit', {
             <n-form-item :label="t('common.sourceSubpath')"><n-input v-model:value="sourceSubpath" /></n-form-item>
             <n-form-item :label="t('common.sourceRef')"><n-input v-model:value="sourceRef" /></n-form-item>
             <n-form-item :label="t('common.upstreamCommit')"><n-input v-model:value="sourceCommit" /></n-form-item>
-            <n-button type="primary" :disabled="!skill" @click="save">{{ t('common.save') }}</n-button>
+            <n-button type="primary" :disabled="!skill" :loading="saving" @click="save">{{ t('common.save') }}</n-button>
           </n-form>
         </n-card>
       </n-gi>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import UpdatePlan from '../components/UpdatePlan.vue';
 import DiscoverWizard from '../components/DiscoverWizard.vue';
@@ -9,9 +9,26 @@ import { api, runApi, state } from '../composables/useApi';
 const { t } = useI18n();
 const tab = ref('skill');
 const selected = ref<string[]>([]);
+const updatingSkills = ref(false);
+const updatingSource = reactive<Record<string, boolean>>({});
 
-const updateSkills = () => runApi(() => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: selected.value }) }));
-const updateSource = (key: string) => runApi(() => api('/api/update/source', { method: 'POST', body: JSON.stringify({ key }) }));
+async function updateSkills() {
+  updatingSkills.value = true;
+  try {
+    await runApi(() => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: selected.value }) }), { label: t('loading.updatingSelected') });
+  } finally {
+    updatingSkills.value = false;
+  }
+}
+
+async function updateSource(key: string) {
+  updatingSource[key] = true;
+  try {
+    await runApi(() => api('/api/update/source', { method: 'POST', body: JSON.stringify({ key }) }), { label: t('loading.updatingSource') });
+  } finally {
+    updatingSource[key] = false;
+  }
+}
 </script>
 
 <template>
@@ -29,7 +46,7 @@ const updateSource = (key: string) => runApi(() => api('/api/update/source', { m
               </n-space>
             </n-checkbox-group>
             <n-empty v-else :description="t('updates.noCandidates')" />
-            <n-button type="primary" :disabled="!selected.length" @click="updateSkills">{{ t('common.update') }}</n-button>
+            <n-button type="primary" :disabled="!selected.length" :loading="updatingSkills" @click="updateSkills">{{ t('common.update') }}</n-button>
             <UpdatePlan :candidates="state?.candidates || []" />
           </n-space>
         </n-card>
@@ -41,7 +58,7 @@ const updateSource = (key: string) => runApi(() => api('/api/update/source', { m
             <n-card :title="source.url" size="small">
               <n-space vertical>
                 <n-text depth="3">{{ source.skills.map((candidate) => candidate.skill).join(', ') }}</n-text>
-                <n-button type="primary" @click="updateSource(source.key)">{{ t('common.update') }}</n-button>
+                <n-button type="primary" :loading="!!updatingSource[source.key]" @click="updateSource(source.key)">{{ t('common.update') }}</n-button>
               </n-space>
             </n-card>
           </n-gi>

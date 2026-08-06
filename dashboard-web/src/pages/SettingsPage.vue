@@ -1,10 +1,19 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import LogPanel from '../components/LogPanel.vue';
 import { api, runApi, state } from '../composables/useApi';
 
 const { t } = useI18n();
-const pack = () => runApi(() => api('/api/package/dry-run', { method: 'POST', body: JSON.stringify({}) }));
+const packing = ref(false);
+async function pack() {
+  packing.value = true;
+  try {
+    await runApi(() => api('/api/package/dry-run', { method: 'POST', body: JSON.stringify({}) }), { label: t('loading.packing') });
+  } finally {
+    packing.value = false;
+  }
+}
 </script>
 
 <template>
@@ -23,7 +32,7 @@ const pack = () => runApi(() => api('/api/package/dry-run', { method: 'POST', bo
         <n-card :title="t('settings.package')">
           <n-space vertical>
             <n-code :code="JSON.stringify(state?.package, null, 2)" language="json" word-wrap />
-            <n-button type="primary" @click="pack">{{ t('settings.pack') }}</n-button>
+            <n-button type="primary" :loading="packing" @click="pack">{{ t('settings.pack') }}</n-button>
           </n-space>
         </n-card>
       </n-gi>

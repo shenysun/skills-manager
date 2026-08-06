@@ -2,7 +2,7 @@
 import { useI18n } from 'vue-i18n';
 import type { SourceGroup } from '../composables/useApi';
 
-defineProps<{ source: SourceGroup; selected: string[] }>();
+defineProps<{ source: SourceGroup; selected: string[]; loadingAll?: boolean; loadingSelected?: boolean }>();
 defineEmits<{ update: [key: string, skills?: string[]]; discover: [url: string]; toggle: [key: string, skill: string] }>();
 
 const { t } = useI18n();
@@ -30,8 +30,8 @@ const { t } = useI18n();
       </n-list>
 
       <n-space wrap>
-        <n-button @click="$emit('update', source.key)">{{ t('sources.updateAll') }}</n-button>
-        <n-button :disabled="!selected.length" type="primary" @click="$emit('update', source.key, selected)">{{ t('sources.updateSelected') }}</n-button>
+        <n-button :loading="loadingAll" @click="$emit('update', source.key)">{{ t('sources.updateAll') }}</n-button>
+        <n-button :disabled="!selected.length" :loading="loadingSelected" type="primary" @click="$emit('update', source.key, selected)">{{ t('sources.updateSelected') }}</n-button>
         <n-button tertiary @click="$emit('discover', source.url)">{{ t('sources.discoverMore') }}</n-button>
       </n-space>
     </n-space>

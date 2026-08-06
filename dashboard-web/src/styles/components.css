@@ -11,3 +11,7 @@ pre,
 .n-code {
   font-family: "SFMono-Regular", Consolas, monospace;
 }
+
+.operation-status .n-spin-body {
+  --n-size: 14px;
+}

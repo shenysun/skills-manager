@@ -14,6 +14,8 @@ const discovered = ref<Discovered[]>([]);
 const selected = ref<string[]>([]);
 const consumers = ref<string[]>(['agents', 'claude']);
 const confirmOverwrite = ref(false);
+const discovering = ref(false);
+const installing = ref(false);
 const existing = computed(() => new Set(state.value?.skills.map((skill) => skill.name) || []));
 const selectedExisting = computed(() => discovered.value.filter((skill) => selected.value.includes(skill.subpath) && existing.value.has(skill.name)));
 const requiresOverwrite = computed(() => selectedExisting.value.length > 0);
@@ -51,22 +53,32 @@ const columns = computed<DataTableColumns<Discovered>>(() => [
 ]);
 
 async function discover() {
-  const result = await runApi(() => api<{ discovered: Discovered[] }>('/api/discover', { method: 'POST', body: JSON.stringify({ source: source.value }) }));
-  discovered.value = result.discovered;
-  selected.value = [];
-  confirmOverwrite.value = false;
+  discovering.value = true;
+  try {
+    const result = await runApi(() => api<{ discovered: Discovered[] }>('/api/discover', { method: 'POST', body: JSON.stringify({ source: source.value }) }), { label: t('loading.discovering') });
+    discovered.value = result.discovered;
+    selected.value = [];
+    confirmOverwrite.value = false;
+  } finally {
+    discovering.value = false;
+  }
 }
 
 async function install() {
-  await runApi(() => api('/api/install', {
-    method: 'POST',
-    body: JSON.stringify({
-      source: source.value,
-      subpaths: selected.value,
-      consumers: consumers.value,
-      overwrite: requiresOverwrite.value && confirmOverwrite.value,
-    }),
-  }));
+  installing.value = true;
+  try {
+    await runApi(() => api('/api/install', {
+      method: 'POST',
+      body: JSON.stringify({
+        source: source.value,
+        subpaths: selected.value,
+        consumers: consumers.value,
+        overwrite: requiresOverwrite.value && confirmOverwrite.value,
+      }),
+    }), { label: t('loading.installing') });
+  } finally {
+    installing.value = false;
+  }
 }
 </script>
 
@@ -75,7 +87,7 @@ async function install() {
     <n-card :title="t('discover.stepSource')">
       <n-input-group>
         <n-input v-model:value="source" :placeholder="t('discover.sourcePlaceholder')" clearable />
-        <n-button type="primary" :disabled="!source" @click="discover">{{ t('common.run') }}</n-button>
+        <n-button type="primary" :disabled="!source" :loading="discovering" @click="discover">{{ t('common.run') }}</n-button>
       </n-input-group>
     </n-card>
 
@@ -84,7 +96,9 @@ async function install() {
         <n-alert v-if="discovered.length" type="info" :show-icon="false">
           {{ t('discover.discovered', { count: discovered.length }) }}
         </n-alert>
-        <n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
+        <n-spin :show="discovering || installing">
+          <n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
+        </n-spin>
       </n-space>
     </n-card>
 
@@ -105,7 +119,7 @@ async function install() {
         <n-checkbox v-model:checked="confirmOverwrite" :disabled="!requiresOverwrite">
           {{ t('discover.overwriteConfirm') }}
         </n-checkbox>
-        <n-button type="primary" :disabled="!canInstall" @click="install">
+        <n-button type="primary" :disabled="!canInstall" :loading="installing" @click="install">
           {{ t('common.install') }} {{ selected.length }}
         </n-button>
       </n-space>

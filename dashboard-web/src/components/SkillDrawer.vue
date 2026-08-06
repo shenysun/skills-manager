@@ -3,7 +3,7 @@ import { useI18n } from 'vue-i18n';
 import ConsumerBadges from './ConsumerBadges.vue';
 import type { Skill } from '../composables/useApi';
 
-defineProps<{ skill: Skill | null }>();
+defineProps<{ skill: Skill | null; busyAction?: string }>();
 defineEmits<{ close: []; update: [skill: string]; expose: [skill: string, consumer: string]; hide: [skill: string, consumer: string]; archive: [skill: string] }>();
 
 const { t } = useI18n();
@@ -29,12 +29,12 @@ const { t } = useI18n();
 
         <n-card :title="t('common.actions')" size="small">
           <n-space wrap>
-            <n-button type="primary" @click="$emit('update', skill.name)">{{ t('common.update') }}</n-button>
-            <n-button @click="$emit('expose', skill.name, 'agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button @click="$emit('expose', skill.name, 'claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
-            <n-button tertiary @click="$emit('hide', skill.name, 'agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button tertiary @click="$emit('hide', skill.name, 'claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
-            <n-button type="error" secondary @click="$emit('archive', skill.name)">{{ t('common.archive') }}</n-button>
+            <n-button type="primary" :loading="busyAction === `update-${skill.name}`" @click="$emit('update', skill.name)">{{ t('common.update') }}</n-button>
+            <n-button :loading="busyAction === 'expose-agents'" @click="$emit('expose', skill.name, 'agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
+            <n-button :loading="busyAction === 'expose-claude'" @click="$emit('expose', skill.name, 'claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button :loading="busyAction === 'hide-agents'" tertiary @click="$emit('hide', skill.name, 'agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
+            <n-button :loading="busyAction === 'hide-claude'" tertiary @click="$emit('hide', skill.name, 'claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button :loading="busyAction === 'archive'" type="error" secondary @click="$emit('archive', skill.name)">{{ t('common.archive') }}</n-button>
           </n-space>
         </n-card>
 

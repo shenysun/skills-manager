@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import StatusBadge from '../components/StatusBadge.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -7,7 +7,15 @@ import LogPanel from '../components/LogPanel.vue';
 import { api, runApi, state } from '../composables/useApi';
 
 const { t } = useI18n();
-const runDoctor = () => runApi(() => api('/api/doctor'));
+const doctorLoading = ref(false);
+async function runDoctor() {
+  doctorLoading.value = true;
+  try {
+    await runApi(() => api('/api/doctor'), { label: t('loading.runningDoctor') });
+  } finally {
+    doctorLoading.value = false;
+  }
+}
 const healthy = computed(() => !(state.value?.doctor?.warnings?.length || state.value?.doctor?.brokenLinks?.length));
 </script>
 
@@ -15,7 +23,7 @@ const healthy = computed(() => !(state.value?.doctor?.warnings?.length || state.
   <n-space vertical size="large">
     <n-page-header :title="t('overview.title')">
       <template #extra>
-        <n-button type="primary" @click="runDoctor">{{ t('overview.runDoctor') }}</n-button>
+        <n-button type="primary" :loading="doctorLoading" @click="runDoctor">{{ t('overview.runDoctor') }}</n-button>
       </template>
     </n-page-header>
 

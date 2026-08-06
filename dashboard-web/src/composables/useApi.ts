@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 export type ApiOk<T> = { ok: true; data: T };
 export type ApiErr = { ok: false; error: { code: string; message: string; details?: unknown } };
@@ -13,6 +13,28 @@ export type DashboardState = { skillHome: string; skills: Skill[]; candidates: U
 export const state = ref<DashboardState | null>(null);
 export const logText = ref('');
 
+type ActiveOperation = { id: number; label?: string; startedAt: number };
+type OperationOptions = { label?: string };
+let nextOperationId = 1;
+
+export const activeOperations = ref<ActiveOperation[]>([]);
+export const isBusy = computed(() => activeOperations.value.length > 0);
+export const currentOperation = computed(() => activeOperations.value.at(-1) || null);
+export const currentOperationLabel = computed(() => currentOperation.value?.label || '');
+
+function startOperation(options?: OperationOptions) {
+  if (!options?.label) return null;
+  const operation = { id: nextOperationId++, label: options.label, startedAt: Date.now() };
+  activeOperations.value = [...activeOperations.value, operation];
+  logText.value = `${options.label}…`;
+  return operation.id;
+}
+
+function finishOperation(operationId: number | null) {
+  if (operationId === null) return;
+  activeOperations.value = activeOperations.value.filter((operation) => operation.id !== operationId);
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { 'content-type': 'application/json' }, ...init });
   const payload = (await res.json().catch(() => null)) as ApiResponse<T> | null;
@@ -21,12 +43,18 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-export async function refreshState() {
-  state.value = await api<DashboardState>('/api/state');
-  return state.value;
+export async function refreshState(options?: OperationOptions) {
+  const operationId = startOperation(options);
+  try {
+    state.value = await api<DashboardState>('/api/state');
+    return state.value;
+  } finally {
+    finishOperation(operationId);
+  }
 }
 
-export async function runApi<T>(fn: () => Promise<T>) {
+export async function runApi<T>(fn: () => Promise<T>, options?: OperationOptions) {
+  const operationId = startOperation(options);
   try {
     const result = await fn();
     logText.value = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
@@ -35,5 +63,7 @@ export async function runApi<T>(fn: () => Promise<T>) {
   } catch (error) {
     logText.value = error instanceof Error ? error.message : String(error);
     throw error;
+  } finally {
+    finishOperation(operationId);
   }
 }
