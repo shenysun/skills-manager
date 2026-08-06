@@ -21,13 +21,14 @@ const updateSource = (key: string) => runApi(() => api('/api/update/source', { m
       <n-tab-pane name="skill" :tab="t('updates.bySkill')">
         <n-card :title="t('updates.plan')">
           <n-space vertical size="large">
-            <n-checkbox-group v-model:value="selected">
+            <n-checkbox-group v-if="state?.candidates?.length" v-model:value="selected">
               <n-space wrap>
                 <n-checkbox v-for="candidate in state?.candidates" :key="candidate.skill" :value="candidate.skill">
                   {{ candidate.skill }}
                 </n-checkbox>
               </n-space>
             </n-checkbox-group>
+            <n-empty v-else :description="t('updates.noCandidates')" />
             <n-button type="primary" :disabled="!selected.length" @click="updateSkills">{{ t('common.update') }}</n-button>
             <UpdatePlan :candidates="state?.candidates || []" />
           </n-space>
@@ -45,6 +46,7 @@ const updateSource = (key: string) => runApi(() => api('/api/update/source', { m
             </n-card>
           </n-gi>
         </n-grid>
+        <n-empty v-if="!state?.sources?.length" :description="t('sources.noSources')" />
       </n-tab-pane>
 
       <n-tab-pane name="url" :tab="t('updates.fromUrl')">

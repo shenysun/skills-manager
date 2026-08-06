@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import type { SourceGroup } from '../composables/useApi';
 
 defineProps<{ source: SourceGroup; selected: string[] }>();
 defineEmits<{ update: [key: string, skills?: string[]]; discover: [url: string]; toggle: [key: string, skill: string] }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -27,9 +30,9 @@ defineEmits<{ update: [key: string, skills?: string[]]; discover: [url: string];
       </n-list>
 
       <n-space wrap>
-        <n-button @click="$emit('update', source.key)">Update all</n-button>
-        <n-button :disabled="!selected.length" type="primary" @click="$emit('update', source.key, selected)">Update selected</n-button>
-        <n-button tertiary @click="$emit('discover', source.url)">Discover more</n-button>
+        <n-button @click="$emit('update', source.key)">{{ t('sources.updateAll') }}</n-button>
+        <n-button :disabled="!selected.length" type="primary" @click="$emit('update', source.key, selected)">{{ t('sources.updateSelected') }}</n-button>
+        <n-button tertiary @click="$emit('discover', source.url)">{{ t('sources.discoverMore') }}</n-button>
       </n-space>
     </n-space>
   </n-card>

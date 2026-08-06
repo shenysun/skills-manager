@@ -11,7 +11,7 @@ export type ActivityRecord = { id?: string; timestamp: string; action?: string; 
 export type DashboardState = { skillHome: string; skills: Skill[]; candidates: UpdateCandidate[]; sources: SourceGroup[]; doctor: Doctor; registry: { skills: Record<string, unknown> }; activity: ActivityRecord[]; gitHistory: ActivityRecord[]; package: { ok: boolean; warnings: string[]; info: Record<string, unknown> }; counts: Record<string, number> };
 
 export const state = ref<DashboardState | null>(null);
-export const logText = ref('Ready.');
+export const logText = ref('');
 
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { 'content-type': 'application/json' }, ...init });

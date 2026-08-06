@@ -58,21 +58,21 @@ const save = () => runApi(() => api('/api/registry/edit', {
               <n-thing :title="name" />
             </n-list-item>
           </n-list>
-          <n-empty v-if="!names.length" description="No registry entries" />
+          <n-empty v-if="!names.length" :description="t('registry.noEntries')" />
         </n-card>
       </n-gi>
       <n-gi>
         <n-card :title="t('registry.editSkill')">
           <n-form label-placement="top">
-            <n-form-item label="Skill"><n-input v-model:value="skill" /></n-form-item>
-            <n-form-item label="Title"><n-input v-model:value="title" /></n-form-item>
-            <n-form-item label="Category"><n-input v-model:value="category" /></n-form-item>
-            <n-form-item label="Tags"><n-input v-model:value="tags" /></n-form-item>
-            <n-form-item label="Consumers"><n-input v-model:value="consumers" /></n-form-item>
-            <n-form-item label="Source URL"><n-input v-model:value="sourceUrl" /></n-form-item>
-            <n-form-item label="Source subpath"><n-input v-model:value="sourceSubpath" /></n-form-item>
-            <n-form-item label="Source ref"><n-input v-model:value="sourceRef" /></n-form-item>
-            <n-form-item label="Upstream commit"><n-input v-model:value="sourceCommit" /></n-form-item>
+            <n-form-item :label="t('common.skill')"><n-input v-model:value="skill" /></n-form-item>
+            <n-form-item :label="t('common.title')"><n-input v-model:value="title" /></n-form-item>
+            <n-form-item :label="t('common.category')"><n-input v-model:value="category" /></n-form-item>
+            <n-form-item :label="t('common.tags')"><n-input v-model:value="tags" /></n-form-item>
+            <n-form-item :label="t('common.consumers')"><n-input v-model:value="consumers" /></n-form-item>
+            <n-form-item :label="t('common.sourceUrl')"><n-input v-model:value="sourceUrl" /></n-form-item>
+            <n-form-item :label="t('common.sourceSubpath')"><n-input v-model:value="sourceSubpath" /></n-form-item>
+            <n-form-item :label="t('common.sourceRef')"><n-input v-model:value="sourceRef" /></n-form-item>
+            <n-form-item :label="t('common.upstreamCommit')"><n-input v-model:value="sourceCommit" /></n-form-item>
             <n-button type="primary" :disabled="!skill" @click="save">{{ t('common.save') }}</n-button>
           </n-form>
         </n-card>

@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { h } from 'vue';
+import { computed, h } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { NCode, NSpace, type DataTableColumns } from 'naive-ui';
 import type { UpdateCandidate } from '../composables/useApi';
 
 defineProps<{ candidates: UpdateCandidate[] }>();
 
-const columns: DataTableColumns<UpdateCandidate> = [
-  { title: 'Skill', key: 'skill', minWidth: 180 },
+const { t } = useI18n();
+const columns = computed<DataTableColumns<UpdateCandidate>>(() => [
+  { title: t('common.skill'), key: 'skill', minWidth: 180 },
   {
-    title: 'Source',
+    title: t('common.source'),
     key: 'source',
     minWidth: 260,
     render: (candidate) => h(NSpace, { vertical: true, size: 2 }, {
       default: () => [candidate.url, candidate.ref ? `#${candidate.ref}` : null],
     }),
   },
-  { title: 'Path', key: 'subpath', minWidth: 220, render: (candidate) => h(NCode, { code: candidate.subpath, wordWrap: true }) },
-];
+  { title: t('common.path'), key: 'subpath', minWidth: 220, render: (candidate) => h(NCode, { code: candidate.subpath, wordWrap: true }) },
+]);
 </script>
 
 <template>

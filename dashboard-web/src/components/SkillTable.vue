@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, h } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { NCheckbox, NCode, NEllipsis, NSpace, NText, type DataTableColumns } from 'naive-ui';
 import ConsumerBadges from './ConsumerBadges.vue';
 import type { Skill } from '../composables/useApi';
 
 const props = defineProps<{ skills: Skill[]; selected?: string[] }>();
 const emit = defineEmits<{ toggle: [name: string]; open: [skill: Skill] }>();
+const { t } = useI18n();
 
 const columns = computed<DataTableColumns<Skill>>(() => [
   {
@@ -19,7 +21,7 @@ const columns = computed<DataTableColumns<Skill>>(() => [
     }),
   },
   {
-    title: 'Skill',
+    title: t('common.skill'),
     key: 'skill',
     minWidth: 220,
     render: (skill) => h(NSpace, { vertical: true, size: 2 }, {
@@ -29,15 +31,15 @@ const columns = computed<DataTableColumns<Skill>>(() => [
       ],
     }),
   },
-  { title: 'Category', key: 'category', width: 140, render: (skill) => skill.category || '—' },
-  { title: 'Consumers', key: 'consumers', width: 190, render: (skill) => h(ConsumerBadges, { consumers: skill.consumers || [] }) },
+  { title: t('common.category'), key: 'category', width: 140, render: (skill) => skill.category || '—' },
+  { title: t('common.consumers'), key: 'consumers', width: 190, render: (skill) => h(ConsumerBadges, { consumers: skill.consumers || [] }) },
   {
-    title: 'Source',
+    title: t('common.source'),
     key: 'source',
     minWidth: 260,
     render: (skill) => h(NSpace, { vertical: true, size: 2 }, {
       default: () => [
-        h(NEllipsis, { style: 'max-width: 360px' }, { default: () => skill.source?.url || 'local' }),
+        h(NEllipsis, { style: 'max-width: 360px' }, { default: () => skill.source?.url || t('common.local') }),
         h(NCode, { code: skill.source?.subpath || skill.path || '—', wordWrap: true }),
       ],
     }),

@@ -11,7 +11,7 @@ const search = ref('');
 const consumer = ref<string | null>(null);
 const selected = ref<string[]>([]);
 const openSkill = ref<Skill | null>(null);
-const consumerOptions = [{ label: 'All', value: '' }, { label: 'agents', value: 'agents' }, { label: 'claude', value: 'claude' }];
+const consumerOptions = computed(() => [{ label: t('common.all'), value: '' }, { label: 'agents', value: 'agents' }, { label: 'claude', value: 'claude' }]);
 
 const skills = computed(() => (state.value?.skills || []).filter((skill) => {
   const selectedConsumer = consumer.value || '';
@@ -44,10 +44,10 @@ const archive = (only?: string) => runApi(() => api('/api/skills/archive', { met
           <n-input v-model:value="search" clearable :placeholder="t('installed.filter')" style="min-width: 280px" />
           <n-select v-model:value="consumer" :options="consumerOptions" clearable style="width: 140px" />
           <n-button :disabled="!selected.length" @click="updateSelected">{{ t('installed.updateSelected') }}</n-button>
-          <n-button :disabled="!selected.length" @click="expose('agents')">{{ t('common.expose') }} agents</n-button>
-          <n-button :disabled="!selected.length" @click="expose('claude')">{{ t('common.expose') }} claude</n-button>
-          <n-button :disabled="!selected.length" tertiary @click="hide('agents')">{{ t('common.hide') }} agents</n-button>
-          <n-button :disabled="!selected.length" tertiary @click="hide('claude')">{{ t('common.hide') }} claude</n-button>
+          <n-button :disabled="!selected.length" @click="expose('agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
+          <n-button :disabled="!selected.length" @click="expose('claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
+          <n-button :disabled="!selected.length" tertiary @click="hide('agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
+          <n-button :disabled="!selected.length" tertiary @click="hide('claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
           <n-button :disabled="!selected.length" type="error" secondary @click="archive()">{{ t('installed.archiveSelected') }}</n-button>
         </n-space>
         <n-alert type="info" :show-icon="false">{{ t('installed.noDelete') }}</n-alert>

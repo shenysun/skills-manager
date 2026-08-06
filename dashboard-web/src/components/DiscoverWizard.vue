@@ -32,7 +32,7 @@ const columns = computed<DataTableColumns<Discovered>>(() => [
     }),
   },
   {
-    title: 'Skill',
+    title: t('common.skill'),
     key: 'skill',
     minWidth: 220,
     render: (skill) => h('div', [
@@ -41,12 +41,12 @@ const columns = computed<DataTableColumns<Discovered>>(() => [
       h(NText, { depth: 3 }, { default: () => skill.description || skill.title || '—' }),
     ]),
   },
-  { title: 'Path', key: 'subpath', minWidth: 220, render: (skill) => h(NCode, { code: skill.subpath, wordWrap: true }) },
+  { title: t('common.path'), key: 'subpath', minWidth: 220, render: (skill) => h(NCode, { code: skill.subpath, wordWrap: true }) },
   {
-    title: 'Status',
+    title: t('common.status'),
     key: 'status',
     width: 130,
-    render: (skill) => h(NTag, { type: existing.value.has(skill.name) ? 'warning' : 'success', round: true, size: 'small' }, { default: () => existing.value.has(skill.name) ? 'Overwrite' : 'New' }),
+    render: (skill) => h(NTag, { type: existing.value.has(skill.name) ? 'warning' : 'success', round: true, size: 'small' }, { default: () => existing.value.has(skill.name) ? t('common.overwrite') : t('common.new') }),
   },
 ]);
 
@@ -100,10 +100,10 @@ async function install() {
     <n-card :title="t('discover.stepReview')">
       <n-space vertical>
         <n-alert :type="requiresOverwrite ? 'warning' : 'success'">
-          {{ requiresOverwrite ? t('discover.overwrite') : 'No selected skills require overwrite.' }}
+          {{ requiresOverwrite ? t('discover.overwrite') : t('discover.noOverwriteRequired') }}
         </n-alert>
         <n-checkbox v-model:checked="confirmOverwrite" :disabled="!requiresOverwrite">
-          Explicitly allow overwriting existing skills in this selection
+          {{ t('discover.overwriteConfirm') }}
         </n-checkbox>
         <n-button type="primary" :disabled="!canInstall" @click="install">
           {{ t('common.install') }} {{ selected.length }}

@@ -16,7 +16,7 @@ const { t } = useI18n();
               {{ activity.summary }}
             </n-timeline-item>
           </n-timeline>
-          <n-empty v-else description="No operations" />
+          <n-empty v-else :description="t('activity.noOperations')" />
         </n-card>
       </n-gi>
       <n-gi>
@@ -30,7 +30,7 @@ const { t } = useI18n();
               </n-thing>
             </n-list-item>
           </n-list>
-          <n-empty v-else description="No git history" />
+          <n-empty v-else :description="t('activity.noGitHistory')" />
         </n-card>
       </n-gi>
     </n-grid>

@@ -30,7 +30,7 @@ const discover = (url: string) => {
         <SourceCard :source="source" :selected="selectedBySource[source.key] || []" @toggle="toggle" @update="update" @discover="discover" />
       </n-gi>
     </n-grid>
-    <n-empty v-if="!state?.sources?.length" description="No sources" />
+    <n-empty v-if="!state?.sources?.length" :description="t('sources.noSources')" />
     <LogPanel />
   </n-space>
 </template>
