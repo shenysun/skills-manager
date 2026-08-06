@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Central skill registry and CLI for agent/Claude skills",
   "scripts": {
-    "skillctl": "tsx src/cli.ts",
+    "skills": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.json",
     "doctor": "tsx src/cli.ts doctor",
     "menu": "tsx src/cli.ts menu"
@@ -25,6 +25,6 @@
   },
   "private": true,
   "bin": {
-    "skillctl": "./bin/skillctl"
+    "skills": "./bin/skills"
   }
 }

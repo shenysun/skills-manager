@@ -29,10 +29,10 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 
 ```zsh
 export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
-"$SKILL_HOME/bin/skillctl" menu
-"$SKILL_HOME/bin/skillctl" doctor
-"$SKILL_HOME/bin/skillctl" switch --dry-run
-"$SKILL_HOME/bin/skillctl" add owner/repo --list
+"$SKILL_HOME/bin/skills" menu
+"$SKILL_HOME/bin/skills" doctor
+"$SKILL_HOME/bin/skills" switch --dry-run
+"$SKILL_HOME/bin/skills" add owner/repo --list
 ```
 
 完整命令见 `docs/CLI.md`。

@@ -406,7 +406,7 @@ function checkoutSource(source: string): SourceInfo {
     return { ...normalized, repoDir: normalized.repoUrl, commit };
   }
 
-  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skillctl-source-'));
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skills-source-'));
   const repoDir = path.join(tmp, 'repo');
   run('git', ['clone', normalized.repoUrl, repoDir], { cwd: tmp });
   const commit = run('git', ['-C', repoDir, 'rev-parse', 'HEAD'], { quiet: true });
@@ -531,11 +531,11 @@ async function addFromSource(source: string, opts: { list?: boolean; all?: boole
   rebuildViews();
   rebuildCollections();
   printDiscoveredSkills(selected);
-  console.log(`已安装 ${selected.length} 个 skill。下一步建议运行：skillctl doctor && git diff`);
+  console.log(`已安装 ${selected.length} 个 skill。下一步建议运行：skills doctor && git diff`);
 }
 
 function installGit(skill: string, repo: string, subpath: string, consumers: Consumer[]) {
-  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skillctl-'));
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skills-'));
   run('git', ['clone', repo, path.join(tmp, 'repo')], { cwd: tmp });
   const commit = run('git', ['-C', path.join(tmp, 'repo'), 'rev-parse', 'HEAD'], { quiet: true });
   mkdirSync(skillDir(skill), { recursive: true });
@@ -556,7 +556,7 @@ function updateGit(skill: string, repo?: string, subpath?: string) {
   const finalRepo = repo || entry.source?.url;
   const finalSubpath = subpath || entry.source?.subpath;
   if (!finalRepo || !finalSubpath) throw new Error(`缺少 repo/subpath：${skill}`);
-  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skillctl-'));
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skills-'));
   run('git', ['clone', finalRepo, path.join(tmp, 'repo')], { cwd: tmp });
   const commit = run('git', ['-C', path.join(tmp, 'repo'), 'rev-parse', 'HEAD'], { quiet: true });
   run('rsync', ['-a', '--delete', `${path.join(tmp, 'repo', finalSubpath)}/`, `${skillDir(skill)}/`]);
@@ -596,7 +596,7 @@ async function menu() {
     { name: '退出', value: 'quit' },
   ];
   while (true) {
-    const { action } = await inquirer.prompt([{ type: 'select', name: 'action', message: '请选择操作', choices }]);
+    const { action } = await inquirer.prompt([{ type: 'select', name: 'action', message: '请选择 skills 操作', choices }]);
     try {
       if (action === 'quit') return;
       if (action === 'doctor') doctor();
@@ -642,7 +642,7 @@ async function menu() {
 }
 
 const program = new Command();
-program.name('skillctl').description('统一管理 agents/Claude skills 的中央仓库').version('0.1.0', '-V, --version', '显示版本号').helpOption('-h, --help', '显示帮助').addHelpCommand('help [command]', '显示命令帮助');
+program.name('skills').description('统一管理 agents/Claude skills 的中央仓库').version('0.1.0', '-V, --version', '显示版本号').helpOption('-h, --help', '显示帮助').addHelpCommand('help [command]', '显示命令帮助');
 
 program.command('menu').description('打开交互式菜单').action(menu);
 program.command('doctor').description('运行健康检查').action(() => doctor());
