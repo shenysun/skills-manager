@@ -82,26 +82,21 @@ body,
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
-  padding: 0 22px;
-  pointer-events: none;
-}
-
-.operation-bar__track {
-  position: relative;
-  height: 2px;
+  bottom: 0;
+  z-index: 2;
+  height: 3px;
   overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--brand) 13%, transparent);
+  pointer-events: none;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
-.operation-bar__track > span {
+.operation-bar > span {
   position: absolute;
   inset-block: 0;
-  width: 38%;
-  border-radius: inherit;
+  width: 42%;
+  border-radius: 999px;
   background: linear-gradient(90deg, transparent, var(--brand), transparent);
-  animation: operation-bar-slide 1.15s ease-in-out infinite;
+  animation: operation-bar-slide 1s ease-in-out infinite;
 }
 
 @keyframes operation-bar-slide {
@@ -109,6 +104,6 @@ body,
     transform: translateX(-110%);
   }
   to {
-    transform: translateX(280%);
+    transform: translateX(260%);
   }
 }

@@ -37,7 +37,7 @@ async function refresh() {
       <n-button type="primary" :loading="refreshLoading" @click="refresh">{{ t('app.refresh') }}</n-button>
     </n-space>
     <div v-if="isBusy" class="operation-bar" role="status" :aria-label="t('loading.working')">
-      <span class="operation-bar__track"><span /></span>
+      <span />
     </div>
   </div>
 </template>
