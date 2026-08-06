@@ -281,7 +281,7 @@ async function rollbackLive(tsArg?: string, opts: { yes?: boolean } = {}) {
   const backups = existsSync(agentsDir)
     ? readdirSync(agentsDir).map((x) => x.match(/^skills\.backup-(.+)$/)?.[1]).filter(Boolean) as string[]
     : [];
-  const ts = tsArg || (await inquirer.prompt([{ type: 'list', name: 'ts', message: '选择要回滚的备份时间戳', choices: backups.sort().reverse() }])).ts;
+  const ts = tsArg || (await inquirer.prompt([{ type: 'select', name: 'ts', message: '选择要回滚的备份时间戳', choices: backups.sort().reverse() }])).ts;
   if (!ts) throw new Error('未提供备份时间戳');
   if (!(await confirm(`确认将线上 skills 回滚到备份 ${ts} 吗？`, opts.yes))) return;
   for (const consumer of ['agents', 'claude'] as Consumer[]) {
@@ -406,7 +406,7 @@ async function menu() {
     { name: '退出', value: 'quit' },
   ];
   while (true) {
-    const { action } = await inquirer.prompt([{ type: 'list', name: 'action', message: '请选择操作', choices }]);
+    const { action } = await inquirer.prompt([{ type: 'select', name: 'action', message: '请选择操作', choices }]);
     try {
       if (action === 'quit') return;
       if (action === 'doctor') doctor();
@@ -419,7 +419,7 @@ async function menu() {
       if (action === 'expose skill' || action === 'hide skill') {
         const skills = listCanonicalSkills();
         const ans = await inquirer.prompt([
-          { type: 'list', name: 'skill', message: '选择 skill', choices: skills },
+          { type: 'select', name: 'skill', message: '选择 skill', choices: skills },
           { type: 'checkbox', name: 'consumers', message: '选择消费者', choices: ['agents', 'claude'], validate: (x) => x.length > 0 || '至少选择一个消费者' },
         ]);
         if (action === 'expose skill') expose(ans.skill, ans.consumers);
@@ -436,7 +436,7 @@ async function menu() {
       }
       if (action === 'update from git') {
         const skills = listCanonicalSkills();
-        const ans = await inquirer.prompt([{ type: 'list', name: 'skill', message: '选择 skill', choices: skills }]);
+        const ans = await inquirer.prompt([{ type: 'select', name: 'skill', message: '选择 skill', choices: skills }]);
         updateGit(ans.skill);
       }
     } catch (e) {
