@@ -1,19 +1,31 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { state, refreshState } from '../composables/useApi';
 import { useLocale } from '../composables/useLocale';
 import { useTheme } from '../composables/useTheme';
+
 const { t } = useI18n();
 const { locale } = useLocale();
 const { theme } = useTheme();
+const localeOptions = [{ label: '中文', value: 'zh-CN' }, { label: 'English', value: 'en-US' }];
+const themeOptions = computed(() => [
+  { label: t('app.system'), value: 'system' },
+  { label: t('app.light'), value: 'light' },
+  { label: t('app.dark'), value: 'dark' },
+]);
 </script>
+
 <template>
-  <header class="topbar">
-    <div><strong>{{ state?.skillHome || '—' }}</strong><span>{{ state?.package?.info?.name || '@shenysun/skills-manager' }}</span></div>
-    <div class="toolbar">
-      <label>{{ t('app.language') }} <select v-model="locale"><option value="zh-CN">中文</option><option value="en-US">English</option></select></label>
-      <label>{{ t('app.theme') }} <select v-model="theme"><option value="system">{{ t('app.system') }}</option><option value="light">{{ t('app.light') }}</option><option value="dark">{{ t('app.dark') }}</option></select></label>
-      <button @click="refreshState">{{ t('app.refresh') }}</button>
+  <div class="topbar">
+    <div class="topbar-title">
+      <n-text strong>{{ state?.skillHome || '—' }}</n-text>
+      <n-text depth="3">{{ state?.package?.info?.name || '@shenysun/skills-manager' }}</n-text>
     </div>
-  </header>
+    <n-space align="center" wrap>
+      <n-select v-model:value="locale" :options="localeOptions" :aria-label="t('app.language')" style="width: 132px" />
+      <n-select v-model:value="theme" :options="themeOptions" :aria-label="t('app.theme')" style="width: 132px" />
+      <n-button type="primary" @click="refreshState">{{ t('app.refresh') }}</n-button>
+    </n-space>
+  </div>
 </template>

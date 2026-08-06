@@ -1,1 +1,13 @@
-.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.metric{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}.metric span{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.metric strong{font-size:32px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}th{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:var(--panel-2)}tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)}.pill,.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 8px;margin:2px;color:var(--muted);font-size:12px;font-weight:700}.badge.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 55%,var(--line))}.badge.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}.empty{padding:18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}.log{white-space:pre-wrap;max-height:360px;overflow:auto;background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:12px}.drawer{position:fixed;right:18px;top:78px;bottom:18px;width:min(460px,calc(100vw - 36px));overflow:auto;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:18px}.dialog{position:fixed;inset:0;background:rgba(0,0,0,.35);display:grid;place-items:center;z-index:40}.tabs{display:flex;gap:8px}.list-button{display:block;width:100%;margin:4px 0;text-align:left}.source-card{display:grid;gap:10px}label{display:inline-grid;gap:6px;margin:6px 8px 6px 0}
+.log {
+  max-height: 360px;
+}
+
+.source-card .n-card-header__main {
+  min-width: 0;
+}
+
+code,
+pre,
+.n-code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}

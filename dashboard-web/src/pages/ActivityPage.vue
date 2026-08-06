@@ -1,1 +1,38 @@
-<script setup lang="ts">import { useI18n } from 'vue-i18n'; import { state } from '../composables/useApi'; const { t } = useI18n();</script><template><section class="page-head"><h1>{{ t('activity.title') }}</h1></section><section class="grid two"><article class="card"><h2>{{ t('activity.operations') }}</h2><ul><li v-for="a in state?.activity" :key="a.id">{{ a.timestamp }} — {{ a.action }} — {{ a.summary }}</li></ul></article><article class="card"><h2>{{ t('activity.git') }}</h2><ul><li v-for="g in state?.gitHistory" :key="g.hash"><code>{{ g.hash?.slice(0,7) }}</code> {{ g.timestamp }} — {{ g.subject }}</li></ul></article></section></template>
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import { state } from '../composables/useApi';
+
+const { t } = useI18n();
+</script>
+
+<template>
+  <n-space vertical size="large">
+    <n-page-header :title="t('activity.title')" />
+    <n-grid :cols="2" :x-gap="18" :y-gap="18" responsive="screen">
+      <n-gi>
+        <n-card :title="t('activity.operations')">
+          <n-timeline v-if="state?.activity?.length">
+            <n-timeline-item v-for="activity in state?.activity" :key="activity.id || activity.timestamp" type="info" :time="activity.timestamp" :title="activity.action || activity.summary">
+              {{ activity.summary }}
+            </n-timeline-item>
+          </n-timeline>
+          <n-empty v-else description="No operations" />
+        </n-card>
+      </n-gi>
+      <n-gi>
+        <n-card :title="t('activity.git')">
+          <n-list v-if="state?.gitHistory?.length" hoverable>
+            <n-list-item v-for="git in state?.gitHistory" :key="git.hash || git.timestamp">
+              <n-thing :title="git.subject" :description="git.timestamp">
+                <template #header-extra>
+                  <n-tag v-if="git.hash" size="small" round>{{ git.hash.slice(0, 7) }}</n-tag>
+                </template>
+              </n-thing>
+            </n-list-item>
+          </n-list>
+          <n-empty v-else description="No git history" />
+        </n-card>
+      </n-gi>
+    </n-grid>
+  </n-space>
+</template>

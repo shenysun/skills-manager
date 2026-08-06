@@ -1,16 +1,55 @@
 <script setup lang="ts">
+import { computed, h } from 'vue';
+import { NCheckbox, NCode, NEllipsis, NSpace, NText, type DataTableColumns } from 'naive-ui';
 import ConsumerBadges from './ConsumerBadges.vue';
 import type { Skill } from '../composables/useApi';
-defineProps<{ skills: Skill[]; selected?: string[] }>();
-defineEmits<{ toggle: [name: string]; open: [skill: Skill] }>();
+
+const props = defineProps<{ skills: Skill[]; selected?: string[] }>();
+const emit = defineEmits<{ toggle: [name: string]; open: [skill: Skill] }>();
+
+const columns = computed<DataTableColumns<Skill>>(() => [
+  {
+    title: '',
+    key: 'selected',
+    width: 48,
+    render: (skill) => h(NCheckbox, {
+      checked: props.selected?.includes(skill.name) || false,
+      onClick: (event: MouseEvent) => event.stopPropagation(),
+      'onUpdate:checked': () => emit('toggle', skill.name),
+    }),
+  },
+  {
+    title: 'Skill',
+    key: 'skill',
+    minWidth: 220,
+    render: (skill) => h(NSpace, { vertical: true, size: 2 }, {
+      default: () => [
+        h(NText, { strong: true }, { default: () => skill.name }),
+        h(NText, { depth: 3 }, { default: () => skill.description || skill.title || '—' }),
+      ],
+    }),
+  },
+  { title: 'Category', key: 'category', width: 140, render: (skill) => skill.category || '—' },
+  { title: 'Consumers', key: 'consumers', width: 190, render: (skill) => h(ConsumerBadges, { consumers: skill.consumers || [] }) },
+  {
+    title: 'Source',
+    key: 'source',
+    minWidth: 260,
+    render: (skill) => h(NSpace, { vertical: true, size: 2 }, {
+      default: () => [
+        h(NEllipsis, { style: 'max-width: 360px' }, { default: () => skill.source?.url || 'local' }),
+        h(NCode, { code: skill.source?.subpath || skill.path || '—', wordWrap: true }),
+      ],
+    }),
+  },
+]);
+
+const rowProps = (skill: Skill) => ({
+  style: 'cursor: pointer',
+  onClick: () => emit('open', skill),
+});
 </script>
+
 <template>
-  <div class="table-wrap"><table><thead><tr><th></th><th>Skill</th><th>Category</th><th>Consumers</th><th>Source</th></tr></thead><tbody>
-    <tr v-for="skill in skills" :key="skill.name" @click="$emit('open', skill)">
-      <td><input type="checkbox" :checked="selected?.includes(skill.name)" @click.stop="$emit('toggle', skill.name)" /></td>
-      <td><strong>{{ skill.name }}</strong><br><span class="muted">{{ skill.description || skill.title }}</span></td>
-      <td>{{ skill.category }}</td><td><ConsumerBadges :consumers="skill.consumers" /></td>
-      <td><span class="muted">{{ skill.source?.url || 'local' }}</span><br><code>{{ skill.source?.subpath || skill.path }}</code></td>
-    </tr>
-  </tbody></table></div>
+  <n-data-table :columns="columns" :data="skills" :row-key="(row: Skill) => row.name" :row-props="rowProps" size="small" :bordered="false" />
 </template>

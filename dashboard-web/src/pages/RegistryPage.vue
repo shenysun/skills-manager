@@ -1,7 +1,84 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'; import { useI18n } from 'vue-i18n'; import LogPanel from '../components/LogPanel.vue'; import { api, runApi, state } from '../composables/useApi';
-const { t } = useI18n(); const skill = ref(''); const title = ref(''); const category = ref(''); const tags = ref(''); const consumers = ref('agents,claude'); const sourceUrl = ref(''); const sourceSubpath = ref(''); const sourceRef = ref(''); const sourceCommit = ref('');
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import LogPanel from '../components/LogPanel.vue';
+import { api, runApi, state } from '../composables/useApi';
+
+const { t } = useI18n();
+const skill = ref('');
+const title = ref('');
+const category = ref('');
+const tags = ref('');
+const consumers = ref('agents,claude');
+const sourceUrl = ref('');
+const sourceSubpath = ref('');
+const sourceRef = ref('');
+const sourceCommit = ref('');
 const names = computed(() => Object.keys(state.value?.registry?.skills || {}).sort());
-function load(name: string) { skill.value = name; const e = (state.value?.registry?.skills as any)?.[name] || {}; title.value=e.title||name; category.value=e.category||'experimental'; tags.value=(e.tags||[]).join(','); consumers.value=(e.consumers||[]).join(','); sourceUrl.value=e.source?.url||''; sourceSubpath.value=e.source?.subpath||''; sourceRef.value=e.source?.ref||''; sourceCommit.value=e.source?.upstream_commit||''; }
-const save = () => runApi(() => api('/api/registry/edit', { method: 'POST', body: JSON.stringify({ skill: skill.value, patch: { title: title.value, category: category.value, tags: tags.value.split(',').map(s=>s.trim()).filter(Boolean), consumers: consumers.value.split(',').map(s=>s.trim()).filter(Boolean), source: { url: sourceUrl.value, subpath: sourceSubpath.value, ref: sourceRef.value, upstream_commit: sourceCommit.value } } }) }));
-</script><template><section class="page-head"><h1>{{ t('registry.title') }}</h1><p>{{ t('registry.safeEdit') }}</p></section><section class="grid two"><article class="card"><button v-for="name in names" :key="name" class="list-button" @click="load(name)">{{ name }}</button></article><article class="card"><h2>{{ t('registry.editSkill') }}</h2><label>Skill <input v-model="skill"></label><label>Title <input v-model="title"></label><label>Category <input v-model="category"></label><label>Tags <input v-model="tags"></label><label>Consumers <input v-model="consumers"></label><label>Source URL <input v-model="sourceUrl"></label><label>Source subpath <input v-model="sourceSubpath"></label><label>Source ref <input v-model="sourceRef"></label><label>Upstream commit <input v-model="sourceCommit"></label><button :disabled="!skill" @click="save">{{ t('common.save') }}</button></article></section><LogPanel/></template>
+
+function load(name: string) {
+  skill.value = name;
+  const entry = (state.value?.registry?.skills as any)?.[name] || {};
+  title.value = entry.title || name;
+  category.value = entry.category || 'experimental';
+  tags.value = (entry.tags || []).join(',');
+  consumers.value = (entry.consumers || []).join(',');
+  sourceUrl.value = entry.source?.url || '';
+  sourceSubpath.value = entry.source?.subpath || '';
+  sourceRef.value = entry.source?.ref || '';
+  sourceCommit.value = entry.source?.upstream_commit || '';
+}
+
+const save = () => runApi(() => api('/api/registry/edit', {
+  method: 'POST',
+  body: JSON.stringify({
+    skill: skill.value,
+    patch: {
+      title: title.value,
+      category: category.value,
+      tags: tags.value.split(',').map((item) => item.trim()).filter(Boolean),
+      consumers: consumers.value.split(',').map((item) => item.trim()).filter(Boolean),
+      source: { url: sourceUrl.value, subpath: sourceSubpath.value, ref: sourceRef.value, upstream_commit: sourceCommit.value },
+    },
+  }),
+}));
+</script>
+
+<template>
+  <n-space vertical size="large">
+    <n-page-header :title="t('registry.title')">
+      <template #subtitle>{{ t('registry.safeEdit') }}</template>
+    </n-page-header>
+
+    <n-grid :cols="2" :x-gap="18" :y-gap="18" responsive="screen">
+      <n-gi>
+        <n-card>
+          <n-list hoverable clickable>
+            <n-list-item v-for="name in names" :key="name" @click="load(name)">
+              <n-thing :title="name" />
+            </n-list-item>
+          </n-list>
+          <n-empty v-if="!names.length" description="No registry entries" />
+        </n-card>
+      </n-gi>
+      <n-gi>
+        <n-card :title="t('registry.editSkill')">
+          <n-form label-placement="top">
+            <n-form-item label="Skill"><n-input v-model:value="skill" /></n-form-item>
+            <n-form-item label="Title"><n-input v-model:value="title" /></n-form-item>
+            <n-form-item label="Category"><n-input v-model:value="category" /></n-form-item>
+            <n-form-item label="Tags"><n-input v-model:value="tags" /></n-form-item>
+            <n-form-item label="Consumers"><n-input v-model:value="consumers" /></n-form-item>
+            <n-form-item label="Source URL"><n-input v-model:value="sourceUrl" /></n-form-item>
+            <n-form-item label="Source subpath"><n-input v-model:value="sourceSubpath" /></n-form-item>
+            <n-form-item label="Source ref"><n-input v-model:value="sourceRef" /></n-form-item>
+            <n-form-item label="Upstream commit"><n-input v-model:value="sourceCommit" /></n-form-item>
+            <n-button type="primary" :disabled="!skill" @click="save">{{ t('common.save') }}</n-button>
+          </n-form>
+        </n-card>
+      </n-gi>
+    </n-grid>
+
+    <LogPanel />
+  </n-space>
+</template>

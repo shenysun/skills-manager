@@ -22,8 +22,10 @@
   "type": "module",
   "dependencies": {
     "@fastify/static": "^10.1.2",
+    "@vicons/ionicons5": "^0.13.0",
     "commander": "^15.0.0",
     "fastify": "^5.11.2",
+    "naive-ui": "^2.44.1",
     "vue": "^3.5.41",
     "vue-i18n": "^11.4.8",
     "yaml": "^2.9.0"

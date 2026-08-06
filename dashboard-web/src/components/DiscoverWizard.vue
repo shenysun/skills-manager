@@ -1,27 +1,114 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { NCheckbox, NCode, NTag, NText, type DataTableColumns } from 'naive-ui';
 import { api, runApi, state } from '../composables/useApi';
+
 type Discovered = { name: string; title: string; description: string; subpath: string };
+
 const { t } = useI18n();
 const source = ref(localStorage.getItem('skills-manager-last-source') || '');
 if (source.value) localStorage.removeItem('skills-manager-last-source');
+
 const discovered = ref<Discovered[]>([]);
 const selected = ref<string[]>([]);
-const consumers = ref<string[]>(['agents','claude']);
+const consumers = ref<string[]>(['agents', 'claude']);
 const confirmOverwrite = ref(false);
-const existing = computed(() => new Set(state.value?.skills.map(s => s.name) || []));
+const existing = computed(() => new Set(state.value?.skills.map((skill) => skill.name) || []));
+const selectedExisting = computed(() => discovered.value.filter((skill) => selected.value.includes(skill.subpath) && existing.value.has(skill.name)));
+const requiresOverwrite = computed(() => selectedExisting.value.length > 0);
+const canInstall = computed(() => selected.value.length > 0 && (!requiresOverwrite.value || confirmOverwrite.value));
+
+const columns = computed<DataTableColumns<Discovered>>(() => [
+  {
+    title: '',
+    key: 'selected',
+    width: 48,
+    render: (skill) => h(NCheckbox, {
+      checked: selected.value.includes(skill.subpath),
+      'onUpdate:checked': (checked: boolean) => {
+        selected.value = checked ? [...selected.value, skill.subpath] : selected.value.filter((item) => item !== skill.subpath);
+      },
+    }),
+  },
+  {
+    title: 'Skill',
+    key: 'skill',
+    minWidth: 220,
+    render: (skill) => h('div', [
+      h(NText, { strong: true }, { default: () => skill.name }),
+      h('br'),
+      h(NText, { depth: 3 }, { default: () => skill.description || skill.title || '—' }),
+    ]),
+  },
+  { title: 'Path', key: 'subpath', minWidth: 220, render: (skill) => h(NCode, { code: skill.subpath, wordWrap: true }) },
+  {
+    title: 'Status',
+    key: 'status',
+    width: 130,
+    render: (skill) => h(NTag, { type: existing.value.has(skill.name) ? 'warning' : 'success', round: true, size: 'small' }, { default: () => existing.value.has(skill.name) ? 'Overwrite' : 'New' }),
+  },
+]);
+
 async function discover() {
   const result = await runApi(() => api<{ discovered: Discovered[] }>('/api/discover', { method: 'POST', body: JSON.stringify({ source: source.value }) }));
-  discovered.value = result.discovered; selected.value = [];
+  discovered.value = result.discovered;
+  selected.value = [];
+  confirmOverwrite.value = false;
 }
+
 async function install() {
-  await runApi(() => api('/api/install', { method: 'POST', body: JSON.stringify({ source: source.value, subpaths: selected.value, consumers: consumers.value, overwrite: confirmOverwrite.value }) }));
+  await runApi(() => api('/api/install', {
+    method: 'POST',
+    body: JSON.stringify({
+      source: source.value,
+      subpaths: selected.value,
+      consumers: consumers.value,
+      overwrite: requiresOverwrite.value && confirmOverwrite.value,
+    }),
+  }));
 }
 </script>
+
 <template>
-  <section class="card"><h2>{{ t('discover.stepSource') }}</h2><div class="toolbar"><input v-model="source" class="wide" :placeholder="t('discover.sourcePlaceholder')"/><button @click="discover">{{ t('common.run') }}</button></div></section>
-  <section class="card"><h2>{{ t('discover.stepSkills') }}</h2><div class="table-wrap"><table><thead><tr><th></th><th>Skill</th><th>Path</th><th>Status</th></tr></thead><tbody><tr v-for="skill in discovered" :key="skill.subpath"><td><input v-model="selected" :value="skill.subpath" type="checkbox"></td><td><strong>{{ skill.name }}</strong><br><span class="muted">{{ skill.description }}</span></td><td><code>{{ skill.subpath }}</code></td><td><span v-if="existing.has(skill.name)" class="badge warn">Overwrite</span><span v-else class="badge ok">New</span></td></tr></tbody></table></div></section>
-  <section class="card"><h2>{{ t('discover.stepConsumers') }}</h2><label><input v-model="consumers" value="agents" type="checkbox"> agents</label> <label><input v-model="consumers" value="claude" type="checkbox"> claude</label></section>
-  <section class="card"><h2>{{ t('discover.stepReview') }}</h2><p>{{ t('discover.overwrite') }}</p><label><input v-model="confirmOverwrite" type="checkbox"> Explicitly allow overwriting existing skills in this selection</label><button class="primary" :disabled="!selected.length || !confirmOverwrite" @click="install">{{ t('common.install') }} {{ selected.length }}</button></section>
+  <n-space vertical size="large">
+    <n-card :title="t('discover.stepSource')">
+      <n-input-group>
+        <n-input v-model:value="source" :placeholder="t('discover.sourcePlaceholder')" clearable />
+        <n-button type="primary" :disabled="!source" @click="discover">{{ t('common.run') }}</n-button>
+      </n-input-group>
+    </n-card>
+
+    <n-card :title="t('discover.stepSkills')">
+      <n-space vertical>
+        <n-alert v-if="discovered.length" type="info" :show-icon="false">
+          {{ t('discover.discovered', { count: discovered.length }) }}
+        </n-alert>
+        <n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
+      </n-space>
+    </n-card>
+
+    <n-card :title="t('discover.stepConsumers')">
+      <n-checkbox-group v-model:value="consumers">
+        <n-space>
+          <n-checkbox value="agents">agents</n-checkbox>
+          <n-checkbox value="claude">claude</n-checkbox>
+        </n-space>
+      </n-checkbox-group>
+    </n-card>
+
+    <n-card :title="t('discover.stepReview')">
+      <n-space vertical>
+        <n-alert :type="requiresOverwrite ? 'warning' : 'success'">
+          {{ requiresOverwrite ? t('discover.overwrite') : 'No selected skills require overwrite.' }}
+        </n-alert>
+        <n-checkbox v-model:checked="confirmOverwrite" :disabled="!requiresOverwrite">
+          Explicitly allow overwriting existing skills in this selection
+        </n-checkbox>
+        <n-button type="primary" :disabled="!canInstall" @click="install">
+          {{ t('common.install') }} {{ selected.length }}
+        </n-button>
+      </n-space>
+    </n-card>
+  </n-space>
 </template>

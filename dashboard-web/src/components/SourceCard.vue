@@ -1,12 +1,36 @@
 <script setup lang="ts">
 import type { SourceGroup } from '../composables/useApi';
+
 defineProps<{ source: SourceGroup; selected: string[] }>();
 defineEmits<{ update: [key: string, skills?: string[]]; discover: [url: string]; toggle: [key: string, skill: string] }>();
 </script>
+
 <template>
-  <article class="card source-card">
-    <div><strong>{{ source.url }}</strong><span v-if="source.ref" class="pill">{{ source.ref }}</span></div>
-    <div class="check-list"><label v-for="candidate in source.skills" :key="candidate.skill"><input type="checkbox" :checked="selected.includes(candidate.skill)" @change="$emit('toggle', source.key, candidate.skill)"> {{ candidate.skill }} <code>{{ candidate.subpath }}</code></label></div>
-    <div class="toolbar"><button @click="$emit('update', source.key)">Update all</button><button :disabled="!selected.length" @click="$emit('update', source.key, selected)">Update selected</button><button @click="$emit('discover', source.url)">Discover more</button></div>
-  </article>
+  <n-card class="source-card" size="small">
+    <template #header>
+      <n-space align="center" justify="space-between">
+        <n-ellipsis style="max-width: 520px">{{ source.url }}</n-ellipsis>
+        <n-tag v-if="source.ref" size="small" round>{{ source.ref }}</n-tag>
+      </n-space>
+    </template>
+
+    <n-space vertical>
+      <n-list hoverable clickable>
+        <n-list-item v-for="candidate in source.skills" :key="candidate.skill">
+          <n-checkbox :checked="selected.includes(candidate.skill)" @update:checked="$emit('toggle', source.key, candidate.skill)">
+            <n-space vertical :size="2">
+              <n-text strong>{{ candidate.skill }}</n-text>
+              <n-code :code="candidate.subpath" word-wrap />
+            </n-space>
+          </n-checkbox>
+        </n-list-item>
+      </n-list>
+
+      <n-space wrap>
+        <n-button @click="$emit('update', source.key)">Update all</n-button>
+        <n-button :disabled="!selected.length" type="primary" @click="$emit('update', source.key, selected)">Update selected</n-button>
+        <n-button tertiary @click="$emit('discover', source.url)">Discover more</n-button>
+      </n-space>
+    </n-space>
+  </n-card>
 </template>
