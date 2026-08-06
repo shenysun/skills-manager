@@ -26,7 +26,6 @@ function startOperation(options?: OperationOptions) {
   if (!options?.label) return null;
   const operation = { id: nextOperationId++, label: options.label, startedAt: Date.now() };
   activeOperations.value = [...activeOperations.value, operation];
-  logText.value = `${options.label}…`;
   return operation.id;
 }
 

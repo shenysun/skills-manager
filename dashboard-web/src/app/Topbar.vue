@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { currentOperationLabel, isBusy, refreshState, state } from '../composables/useApi';
 import { useLocale } from '../composables/useLocale';
@@ -14,7 +14,15 @@ const themeOptions = computed(() => [
   { label: t('app.light'), value: 'light' },
   { label: t('app.dark'), value: 'dark' },
 ]);
-const refresh = () => refreshState({ label: t('loading.refreshing') });
+const refreshLoading = ref(false);
+async function refresh() {
+  refreshLoading.value = true;
+  try {
+    await refreshState({ label: t('loading.refreshing') });
+  } finally {
+    refreshLoading.value = false;
+  }
+}
 </script>
 
 <template>
@@ -24,15 +32,13 @@ const refresh = () => refreshState({ label: t('loading.refreshing') });
       <n-text depth="3">{{ state?.package?.info?.name || '@shenysun/skills-manager' }}</n-text>
     </div>
     <n-space align="center" wrap>
-      <n-tag v-if="isBusy" type="info" round class="operation-status">
-        <n-space :size="6" align="center" inline>
-          <n-spin size="small" />
-          <span>{{ currentOperationLabel || t('loading.working') }}</span>
-        </n-space>
-      </n-tag>
       <n-select v-model:value="locale" :options="localeOptions" :aria-label="t('app.language')" style="width: 132px" />
       <n-select v-model:value="theme" :options="themeOptions" :aria-label="t('app.theme')" style="width: 132px" />
-      <n-button type="primary" :loading="isBusy" @click="refresh">{{ t('app.refresh') }}</n-button>
+      <n-button type="primary" :loading="refreshLoading" @click="refresh">{{ t('app.refresh') }}</n-button>
     </n-space>
+    <div v-if="isBusy" class="operation-bar" role="status" aria-live="polite">
+      <span class="operation-bar__text">{{ currentOperationLabel || t('loading.working') }}</span>
+      <span class="operation-bar__track"><span /></span>
+    </div>
   </div>
 </template>

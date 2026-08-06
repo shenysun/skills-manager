@@ -38,6 +38,7 @@ body,
 }
 
 .topbar {
+  position: relative;
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -74,5 +75,50 @@ body,
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+.operation-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  display: grid;
+  gap: 2px;
+  padding: 0 22px 4px;
+  pointer-events: none;
+}
+
+.operation-bar__text {
+  justify-self: end;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.82;
+}
+
+.operation-bar__track {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand) 13%, transparent);
+}
+
+.operation-bar__track > span {
+  position: absolute;
+  inset-block: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  animation: operation-bar-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes operation-bar-slide {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(280%);
   }
 }

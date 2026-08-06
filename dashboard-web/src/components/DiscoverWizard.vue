@@ -96,9 +96,7 @@ async function install() {
         <n-alert v-if="discovered.length" type="info" :show-icon="false">
           {{ t('discover.discovered', { count: discovered.length }) }}
         </n-alert>
-        <n-spin :show="discovering || installing">
-          <n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
-        </n-spin>
+<n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
       </n-space>
     </n-card>
 
