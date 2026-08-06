@@ -105,6 +105,29 @@ export async function addFromSource(source: string, opts: { list?: boolean; all?
 }
 
 
+
+export function discoverFromSource(source: string) {
+  const sourceInfo = checkoutSource(source);
+  const discovered = discoverSkills(sourceInfo);
+  return { sourceInfo, discovered };
+}
+
+export async function installFromSourceSelection(source: string, subpaths: string[], consumerValues: string[], opts: { yes?: boolean } = {}) {
+  const { sourceInfo, discovered } = discoverFromSource(source);
+  const requested = new Set(subpaths);
+  const selected = discovered.filter((skill) => requested.has(skill.subpath) || requested.has(skill.name));
+  const missing = [...requested].filter((value) => !selected.some((skill) => skill.subpath === value || skill.name === value));
+  if (missing.length > 0) throw new Error(`未找到指定 skill：${missing.join(', ')}`);
+  assertUniqueSkillDestinations(selected);
+  const consumers = parseConsumers(consumerValues, [...CONSUMERS]);
+  const existing = selected.filter((skill) => existsSync(skillDir(skill.name)));
+  if (existing.length > 0 && !(await confirm(`以下 skill 已存在，将覆盖更新：${existing.map((skill) => skill.name).join(', ')}。继续吗？`, opts.yes))) return [];
+  for (const skill of selected) copySkillToCanonical(skill, sourceInfo, consumers);
+  rebuildViews();
+  rebuildCollections();
+  return selected;
+}
+
 type UpdateCandidate = {
   skill: string;
   url: string;
@@ -122,7 +145,7 @@ type SourceGroup = {
   skills: UpdateCandidate[];
 };
 
-function updateCandidatesFromRegistry(): UpdateCandidate[] {
+export function updateCandidatesFromRegistry(): UpdateCandidate[] {
   const registry = loadRegistry();
   const candidates: UpdateCandidate[] = [];
   for (const [skill, entry] of Object.entries(registry.skills || {})) {
@@ -147,7 +170,7 @@ function sourceKey(url: string, ref?: string) {
   return `${url}#${ref || ''}`;
 }
 
-function groupUpdateCandidates(candidates: UpdateCandidate[]): SourceGroup[] {
+export function groupUpdateCandidates(candidates: UpdateCandidate[]): SourceGroup[] {
   const groups = new Map<string, SourceGroup>();
   for (const candidate of candidates) {
     const key = sourceKey(candidate.url, candidate.ref);
@@ -158,7 +181,7 @@ function groupUpdateCandidates(candidates: UpdateCandidate[]): SourceGroup[] {
   return [...groups.values()].sort((a, b) => a.url.localeCompare(b.url) || (a.ref || '').localeCompare(b.ref || ''));
 }
 
-function printUpdatePlan(candidates: UpdateCandidate[]) {
+export function printUpdatePlan(candidates: UpdateCandidate[]) {
   console.log(table([
     ['Skill', '来源', '路径'],
     ...candidates.map((candidate) => [
@@ -206,7 +229,7 @@ export async function updateBySkillNames(skillNames: string[], opts: { yes?: boo
   await updateRegistrySkills(skillNames.map((skill) => byName.get(skill)!), opts);
 }
 
-async function updateMenu() {
+export async function updateMenu() {
   const candidates = updateCandidatesFromRegistry();
   if (candidates.length === 0) throw new Error('没有可更新的 skill。请先在 registry.yaml 中补充 source.url 和 source.subpath。');
 

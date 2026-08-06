@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { addFromSource, adopt, expose, hide, installGitDeprecated, listCommand, menu, updateGit } from './commands.js';
 import { doctor, rebuildCollections, rebuildViews } from './views.js';
+import { startAdminServer } from './admin/server.js';
 
 const program = new Command();
 program
@@ -13,6 +14,7 @@ program
 
 program.command('menu').description('打开交互式菜单').action(menu);
 program.command('doctor').description('运行健康检查').action(doctor);
+program.command('admin').description('启动本地可视化后台').option('-p, --port <port>', '端口', '4777').option('--host <host>', '监听地址', '127.0.0.1').option('--no-open', '不自动打开浏览器').action((opts) => startAdminServer({ port: Number(opts.port), host: opts.host, open: opts.open }));
 program.command('list').description('列出 skills').option('-c, --consumer <consumer>', '只显示指定消费者：agents 或 claude').option('--category <category>', '只显示指定分类').action(listCommand);
 program.command('rebuild-views').description('根据 registry.yaml 重建 views').action(() => { rebuildViews(); console.log('views 已重建'); });
 program.command('rebuild-collections').description('根据 registry.yaml 重建 collections').action(() => { rebuildCollections(); console.log('collections 已重建'); });

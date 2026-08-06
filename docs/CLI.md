@@ -20,6 +20,15 @@ skills doctor
 
 ## 命令
 
+### 可视化后台
+
+```zsh
+"$SKILL_HOME/bin/skills" admin
+"$SKILL_HOME/bin/skills" admin --port 4777 --host 127.0.0.1
+```
+
+后台支持中文 / English，并可视化完成：浏览、搜索、按来源更新、批量更新、发现并安装、暴露/隐藏消费者。
+
 ### 交互式菜单
 
 ```zsh
@@ -151,3 +160,21 @@ git commit -m "Describe skill change"
 
 - `install-git` 旧命令仍作为隐藏兼容命令存在，但不再出现在 help、菜单或文档主流程中；新安装请使用 `skills add <source>`。
 - live switch / rollback 不再暴露在 CLI 中，避免在正式切换前误操作 `~/.agents/skills` 或 `~/.claude/skills`。
+
+## 发布 npm 包
+
+当前包名配置为 `@sunyongshen/skills`，CLI bin 名称为 `skills`。发布前请确认你拥有该 npm scope；如果没有，请修改 `package.json` 的 `name`。
+
+```zsh
+pm run build
+npm pack --dry-run
+npm publish --access public
+```
+
+发布后安装：
+
+```zsh
+npm i -g @sunyongshen/skills
+skills doctor
+skills admin
+```

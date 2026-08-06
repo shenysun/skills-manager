@@ -29,6 +29,7 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 
 ```zsh
 export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
+"$SKILL_HOME/bin/skills" admin
 "$SKILL_HOME/bin/skills" menu
 "$SKILL_HOME/bin/skills" doctor
 "$SKILL_HOME/bin/skills" add owner/repo --list
