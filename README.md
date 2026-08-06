@@ -25,7 +25,7 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 
 ## CLI
 
-Use the TypeScript/Inquirer CLI for day-to-day operations:
+日常操作推荐使用 TypeScript/Inquirer CLI：
 
 ```zsh
 export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
@@ -34,4 +34,4 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 "$SKILL_HOME/bin/skillctl" switch --dry-run
 ```
 
-See `docs/CLI.md` for all commands.
+完整命令见 `docs/CLI.md`。

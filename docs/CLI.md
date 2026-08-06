@@ -1,15 +1,15 @@
 # skillctl CLI
 
-`skillctl` is the command interface for this central skill repository.
+`skillctl` 是中央 skill 仓库的命令行管理工具，基于 TypeScript、Commander 和 Inquirer。
 
-## Entry point
+## 入口
 
 ```zsh
 export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 "$SKILL_HOME/bin/skillctl" doctor
 ```
 
-Optional global install from this repo:
+也可以从仓库本地全局链接：
 
 ```zsh
 cd "$SKILL_HOME"
@@ -18,21 +18,21 @@ npm link
 skillctl doctor
 ```
 
-## Commands
+## 命令
 
-### Interactive menu
+### 交互式菜单
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" menu
 ```
 
-### Health check
+### 健康检查
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" doctor
 ```
 
-### List skills
+### 列出 skills
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" list
@@ -41,85 +41,76 @@ skillctl doctor
 "$SKILL_HOME/bin/skillctl" list --category coding
 ```
 
-### Switch live entry points
+### 切换线上入口
 
-Preview:
+预览，不执行：
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" switch --dry-run
 ```
 
-Execute without prompt:
+直接执行，跳过确认：
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" switch --yes
 ```
 
-### Rollback live entry points
+### 回滚线上入口
 
-Interactive:
+交互式选择备份：
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" rollback
 ```
 
-By timestamp:
+指定时间戳：
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" rollback YYYYMMDD-HHMMSS --yes
 ```
 
-### Rebuild generated links
+### 重建生成链接
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" rebuild-views
 "$SKILL_HOME/bin/skillctl" rebuild-collections
 ```
 
-### Expose or hide a skill
+### 暴露或隐藏 skill
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" expose ask-matt agents claude
 "$SKILL_HOME/bin/skillctl" hide ask-matt claude
 ```
 
-### Install from Git
+### 从 Git 安装
 
 ```zsh
-"$SKILL_HOME/bin/skillctl" install-git \
-  foo-skill \
-  https://github.com/someone/some-skills.git \
-  skills/foo-skill \
-  agents claude
+"$SKILL_HOME/bin/skillctl" install-git   foo-skill   https://github.com/someone/some-skills.git   skills/foo-skill   agents claude
 ```
 
-### Update from Git
+### 从 Git 更新
 
-Use registry source metadata:
+读取 `registry.yaml` 中的来源：
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" update-git foo-skill
 ```
 
-Override source metadata for this update:
+临时覆盖来源：
 
 ```zsh
-"$SKILL_HOME/bin/skillctl" update-git \
-  foo-skill \
-  https://github.com/someone/some-skills.git \
-  skills/foo-skill
+"$SKILL_HOME/bin/skillctl" update-git   foo-skill   https://github.com/someone/some-skills.git   skills/foo-skill
 ```
 
-### Adopt a skill installed into a view
-
-If another installer creates a real directory under `views/agents` or `views/claude`:
+### 收编 installer 安装到 view 的真实目录
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" adopt agents new-skill claude
 "$SKILL_HOME/bin/skillctl" adopt claude new-skill agents
 ```
 
-## Standard finish after changes
+## 标准收尾
 
 ```zsh
 cd "$SKILL_HOME"
