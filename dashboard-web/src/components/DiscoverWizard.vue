@@ -2,11 +2,13 @@
 import { computed, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { NCheckbox, NCode, NTag, NText, type DataTableColumns } from 'naive-ui';
-import { api, runApi, state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 type Discovered = { name: string; title: string; description: string; subpath: string };
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const source = ref(localStorage.getItem('skills-manager-last-source') || '');
 if (source.value) localStorage.removeItem('skills-manager-last-source');
 
@@ -55,7 +57,7 @@ const columns = computed<DataTableColumns<Discovered>>(() => [
 async function discover() {
   discovering.value = true;
   try {
-    const result = await runApi(() => api<{ discovered: Discovered[] }>('/api/discover', { method: 'POST', body: JSON.stringify({ source: source.value }) }), { label: t('loading.discovering') });
+    const result = await runWithNotification(() => api<{ discovered: Discovered[] }>('/api/discover', { method: 'POST', body: JSON.stringify({ source: source.value }) }), { loading: t('loading.discovering'), success: t('notification.discoverDone'), error: t('notification.failed') });
     discovered.value = result.discovered;
     selected.value = [];
     confirmOverwrite.value = false;
@@ -67,7 +69,7 @@ async function discover() {
 async function install() {
   installing.value = true;
   try {
-    await runApi(() => api('/api/install', {
+    await runWithNotification(() => api('/api/install', {
       method: 'POST',
       body: JSON.stringify({
         source: source.value,
@@ -75,7 +77,7 @@ async function install() {
         consumers: consumers.value,
         overwrite: requiresOverwrite.value && confirmOverwrite.value,
       }),
-    }), { label: t('loading.installing') });
+    }), { loading: t('loading.installing'), success: t('notification.installDone'), error: t('notification.failed') });
   } finally {
     installing.value = false;
   }

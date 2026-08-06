@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n';
 import SkillTable from '../components/SkillTable.vue';
 import SkillDrawer from '../components/SkillDrawer.vue';
 import LogPanel from '../components/LogPanel.vue';
-import { api, runApi, state, type Skill } from '../composables/useApi';
+import { api, state, type Skill } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const search = ref('');
 const consumer = ref<string | null>(null);
 const selected = ref<string[]>([]);
@@ -24,20 +26,20 @@ function toggle(name: string) {
   selected.value = selected.value.includes(name) ? selected.value.filter((skill) => skill !== name) : [...selected.value, name];
 }
 
-async function runSkillAction<T>(action: string, label: string, fn: () => Promise<T>) {
+async function runSkillAction<T>(action: string, loading: string, success: string, fn: () => Promise<T>) {
   busyAction.value = action;
   try {
-    return await runApi(fn, { label });
+    return await runWithNotification(fn, { loading, success, error: t('notification.failed') });
   } finally {
     busyAction.value = '';
   }
 }
 
-const updateSelected = () => runSkillAction('update-selected', t('loading.updatingSelected'), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: selected.value }) }));
-const updateOne = (skill: string) => runSkillAction(`update-${skill}`, t('loading.updatingSkill', { skill }), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: [skill] }) }));
-const expose = (consumerName: string, only?: string) => runSkillAction(`expose-${consumerName}`, t('loading.exposing'), () => api('/api/skills/expose', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value, consumer: consumerName }) }));
-const hide = (consumerName: string, only?: string) => runSkillAction(`hide-${consumerName}`, t('loading.hiding'), () => api('/api/skills/hide', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value, consumer: consumerName }) }));
-const archive = (only?: string) => runSkillAction('archive', t('loading.archiving'), () => api('/api/skills/archive', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value }) }));
+const updateSelected = () => runSkillAction('update-selected', t('loading.updatingSelected'), t('notification.updateDone'), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: selected.value }) }));
+const updateOne = (skill: string) => runSkillAction(`update-${skill}`, t('loading.updatingSkill', { skill }), t('notification.updateDone'), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: [skill] }) }));
+const expose = (consumerName: string, only?: string) => runSkillAction(`expose-${consumerName}`, t('loading.exposing'), t('notification.exposeDone'), () => api('/api/skills/expose', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value, consumer: consumerName }) }));
+const hide = (consumerName: string, only?: string) => runSkillAction(`hide-${consumerName}`, t('loading.hiding'), t('notification.hideDone'), () => api('/api/skills/hide', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value, consumer: consumerName }) }));
+const archive = (only?: string) => runSkillAction('archive', t('loading.archiving'), t('notification.archiveDone'), () => api('/api/skills/archive', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value }) }));
 </script>
 
 <template>

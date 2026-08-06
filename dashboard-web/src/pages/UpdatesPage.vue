@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n';
 import UpdatePlan from '../components/UpdatePlan.vue';
 import DiscoverWizard from '../components/DiscoverWizard.vue';
 import LogPanel from '../components/LogPanel.vue';
-import { api, runApi, state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const tab = ref('skill');
 const selected = ref<string[]>([]);
 const updatingSkills = ref(false);
@@ -15,7 +17,7 @@ const updatingSource = reactive<Record<string, boolean>>({});
 async function updateSkills() {
   updatingSkills.value = true;
   try {
-    await runApi(() => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: selected.value }) }), { label: t('loading.updatingSelected') });
+    await runWithNotification(() => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: selected.value }) }), { loading: t('loading.updatingSelected'), success: t('notification.updateDone'), error: t('notification.failed') });
   } finally {
     updatingSkills.value = false;
   }
@@ -24,7 +26,7 @@ async function updateSkills() {
 async function updateSource(key: string) {
   updatingSource[key] = true;
   try {
-    await runApi(() => api('/api/update/source', { method: 'POST', body: JSON.stringify({ key }) }), { label: t('loading.updatingSource') });
+    await runWithNotification(() => api('/api/update/source', { method: 'POST', body: JSON.stringify({ key }) }), { loading: t('loading.updatingSource'), success: t('notification.updateDone'), error: t('notification.failed') });
   } finally {
     updatingSource[key] = false;
   }

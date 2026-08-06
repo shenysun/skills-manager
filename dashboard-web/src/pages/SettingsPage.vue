@@ -2,14 +2,16 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import LogPanel from '../components/LogPanel.vue';
-import { api, runApi, state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const packing = ref(false);
 async function pack() {
   packing.value = true;
   try {
-    await runApi(() => api('/api/package/dry-run', { method: 'POST', body: JSON.stringify({}) }), { label: t('loading.packing') });
+    await runWithNotification(() => api('/api/package/dry-run', { method: 'POST', body: JSON.stringify({}) }), { loading: t('loading.packing'), success: t('notification.packageDone'), error: t('notification.failed') });
   } finally {
     packing.value = false;
   }

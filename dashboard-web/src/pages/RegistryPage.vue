@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import LogPanel from '../components/LogPanel.vue';
-import { api, runApi, state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const skill = ref('');
 const title = ref('');
 const category = ref('');
@@ -33,7 +35,7 @@ function load(name: string) {
 async function save() {
   saving.value = true;
   try {
-    await runApi(() => api('/api/registry/edit', {
+    await runWithNotification(() => api('/api/registry/edit', {
       method: 'POST',
       body: JSON.stringify({
         skill: skill.value,
@@ -45,7 +47,7 @@ async function save() {
           source: { url: sourceUrl.value, subpath: sourceSubpath.value, ref: sourceRef.value, upstream_commit: sourceCommit.value },
         },
       }),
-    }), { label: t('loading.savingRegistry') });
+    }), { loading: t('loading.savingRegistry'), success: t('notification.registrySaved'), error: t('notification.failed') });
   } finally {
     saving.value = false;
   }

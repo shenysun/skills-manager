@@ -3,9 +3,11 @@ import { reactive } from 'vue';
 import { useI18n } from 'vue-i18n';
 import SourceCard from '../components/SourceCard.vue';
 import LogPanel from '../components/LogPanel.vue';
-import { api, runApi, state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const selectedBySource = reactive<Record<string, string[]>>({});
 const loadingBySource = reactive<Record<string, boolean>>({});
 
@@ -18,7 +20,7 @@ async function update(key: string, skills?: string[]) {
   const loadingKey = `${key}:${skills ? 'selected' : 'all'}`;
   loadingBySource[loadingKey] = true;
   try {
-    await runApi(() => api('/api/update/source', { method: 'POST', body: JSON.stringify({ key, skills }) }), { label: skills ? t('loading.updatingSourceSelected') : t('loading.updatingSource') });
+    await runWithNotification(() => api('/api/update/source', { method: 'POST', body: JSON.stringify({ key, skills }) }), { loading: skills ? t('loading.updatingSourceSelected') : t('loading.updatingSource'), success: t('notification.updateDone'), error: t('notification.failed') });
   } finally {
     loadingBySource[loadingKey] = false;
   }

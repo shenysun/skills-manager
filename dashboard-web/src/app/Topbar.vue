@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useNotification } from 'naive-ui';
 import { useI18n } from 'vue-i18n';
 import { isBusy, refreshState, state } from '../composables/useApi';
 import { useLocale } from '../composables/useLocale';
 import { useTheme } from '../composables/useTheme';
 
 const { t } = useI18n();
+const notification = useNotification();
 const { locale } = useLocale();
 const { theme } = useTheme();
 const localeOptions = [{ label: '中文', value: 'zh-CN' }, { label: 'English', value: 'en-US' }];
@@ -19,6 +21,9 @@ async function refresh() {
   refreshLoading.value = true;
   try {
     await refreshState({ label: t('loading.refreshing') });
+    notification.success({ title: t('notification.refreshDone'), duration: 2200, keepAliveOnHover: true });
+  } catch (error) {
+    notification.error({ title: t('notification.failed'), content: error instanceof Error ? error.message : String(error), duration: 5200, keepAliveOnHover: true });
   } finally {
     refreshLoading.value = false;
   }

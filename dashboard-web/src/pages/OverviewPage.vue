@@ -4,14 +4,16 @@ import { useI18n } from 'vue-i18n';
 import StatusBadge from '../components/StatusBadge.vue';
 import EmptyState from '../components/EmptyState.vue';
 import LogPanel from '../components/LogPanel.vue';
-import { api, runApi, state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
 const doctorLoading = ref(false);
 async function runDoctor() {
   doctorLoading.value = true;
   try {
-    await runApi(() => api('/api/doctor'), { label: t('loading.runningDoctor') });
+    await runWithNotification(() => api('/api/doctor'), { loading: t('loading.runningDoctor'), success: t('notification.doctorDone'), error: t('notification.failed') });
   } finally {
     doctorLoading.value = false;
   }
