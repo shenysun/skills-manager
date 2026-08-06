@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import YAML from 'yaml';
+import { table } from 'table';
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, symlinkSync, unlinkSync, writeFileSync, statSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
@@ -302,10 +303,24 @@ function listCommand(opts: { consumer?: Consumer; category?: string }) {
   const rows = Object.entries(registry.skills || {})
     .filter(([skill, entry]) => skillExists(skill) && (!opts.consumer || (entry.consumers || []).includes(opts.consumer)) && (!opts.category || entry.category === opts.category))
     .sort(([a], [b]) => a.localeCompare(b));
-  for (const [skill, entry] of rows) {
-    const consumers = (entry.consumers || []).join(',') || '-';
-    console.log(`${skill}\t${entry.category || 'experimental'}\t${consumers}`);
-  }
+
+  const data = [
+    ['Skill', '分类', '消费者'],
+    ...rows.map(([skill, entry]) => [
+      skill,
+      entry.category || 'experimental',
+      (entry.consumers || []).join(', ') || '-',
+    ]),
+  ];
+
+  console.log(table(data, {
+    columns: {
+      0: { alignment: 'left' },
+      1: { alignment: 'left' },
+      2: { alignment: 'left' },
+    },
+    drawHorizontalLine: (lineIndex, rowCount) => lineIndex === 0 || lineIndex === 1 || lineIndex === rowCount,
+  }).trimEnd());
 }
 
 function setConsumers(skill: string, consumers: Consumer[]) {

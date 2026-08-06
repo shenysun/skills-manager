@@ -15,6 +15,7 @@
   "dependencies": {
     "commander": "^15.0.0",
     "inquirer": "^14.0.2",
+    "table": "^6.9.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
