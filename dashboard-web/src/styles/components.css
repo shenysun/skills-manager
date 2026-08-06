@@ -11,3 +11,25 @@ pre,
 .n-code {
   font-family: "SFMono-Regular", Consolas, monospace;
 }
+
+.source-expand {
+  display: grid;
+  gap: 8px;
+  padding: 10px 8px 12px 42px;
+}
+
+.source-skill-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+
+.source-skill-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
