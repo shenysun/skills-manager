@@ -1,0 +1,6 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+SCRIPT_PATH="${0:A}"
+ROOT="${SCRIPT_PATH:h:h}"
+export SKILL_HOME="${SKILL_HOME:-$ROOT}"
+exec "$ROOT/node_modules/.bin/tsx" "$ROOT/src/cli.ts" "$@"

@@ -22,3 +22,16 @@ export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
 "$SKILL_HOME/scripts/doctor.sh"
 "$SKILL_HOME/scripts/rebuild-views.sh"
 ```
+
+## CLI
+
+Use the TypeScript/Inquirer CLI for day-to-day operations:
+
+```zsh
+export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
+"$SKILL_HOME/bin/skillctl" menu
+"$SKILL_HOME/bin/skillctl" doctor
+"$SKILL_HOME/bin/skillctl" switch --dry-run
+```
+
+See `docs/CLI.md` for all commands.

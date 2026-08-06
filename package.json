@@ -1,0 +1,29 @@
+{
+  "name": "agent-skills",
+  "version": "1.0.0",
+  "description": "Central skill registry and CLI for agent/Claude skills",
+  "scripts": {
+    "skillctl": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "doctor": "tsx src/cli.ts doctor",
+    "menu": "tsx src/cli.ts menu"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "inquirer": "^14.0.2",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.7",
+    "typescript": "^7.0.2"
+  },
+  "private": true,
+  "bin": {
+    "skillctl": "./bin/skillctl"
+  }
+}
