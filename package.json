@@ -1,17 +1,20 @@
 {
-  "name": "@sunyongshen/skills",
+  "name": "@shenysun/skills-manager",
   "version": "0.1.0",
-  "description": "Central skill registry, CLI, and local web admin for agent/Claude skills",
+  "description": "Local-first CLI and dashboard for managing agent, Claude, and Codex skills",
   "scripts": {
-    "skills": "tsx src/cli.ts",
-    "build": "npm run clean && tsc -p tsconfig.json && vite build --config admin-web/vite.config.ts",
+    "skills-manager": "tsx src/cli.ts",
+    "build": "npm run clean && tsc -p tsconfig.json && vite build --config dashboard-web/vite.config.ts",
     "build:cli": "npm run clean && tsc -p tsconfig.json",
-    "build:web": "vite build --config admin-web/vite.config.ts",
-    "dev:web": "vite --config admin-web/vite.config.ts",
+    "build:web": "vite build --config dashboard-web/vite.config.ts",
+    "dev:web": "vite --config dashboard-web/vite.config.ts",
     "doctor": "tsx src/cli.ts doctor",
-    "menu": "tsx src/cli.ts menu",
-    "admin": "tsx src/cli.ts admin",
-    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+    "dashboard": "tsx src/cli.ts dashboard",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "smoke:core": "npm run build:cli && node scripts/smoke-core-services.mjs",
+    "smoke:cli": "npm run build:cli && node scripts/smoke-cli-resolution.mjs",
+    "smoke:api": "npm run build:cli && node scripts/smoke-dashboard-api.mjs",
+    "smoke:package": "npm run build && node scripts/smoke-package.mjs"
   },
   "keywords": [],
   "author": "",
@@ -21,8 +24,6 @@
     "@fastify/static": "^10.1.2",
     "commander": "^15.0.0",
     "fastify": "^5.11.2",
-    "inquirer": "^14.0.2",
-    "table": "^6.9.0",
     "vue": "^3.5.41",
     "vue-i18n": "^11.4.8",
     "yaml": "^2.9.0"
@@ -30,14 +31,13 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "@vitejs/plugin-vue": "^6.0.8",
-    "concurrently": "^10.0.4",
     "tsx": "^4.23.7",
     "typescript": "^7.0.2",
     "vite": "^8.2.0"
   },
   "private": false,
   "bin": {
-    "skills": "./dist/cli.js"
+    "skills-manager": "./dist/cli.js"
   },
   "files": [
     "dist",

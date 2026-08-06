@@ -1,0 +1,1 @@
+<script setup lang="ts">import { useI18n } from 'vue-i18n'; import DiscoverWizard from '../components/DiscoverWizard.vue'; import LogPanel from '../components/LogPanel.vue'; const { t } = useI18n();</script><template><section class="page-head"><h1>{{ t('discover.title') }}</h1></section><DiscoverWizard/><LogPanel/></template>

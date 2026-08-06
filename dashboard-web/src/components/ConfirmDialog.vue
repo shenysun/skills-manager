@@ -1,0 +1,1 @@
+<script setup lang="ts">defineProps<{ open: boolean; title: string; body?: string }>(); defineEmits<{ confirm: []; cancel: [] }>();</script><template><div v-if="open" class="dialog"><div class="card"><h3>{{ title }}</h3><p>{{ body }}</p><button @click="$emit('confirm')">OK</button><button @click="$emit('cancel')">Cancel</button></div></div></template>

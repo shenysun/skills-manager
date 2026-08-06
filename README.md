@@ -1,40 +1,67 @@
-# Agent Skills
+# Skills Manager
 
-Central source of truth for local agent and Claude skills.
+`@shenysun/skills-manager` is a local-first CLI and dashboard for managing agent, Claude, and Codex skills from a registry-driven skill home.
 
-## Layout
+## Install and run
 
-- `skills/`: canonical skill source directories. Keep this flat: `skills/<skill-name>/SKILL.md`.
-- `views/agents/`: symlink view exposed as `~/.agents/skills`.
-- `views/claude/`: symlink view exposed as `~/.claude/skills`.
-- `collections/`: browsing-only functional groupings, also symlinks.
-- `registry.yaml`: provenance, consumers, category, and update policy.
-- `scripts/`: install, update, adopt, rebuild, and doctor helpers.
+Use without installing globally:
 
-## Daily rule
+```sh
+npx @shenysun/skills-manager dashboard --home ~/.skills-manager
+```
 
-Install or update into `skills/`, expose through `views/`, record metadata in `registry.yaml`, then commit.
+Or install globally from a published package or packed tarball:
+
+```sh
+npm install -g @shenysun/skills-manager
+skills-manager dashboard --home ~/.skills-manager
+skills-manager doctor --home ~/.skills-manager
+```
+
+The dashboard opens a local Vue/Fastify control center by default. Use `--no-open` to keep the browser closed.
+
+## Skill home layout
+
+A skill home contains:
+
+- `skills/`: canonical skill directories, kept flat as `skills/<skill-name>/SKILL.md`
+- `views/`: generated consumer symlink trees such as `views/agents/` and `views/claude/`
+- `collections/`: generated category symlink trees
+- `registry.yaml`: metadata, provenance, consumers, category, source, and update policy
+- `.skills/activity.jsonl`: operation records written by the dashboard/CLI
+
+Skill home resolution priority:
+
+1. `--home <path>`
+2. `SKILL_HOME`
+3. current working directory when it already looks like a skill home
+4. `~/.skills-manager`, initialized automatically
 
 ## Common commands
 
-```zsh
-export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
-"$SKILL_HOME/scripts/doctor.sh"
-"$SKILL_HOME/scripts/rebuild-views.sh"
+```sh
+skills-manager dashboard --home ~/.skills-manager
+skills-manager doctor --home ~/.skills-manager
+skills-manager list --home ~/.skills-manager
+skills-manager add owner/repo --all --consumer agents --consumer claude --yes
+skills-manager update --plan
+skills-manager update --skill my-skill
+skills-manager expose agents my-skill
+skills-manager hide claude my-skill
+skills-manager archive old-skill
 ```
 
-## CLI
+Sources can be GitHub shorthand (`owner/repo`), Git URLs, GitHub tree URLs, or local paths.
 
-日常操作推荐使用 TypeScript/Inquirer CLI：
+## Development
 
-```zsh
-export SKILL_HOME="$HOME/Documents/Cheese/ai/agent-skills"
-"$SKILL_HOME/bin/skills" admin
-"$SKILL_HOME/bin/skills" menu
-"$SKILL_HOME/bin/skills" doctor
-"$SKILL_HOME/bin/skills" add owner/repo --list
+```sh
+npm install
+npm run build
+npm run smoke:core
+npm run smoke:cli
+npm run smoke:api
+npm run smoke:package
 ```
 
-更新入口在菜单里：`更新 skills（单个 / 批量 / 按来源）`。
-
-完整命令见 `docs/CLI.md`。
+See [`docs/CLI.md`](docs/CLI.md) for the full command reference and publish smoke-test workflow.

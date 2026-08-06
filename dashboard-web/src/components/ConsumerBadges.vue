@@ -1,0 +1,1 @@
+<script setup lang="ts">defineProps<{ consumers: string[] }>();</script><template><span v-for="c in consumers" :key="c" class="pill">{{ c }}</span><span v-if="!consumers.length" class="muted">—</span></template>

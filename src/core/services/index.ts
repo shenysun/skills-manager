@@ -1,0 +1,53 @@
+import { createSkillHome, SkillHomeService } from './skill-home-service.js';
+import { RegistryService } from './registry-service.js';
+import { SourceService } from './source-service.js';
+import { ViewService } from './view-service.js';
+import { InstallService } from './install-service.js';
+import { UpdateService } from './update-service.js';
+import { DoctorService } from './doctor-service.js';
+import { ActivityService } from './activity-service.js';
+import { PackageService } from './package-service.js';
+import { ArchiveService } from './archive-service.js';
+import { SkillHomeResolver } from './skill-home-resolver.js';
+import { AdoptService } from './adopt-service.js';
+import type { FileSystemPort } from '../ports/filesystem.js';
+import type { GitPort } from '../ports/git.js';
+import type { ProcessRunnerPort } from '../ports/process-runner.js';
+
+export type CoreServicesOptions = {
+  skillHomeRoot: string;
+  projectRoot: string;
+  fs: FileSystemPort;
+  git: GitPort;
+  processRunner: ProcessRunnerPort;
+  tempRoot?: string;
+};
+
+export function createCoreServices(options: CoreServicesOptions) {
+  const home = createSkillHome(options.skillHomeRoot);
+  const skillHome = new SkillHomeService(options.fs, home);
+  const registry = new RegistryService(options.fs, home);
+  const source = new SourceService(options.fs, options.git, options.tempRoot);
+  const views = new ViewService(options.fs, home, registry);
+  const install = new InstallService(options.fs, home, registry, source, views);
+  const update = new UpdateService(registry, source, install);
+  const doctor = new DoctorService(options.fs, options.git, home, registry, views);
+  const activity = new ActivityService(options.fs, options.git, home);
+  const archive = new ArchiveService(options.fs, home, registry, views);
+  const adopt = new AdoptService(options.fs, home, registry, views);
+  const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
+  return { home, skillHome, registry, source, views, install, update, doctor, activity, archive, adopt, package: packageService };
+}
+
+export { createSkillHome, SkillHomeService } from './skill-home-service.js';
+export { RegistryService } from './registry-service.js';
+export { SourceService } from './source-service.js';
+export { ViewService } from './view-service.js';
+export { InstallService } from './install-service.js';
+export { UpdateService } from './update-service.js';
+export { DoctorService } from './doctor-service.js';
+export { ActivityService } from './activity-service.js';
+export { PackageService } from './package-service.js';
+export { ArchiveService } from './archive-service.js';
+export { SkillHomeResolver } from './skill-home-resolver.js';
+export { AdoptService } from './adopt-service.js';
