@@ -1,6 +1,6 @@
 import fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,12 +17,30 @@ export type DashboardServerOptions = RuntimeOptions & {
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function staticRoot() {
+function hasDashboardIndex(candidate: string) {
+  return existsSync(path.join(candidate, 'index.html'));
+}
+
+function buildDashboardWeb(projectRoot?: string) {
+  if (!projectRoot) return;
+  const sourceRoot = path.resolve(projectRoot, 'dashboard-web');
+  const viteBin = path.resolve(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
+  if (!existsSync(path.join(sourceRoot, 'vite.config.ts')) || !existsSync(viteBin)) return;
+  console.log('Dashboard build output not found. Building dashboard web assets...');
+  execFileSync(process.execPath, [viteBin, 'build', '--config', path.join(sourceRoot, 'vite.config.ts')], { cwd: projectRoot, stdio: 'inherit' });
+}
+
+function staticRoot(projectRoot?: string) {
   const candidates = [
     path.resolve(dirname, '..', '..', 'dashboard-web'),
+    projectRoot ? path.resolve(projectRoot, 'dist', 'dashboard-web') : '',
     path.resolve(process.cwd(), 'dist', 'dashboard-web'),
-  ];
-  const found = candidates.find((candidate) => existsSync(path.join(candidate, 'index.html')));
+  ].filter(Boolean);
+  let found = candidates.find((candidate) => hasDashboardIndex(candidate));
+  if (!found) {
+    buildDashboardWeb(projectRoot);
+    found = candidates.find((candidate) => hasDashboardIndex(candidate));
+  }
   if (!found) throw new Error('Dashboard build output not found. Run npm run build first.');
   return found;
 }
@@ -211,7 +229,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
 
 export async function startDashboardServer(options: DashboardServerOptions) {
   const app = createDashboardApp(options);
-  await app.register(fastifyStatic, { root: staticRoot(), prefix: '/' });
+  await app.register(fastifyStatic, { root: staticRoot(options.projectRoot), prefix: '/' });
   app.setNotFoundHandler((_request, reply) => reply.sendFile('index.html'));
   await app.listen({ port: options.port, host: options.host });
   const url = `http://${options.host === '0.0.0.0' ? 'localhost' : options.host}:${options.port}`;
