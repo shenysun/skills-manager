@@ -83,7 +83,44 @@ skillctl doctor
 "$SKILL_HOME/bin/skillctl" hide ask-matt claude
 ```
 
-### 从 Git 安装
+
+### 按来源发现并安装 skills（推荐）
+
+这种方式更接近 `npx skills` 的使用体验：先给 Git URL / GitHub 仓库 / 本地路径，CLI 自动发现 `SKILL.md`，再让你选择要安装的 skill。
+
+只查看可安装项：
+
+```zsh
+"$SKILL_HOME/bin/skillctl" add https://github.com/owner/repo.git --list
+"$SKILL_HOME/bin/skillctl" add owner/repo --list
+"$SKILL_HOME/bin/skillctl" add /absolute/path/to/repo --list
+```
+
+交互选择安装：
+
+```zsh
+"$SKILL_HOME/bin/skillctl" add owner/repo
+```
+
+安装全部：
+
+```zsh
+"$SKILL_HOME/bin/skillctl" add owner/repo --all --consumer agents claude
+```
+
+只安装指定 skill：
+
+```zsh
+"$SKILL_HOME/bin/skillctl" add owner/repo --skill ask-matt --consumer agents claude
+```
+
+支持 GitHub tree URL，会从指定子路径开始发现：
+
+```zsh
+"$SKILL_HOME/bin/skillctl" add https://github.com/owner/repo/tree/main/skills --list
+```
+
+### 从 Git 安装（旧方式）
 
 ```zsh
 "$SKILL_HOME/bin/skillctl" install-git   foo-skill   https://github.com/someone/some-skills.git   skills/foo-skill   agents claude

@@ -33,6 +33,22 @@ type SkillEntry = {
 };
 type Registry = { skills: Record<string, SkillEntry> };
 
+type DiscoveredSkill = {
+  name: string;
+  title: string;
+  description: string;
+  subpath: string;
+  absoluteDir: string;
+};
+
+type SourceInfo = {
+  repoUrl: string;
+  repoDir: string;
+  baseSubpath?: string;
+  commit: string | null;
+  isLocal: boolean;
+};
+
 function p(...parts: string[]) {
   return path.join(SKILL_HOME, ...parts);
 }
@@ -345,6 +361,179 @@ function hide(skill: string, consumers: Consumer[]) {
   setConsumers(skill, current.filter((c) => !consumers.includes(c)));
 }
 
+
+function parseSkillFrontmatter(file: string): { name?: string; description?: string } {
+  const text = readFileSync(file, 'utf8');
+  const match = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  if (!match) return {};
+  const parsed = YAML.parse(match[1]) as { name?: string; description?: string } | null;
+  return parsed || {};
+}
+
+function normalizeSource(source: string): { repoUrl: string; baseSubpath?: string; isLocal: boolean } {
+  if (existsSync(source)) {
+    return { repoUrl: path.resolve(source), isLocal: true };
+  }
+
+  // GitHub shorthand: owner/repo
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(source)) {
+    return { repoUrl: `https://github.com/${source}.git`, isLocal: false };
+  }
+
+  // GitHub tree URL: https://github.com/owner/repo/tree/branch/path/to/skills
+  const githubTree = source.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/?(.*)$/);
+  if (githubTree) {
+    const [, owner, repo, _branch, rest] = githubTree;
+    return { repoUrl: `https://github.com/${owner}/${repo}.git`, baseSubpath: rest || undefined, isLocal: false };
+  }
+
+  // GitHub repo URL without .git
+  const githubRepo = source.match(/^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/);
+  if (githubRepo) {
+    const [, owner, repo] = githubRepo;
+    return { repoUrl: `https://github.com/${owner}/${repo.replace(/\.git$/, '')}.git`, isLocal: false };
+  }
+
+  return { repoUrl: source, isLocal: false };
+}
+
+function checkoutSource(source: string): SourceInfo {
+  const normalized = normalizeSource(source);
+  if (normalized.isLocal) {
+    const commit = existsSync(path.join(normalized.repoUrl, '.git'))
+      ? run('git', ['-C', normalized.repoUrl, 'rev-parse', 'HEAD'], { quiet: true })
+      : null;
+    return { ...normalized, repoDir: normalized.repoUrl, commit };
+  }
+
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'skillctl-source-'));
+  const repoDir = path.join(tmp, 'repo');
+  run('git', ['clone', normalized.repoUrl, repoDir], { cwd: tmp });
+  const commit = run('git', ['-C', repoDir, 'rev-parse', 'HEAD'], { quiet: true });
+  return { ...normalized, repoDir, commit };
+}
+
+function shouldSkipDiscoverDir(dirName: string) {
+  return ['.git', 'node_modules', 'dist', 'build', '.next', '.turbo'].includes(dirName);
+}
+
+function discoverSkills(source: SourceInfo): DiscoveredSkill[] {
+  const baseDir = source.baseSubpath ? path.join(source.repoDir, source.baseSubpath) : source.repoDir;
+  if (!existsSync(baseDir)) throw new Error(`发现路径不存在：${baseDir}`);
+  const found: DiscoveredSkill[] = [];
+  const walk = (dir: string) => {
+    const skillFile = path.join(dir, 'SKILL.md');
+    if (existsSync(skillFile)) {
+      const fm = parseSkillFrontmatter(skillFile);
+      const fallbackName = path.basename(dir);
+      const name = String(fm.name || fallbackName).trim();
+      found.push({
+        name,
+        title: name,
+        description: String(fm.description || '').trim(),
+        subpath: path.relative(source.repoDir, dir).split(path.sep).join('/'),
+        absoluteDir: dir,
+      });
+      return;
+    }
+    for (const item of readdirSync(dir)) {
+      if (shouldSkipDiscoverDir(item)) continue;
+      const full = path.join(dir, item);
+      if (lstatSync(full).isDirectory()) walk(full);
+    }
+  };
+  walk(baseDir);
+  return found.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function printDiscoveredSkills(skills: DiscoveredSkill[]) {
+  const data = [
+    ['Skill', '路径', 'Description'],
+    ...skills.map((skill) => [skill.name, skill.subpath, skill.description || '-']),
+  ];
+  console.log(table(data, {
+    columns: {
+      0: { alignment: 'left' },
+      1: { alignment: 'left' },
+      2: { alignment: 'left', width: 72, wrapWord: true },
+    },
+    drawHorizontalLine: (lineIndex, rowCount) => lineIndex === 0 || lineIndex === 1 || lineIndex === rowCount,
+  }).trimEnd());
+}
+
+async function addFromSource(source: string, opts: { list?: boolean; all?: boolean; skill?: string[]; consumer?: Consumer[]; yes?: boolean }) {
+  const sourceInfo = checkoutSource(source);
+  const discovered = discoverSkills(sourceInfo);
+  if (discovered.length === 0) throw new Error('没有在该来源中发现 SKILL.md');
+
+  if (opts.list) {
+    printDiscoveredSkills(discovered);
+    return;
+  }
+
+  let selected: DiscoveredSkill[];
+  if (opts.all) {
+    selected = discovered;
+  } else if (opts.skill && opts.skill.length > 0) {
+    const requested = new Set(opts.skill);
+    selected = discovered.filter((skill) => requested.has(skill.name) || requested.has(skill.subpath));
+    const missing = [...requested].filter((name) => !selected.some((skill) => skill.name === name || skill.subpath === name));
+    if (missing.length > 0) throw new Error(`未找到指定 skill：${missing.join(', ')}`);
+  } else {
+    const ans = await inquirer.prompt([{
+      type: 'checkbox',
+      name: 'skills',
+      message: '选择要安装的 skills',
+      choices: discovered.map((skill) => ({
+        name: `${skill.name}  (${skill.subpath})${skill.description ? ` - ${skill.description}` : ''}`,
+        value: skill.name,
+      })),
+      validate: (value) => value.length > 0 || '至少选择一个 skill',
+    }]);
+    const selectedNames = new Set(ans.skills as string[]);
+    selected = discovered.filter((skill) => selectedNames.has(skill.name));
+  }
+
+  let consumers = opts.consumer && opts.consumer.length > 0 ? opts.consumer : undefined;
+  if (!consumers) {
+    const ans = await inquirer.prompt([{
+      type: 'checkbox',
+      name: 'consumers',
+      message: '选择消费者',
+      choices: ['agents', 'claude'],
+      default: ['agents', 'claude'],
+      validate: (value) => value.length > 0 || '至少选择一个消费者',
+    }]);
+    consumers = ans.consumers;
+  }
+
+  const existing = selected.filter((skill) => existsSync(skillDir(skill.name)));
+  if (existing.length > 0 && !(await confirm(`以下 skill 已存在，将覆盖更新：${existing.map((skill) => skill.name).join(', ')}。继续吗？`, opts.yes))) {
+    return;
+  }
+
+  for (const skill of selected) {
+    mkdirSync(skillDir(skill.name), { recursive: true });
+    run('rsync', ['-a', '--delete', `${skill.absoluteDir}/`, `${skillDir(skill.name)}/`]);
+    ensureRegistryEntry(skill.name, {
+      title: skill.title,
+      consumers,
+      source: {
+        type: sourceInfo.isLocal ? 'local' : 'git',
+        url: sourceInfo.repoUrl,
+        subpath: skill.subpath,
+        upstream_commit: sourceInfo.commit,
+      },
+      description: skill.description,
+    });
+  }
+
+  rebuildViews();
+  rebuildCollections();
+  printDiscoveredSkills(selected);
+  console.log(`已安装 ${selected.length} 个 skill。下一步建议运行：skillctl doctor && git diff`);
+}
+
 function installGit(skill: string, repo: string, subpath: string, consumers: Consumer[]) {
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'skillctl-'));
   run('git', ['clone', repo, path.join(tmp, 'repo')], { cwd: tmp });
@@ -400,7 +589,8 @@ async function menu() {
     { name: '回滚入口', value: 'rollback live' },
     { name: '暴露 skill 给消费者', value: 'expose skill' },
     { name: '隐藏 skill', value: 'hide skill' },
-    { name: '从 Git 安装 skill', value: 'install from git' },
+    { name: '从 URL/Git 发现并安装 skill', value: 'add from source' },
+    { name: '从 Git 安装 skill（旧方式）', value: 'install from git' },
     { name: '从 Git 更新 skill', value: 'update from git' },
     { name: '查看 Git 状态', value: 'git status' },
     { name: '退出', value: 'quit' },
@@ -424,6 +614,12 @@ async function menu() {
         ]);
         if (action === 'expose skill') expose(ans.skill, ans.consumers);
         else hide(ans.skill, ans.consumers);
+      }
+      if (action === 'add from source') {
+        const ans = await inquirer.prompt([
+          { type: 'input', name: 'source', message: '输入 Git URL、GitHub owner/repo 或本地路径' },
+        ]);
+        await addFromSource(ans.source, {});
       }
       if (action === 'install from git') {
         const ans = await inquirer.prompt([
@@ -457,6 +653,7 @@ program.command('switch').description('将 ~/.agents/skills 和 ~/.claude/skills
 program.command('rollback').description('按备份时间戳回滚线上入口').argument('[timestamp]', '备份时间戳，例如 20260806-112050').option('-y, --yes', '跳过确认提示').action((ts, opts) => rollbackLive(ts, opts));
 program.command('expose').description('把 skill 暴露给指定消费者').argument('<skill>', 'skill 名称').argument('<consumers...>', '消费者列表：agents claude').action((skill, consumers) => expose(skill, consumers));
 program.command('hide').description('从指定消费者隐藏 skill').argument('<skill>', 'skill 名称').argument('<consumers...>', '消费者列表：agents claude').action((skill, consumers) => hide(skill, consumers));
+program.command('add').description('先提供 URL/GitHub 仓库/本地路径，再发现并选择要安装的 skills').argument('<source>', 'Git URL、GitHub owner/repo、GitHub tree URL 或本地路径').option('--list', '只列出可安装 skills，不安装').option('--all', '安装发现到的全部 skills').option('-s, --skill <skill...>', '只安装指定 skill 名称或路径').option('-c, --consumer <consumer...>', '消费者列表：agents claude').option('-y, --yes', '覆盖已有 skill 时跳过确认').action((source, opts) => addFromSource(source, opts));
 program.command('install-git').description('从 Git 仓库安装 skill').argument('<skill>', 'skill 名称').argument('<repo>', 'Git 仓库 URL').argument('<subpath>', '仓库内 skill 子路径').argument('[consumers...]', '消费者列表，默认 agents claude').action((skill, repo, subpath, consumers) => installGit(skill, repo, subpath, consumers?.length ? consumers : ['agents', 'claude']));
 program.command('update-git').description('从 Git 仓库更新 skill；默认读取 registry.yaml 中的来源').argument('<skill>', 'skill 名称').argument('[repo]', '可选：覆盖 registry 中的 Git 仓库 URL').argument('[subpath]', '可选：覆盖 registry 中的仓库内子路径').action(updateGit);
 program.command('adopt').description('收编被 installer 安装到 view 中的真实目录').argument('<view>', '来源 view：agents 或 claude').argument('<skill>', 'skill 名称').argument('[alsoConsumers...]', '同时暴露给其他消费者').action(adopt);
