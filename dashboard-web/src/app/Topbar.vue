@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { currentOperationLabel, isBusy, refreshState, state } from '../composables/useApi';
+import { isBusy, refreshState, state } from '../composables/useApi';
 import { useLocale } from '../composables/useLocale';
 import { useTheme } from '../composables/useTheme';
 
@@ -36,8 +36,7 @@ async function refresh() {
       <n-select v-model:value="theme" :options="themeOptions" :aria-label="t('app.theme')" style="width: 132px" />
       <n-button type="primary" :loading="refreshLoading" @click="refresh">{{ t('app.refresh') }}</n-button>
     </n-space>
-    <div v-if="isBusy" class="operation-bar" role="status" aria-live="polite">
-      <span class="operation-bar__text">{{ currentOperationLabel || t('loading.working') }}</span>
+    <div v-if="isBusy" class="operation-bar" role="status" :aria-label="t('loading.working')">
       <span class="operation-bar__track"><span /></span>
     </div>
   </div>
