@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import LogPanel from '../components/LogPanel.vue';
 import { api, state } from '../composables/useApi';
 import { useOperationNotification } from '../composables/useOperationNotification';
 
@@ -21,7 +20,7 @@ const names = computed(() => Object.keys(state.value?.registry?.skills || {}).so
 
 function load(name: string) {
   skill.value = name;
-  const entry = (state.value?.registry?.skills as any)?.[name] || {};
+  const entry = state.value?.registry?.skills?.[name] || {};
   title.value = entry.title || name;
   category.value = entry.category || 'experimental';
   tags.value = (entry.tags || []).join(',');
@@ -89,6 +88,5 @@ async function save() {
       </n-gi>
     </n-grid>
 
-    <LogPanel />
   </n-space>
 </template>

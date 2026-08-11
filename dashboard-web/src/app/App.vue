@@ -5,32 +5,42 @@ import AppShell from './AppShell.vue';
 import OverviewPage from '../pages/OverviewPage.vue';
 import InstalledPage from '../pages/InstalledPage.vue';
 import SourcesPage from '../pages/SourcesPage.vue';
-import DiscoverPage from '../pages/DiscoverPage.vue';
-import UpdatesPage from '../pages/UpdatesPage.vue';
 import RegistryPage from '../pages/RegistryPage.vue';
 import ActivityPage from '../pages/ActivityPage.vue';
-import SettingsPage from '../pages/SettingsPage.vue';
 import { refreshState } from '../composables/useApi';
 import { useLocale } from '../composables/useLocale';
 import { useTheme } from '../composables/useTheme';
+import { resolveDashboardHash, type DashboardSurface } from '../routing/resolveDashboardHash';
 
 const { effectiveTheme } = useTheme();
 const { locale } = useLocale();
-const route = ref(location.hash.replace('#/', '') || 'overview');
+const surface = ref<DashboardSurface>(resolveDashboardHash(location.hash).surface);
 
-window.addEventListener('hashchange', () => { route.value = location.hash.replace('#/', '') || 'overview'; });
-onMounted(refreshState);
+function syncRouteFromLocation() {
+  const resolved = resolveDashboardHash(location.hash);
+  if (resolved.redirectHash && resolved.redirectHash !== location.hash) {
+    const target = resolved.redirectHash;
+    if (location.hash !== target) {
+      location.replace(`${location.pathname}${location.search}${target}`);
+    }
+    return;
+  }
+  surface.value = resolved.surface;
+}
+
+window.addEventListener('hashchange', syncRouteFromLocation);
+onMounted(() => {
+  syncRouteFromLocation();
+  void refreshState();
+});
 
 const page = computed(() => ({
   overview: OverviewPage,
   installed: InstalledPage,
   sources: SourcesPage,
-  discover: DiscoverPage,
-  updates: UpdatesPage,
   registry: RegistryPage,
   activity: ActivityPage,
-  settings: SettingsPage,
-}[route.value] || OverviewPage));
+}[surface.value] || OverviewPage));
 
 const naiveTheme = computed(() => (effectiveTheme.value === 'dark' ? darkTheme : null));
 const naiveLocale = computed(() => (locale.value === 'zh-CN' ? zhCN : enUS));
@@ -40,8 +50,16 @@ const themeOverrides: GlobalThemeOverrides = {
     primaryColor: '#2563EB',
     primaryColorHover: '#3B82F6',
     primaryColorPressed: '#1D4ED8',
-    borderRadius: '12px',
-    fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+    borderRadius: '10px',
+    borderRadiusSmall: '8px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+  },
+  Card: {
+    borderRadius: '14px',
+  },
+  Menu: {
+    itemHeight: '42px',
+    itemBorderRadius: '10px',
   },
 };
 </script>
@@ -51,8 +69,8 @@ const themeOverrides: GlobalThemeOverrides = {
     <n-message-provider>
       <n-dialog-provider>
         <n-notification-provider>
-          <AppShell :route="route">
-            <component :is="page" />
+          <AppShell :route="surface">
+            <component :is="page" :key="surface" />
           </AppShell>
         </n-notification-provider>
       </n-dialog-provider>

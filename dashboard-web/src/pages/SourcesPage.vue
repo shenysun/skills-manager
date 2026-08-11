@@ -1,16 +1,31 @@
 <script setup lang="ts">
-import { computed, h, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { NButton, NButtonGroup, NCheckbox, NCode, NEllipsis, NSpace, NTag, NText, type DataTableColumns } from 'naive-ui';
-import LogPanel from '../components/LogPanel.vue';
-import { api, state, type SourceGroup, type UpdateCandidate } from '../composables/useApi';
+import DiscoverWizard from '../components/DiscoverWizard.vue';
+import SourceCard from '../components/SourceCard.vue';
+import { api, state } from '../composables/useApi';
 import { useOperationNotification } from '../composables/useOperationNotification';
+import { sourcesTabFromHash, type SourcesTab } from '../routing/resolveDashboardHash';
 
 const { t } = useI18n();
 const { runWithNotification } = useOperationNotification();
 const selectedBySource = reactive<Record<string, string[]>>({});
 const loadingBySource = reactive<Record<string, boolean>>({});
 const search = ref('');
+const tab = ref<SourcesTab>(sourcesTabFromHash(location.hash));
+const discoverSource = ref('');
+
+function syncTabFromHash() {
+  tab.value = sourcesTabFromHash(location.hash);
+}
+
+onMounted(() => {
+  syncTabFromHash();
+  window.addEventListener('hashchange', syncTabFromHash);
+});
+onUnmounted(() => {
+  window.removeEventListener('hashchange', syncTabFromHash);
+});
 
 const filteredSources = computed(() => {
   const query = search.value.trim().toLowerCase();
@@ -23,13 +38,25 @@ const filteredSources = computed(() => {
   ].some((value) => value.toLowerCase().includes(query)));
 });
 
+const filteredSkillCount = computed(() => filteredSources.value.reduce((sum, source) => sum + source.skills.length, 0));
+const selectedTotal = computed(() => Object.values(selectedBySource).reduce((sum, list) => sum + list.length, 0));
+
 function sourceSelection(key: string) {
   return selectedBySource[key] || [];
 }
 
-function toggle(key: string, skill: string) {
-  const list = selectedBySource[key] || (selectedBySource[key] = []);
-  selectedBySource[key] = list.includes(skill) ? list.filter((item) => item !== skill) : [...list, skill];
+function toggle(key: string, skill: string, checked: boolean) {
+  const list = selectedBySource[key] || [];
+  selectedBySource[key] = checked ? Array.from(new Set([...list, skill])) : list.filter((item) => item !== skill);
+}
+
+function selectAllSource(key: string) {
+  const source = state.value?.sources.find((item) => item.key === key);
+  selectedBySource[key] = source?.skills.map((candidate) => candidate.skill) || [];
+}
+
+function clearSource(key: string) {
+  selectedBySource[key] = [];
 }
 
 async function update(key: string, skills?: string[]) {
@@ -43,64 +70,15 @@ async function update(key: string, skills?: string[]) {
 }
 
 const discover = (url: string) => {
-  localStorage.setItem('skills-manager-last-source', url);
-  location.hash = '#/discover';
+  discoverSource.value = url;
+  location.hash = '#/sources?tab=discover';
 };
 
-function renderSkill(source: SourceGroup, candidate: UpdateCandidate) {
-  return h('div', { class: 'source-skill-row' }, [
-    h(NCheckbox, {
-      checked: sourceSelection(source.key).includes(candidate.skill),
-      'onUpdate:checked': () => toggle(source.key, candidate.skill),
-    }),
-    h('div', { class: 'source-skill-main' }, [
-      h(NText, { strong: true }, { default: () => candidate.skill }),
-      h(NCode, { code: candidate.subpath, wordWrap: true }),
-    ]),
-  ]);
+function rememberTab(value: string | number) {
+  const next = value === 'discover' ? 'discover' : 'library';
+  tab.value = next;
+  location.hash = next === 'discover' ? '#/sources?tab=discover' : '#/sources';
 }
-
-const columns = computed<DataTableColumns<SourceGroup>>(() => [
-  { type: 'expand', renderExpand: (source) => h('div', { class: 'source-expand' }, source.skills.map((candidate) => renderSkill(source, candidate))) },
-  {
-    title: t('sources.sourceColumn'),
-    key: 'source',
-    minWidth: 360,
-    render: (source) => h(NSpace, { vertical: true, size: 3 }, {
-      default: () => [
-        h(NEllipsis, { style: 'max-width: 640px' }, { default: () => source.url }),
-        source.ref ? h(NTag, { size: 'small', round: true }, { default: () => source.ref }) : null,
-      ],
-    }),
-  },
-  {
-    title: t('sources.skillsColumn'),
-    key: 'skills',
-    width: 130,
-    render: (source) => h(NTag, { round: true, size: 'small' }, { default: () => t('sources.skillCount', { count: source.skills.length }) }),
-  },
-  {
-    title: t('sources.selectedColumn'),
-    key: 'selected',
-    width: 140,
-    render: (source) => {
-      const count = sourceSelection(source.key).length;
-      return h(NText, { depth: count ? 1 : 3 }, { default: () => count ? t('sources.selectedCount', { count }) : t('sources.noSelection') });
-    },
-  },
-  {
-    title: t('sources.actionsColumn'),
-    key: 'actions',
-    width: 330,
-    render: (source) => h(NButtonGroup, null, {
-      default: () => [
-        h(NButton, { loading: !!loadingBySource[`${source.key}:all`], onClick: (event: MouseEvent) => { event.stopPropagation(); update(source.key); } }, { default: () => t('sources.updateAll') }),
-        h(NButton, { type: 'primary', disabled: !sourceSelection(source.key).length, loading: !!loadingBySource[`${source.key}:selected`], onClick: (event: MouseEvent) => { event.stopPropagation(); update(source.key, sourceSelection(source.key)); } }, { default: () => t('sources.updateSelected') }),
-        h(NButton, { tertiary: true, onClick: (event: MouseEvent) => { event.stopPropagation(); discover(source.url); } }, { default: () => t('sources.discoverMore') }),
-      ],
-    }),
-  },
-]);
 </script>
 
 <template>
@@ -109,17 +87,46 @@ const columns = computed<DataTableColumns<SourceGroup>>(() => [
       <template #subtitle>{{ t('sources.hint') }}</template>
     </n-page-header>
 
-    <n-card>
-      <n-space vertical size="medium">
-        <n-space align="center" justify="space-between" wrap>
-          <n-input v-model:value="search" clearable :placeholder="t('sources.searchPlaceholder')" style="max-width: 520px" />
-          <n-text depth="3">{{ t('sources.expandHint') }}</n-text>
-        </n-space>
-        <n-data-table :columns="columns" :data="filteredSources" :row-key="(row: SourceGroup) => row.key" size="small" :bordered="false" />
-        <n-empty v-if="!filteredSources.length" :description="t('sources.noSources')" />
-      </n-space>
-    </n-card>
+    <n-tabs v-model:value="tab" type="segment" animated @update:value="rememberTab">
+      <n-tab-pane name="library" :tab="t('sources.libraryTab')">
+        <n-space vertical size="medium">
+          <n-card class="source-library-hero" size="small">
+            <n-space align="center" justify="space-between" wrap>
+              <div class="action-center-copy">
+                <n-text strong>{{ t('sources.libraryTitle') }}</n-text>
+                <n-text depth="3">{{ t('sources.libraryHint') }}</n-text>
+              </div>
+              <n-space align="center" wrap>
+                <n-tag round>{{ t('sources.sourceCount', { count: filteredSources.length }) }}</n-tag>
+                <n-tag round>{{ t('sources.totalSkills', { count: filteredSkillCount }) }}</n-tag>
+                <n-tag type="info" round>{{ t('sources.selectedCount', { count: selectedTotal }) }}</n-tag>
+              </n-space>
+            </n-space>
+            <n-input v-model:value="search" clearable :placeholder="t('sources.searchPlaceholder')" class="source-search" />
+          </n-card>
 
-    <LogPanel />
+          <div v-if="filteredSources.length" class="source-card-list">
+            <SourceCard
+              v-for="source in filteredSources"
+              :key="source.key"
+              :source="source"
+              :selected="sourceSelection(source.key)"
+              :loading-all="!!loadingBySource[`${source.key}:all`]"
+              :loading-selected="!!loadingBySource[`${source.key}:selected`]"
+              @toggle="toggle"
+              @select-all="selectAllSource"
+              @clear="clearSource"
+              @update="update"
+              @discover="discover"
+            />
+          </div>
+          <n-empty v-else :description="t('sources.noSources')" />
+        </n-space>
+      </n-tab-pane>
+
+      <n-tab-pane name="discover" :tab="t('sources.discoverTab')">
+        <DiscoverWizard :preset-source="discoverSource" />
+      </n-tab-pane>
+    </n-tabs>
   </n-space>
 </template>

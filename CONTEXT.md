@@ -12,6 +12,8 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
 - **Source-first install**: The preferred install flow: provide a source first, discover available `SKILL.md` files, then choose skills to install or update.
 - **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager dashboard` for browsing, installing, updating, and exposing skills.
+- **Dashboard primary navigation**: The five first-class surfaces of the Dashboard UI, organized by domain object rather than by verb: **Overview**, **Installed**, **Sources**, **Registry**, **Activity**.
+  _Avoid_: Discover, Updates, and Settings as top-level nav labels; those are capabilities hosted inside the five surfaces, not separate destinations.
 
 ## Current product direction
 
@@ -50,6 +52,43 @@ Treat the publishable package as a **new product**, not an incremental pile-on t
 ### Dashboard naming
 
 Use **dashboard** consistently for the local web UI. Code and package paths should use `dashboard` / `dashboard-web`, not `admin` / `admin-web`. The command to launch it is `skills-manager dashboard`.
+
+### Dashboard information architecture
+
+Primary navigation is **five surfaces** (object-centric), not eight verb pages. Placement is **as implemented in the current dashboard WIP** (ratified in grill):
+
+| Surface | Domain object / purpose | Hosted capabilities |
+|---------|-------------------------|---------------------|
+| Overview | Health and status at a glance | Counts (skills/sources/agents/claude), doctor warnings & broken links, Run Doctor, recent activity preview (link to Activity). **No** dedicated git-status card. |
+| Installed | Canonical skills already in the skill home | Search/filter, category workbench, multi-select, **by-skill update** (selected / all candidates / per drawer), expose/hide consumers, archive, skill detail drawer. |
+| Sources | Provenance groups and source-first install | **Library** tab: group by source, search, per-source select, **by-source update** (all/selected), discover-more-from-source. **Discover** tab: compact embedded source-first install wizard (not a standalone multi-step page; safety checks required, step chrome optional). |
+| Registry | Structured registry metadata | Structured edit of safe fields only (unchanged intent). |
+| Activity | Operation history + workspace snapshot | Operations timeline, git history list, skill home path, package name, npm pack dry-run. |
+
+**Not first-class nav** (capabilities relocated):
+
+- **Discover** → Sources · Discover tab; Topbar **Install Skill** uses the Discover deep-link (`#/sources?tab=discover` or equivalent).
+- **Updates** → split: by-skill on Installed; by-source on Sources · Library. No standalone Updates surface.
+- **Settings** → split: language & theme on Topbar; home / package / pack dry-run on Activity. No Settings item in primary nav.
+
+**Global chrome (Topbar):** skill home path, Install Skill, operation log drawer, language, theme, refresh.
+
+**Known implementation defects to fix (ratified in grill — not product intent):**
+
+- `#/updates` must not land on Sources; either map to Installed (by-skill update surface) or drop the hash entirely after migration.
+- `#/settings` and a standalone Settings page must not remain as a parallel settings surface; keep Topbar (language/theme) + Activity (home/package/pack) only.
+- Dead Discover / Updates pages and unused update-center components must be removed so each capability has one home.
+- Do not use `localStorage` to pass Sources tab selection across navigations; express Discover deep-link in the hash itself.
+
+**Dashboard hash contract (ratified):**
+
+- First-class hashes (only): `#/overview`, `#/installed`, `#/sources`, `#/registry`, `#/activity`.
+- Discover deep-link (not primary nav): `#/sources?tab=discover` or equivalent `#/sources/discover` — opens Sources on the Discover tab. Topbar Install Skill uses this.
+- Legacy hashes are not product surfaces; one-time redirects for bookmarks:
+  - `#/discover` → Discover deep-link on Sources
+  - `#/updates` → `#/installed` (by-skill update surface)
+  - `#/settings` → `#/activity` (workspace prefs + history)
+  After redirect, the legacy form is not a first-class destination.
 
 ### Default skill home
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref } from 'vue';
+import { computed, h, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { NCheckbox, NCode, NTag, NText, type DataTableColumns } from 'naive-ui';
 import { api, state } from '../composables/useApi';
@@ -7,10 +7,14 @@ import { useOperationNotification } from '../composables/useOperationNotificatio
 
 type Discovered = { name: string; title: string; description: string; subpath: string };
 
+const props = defineProps<{ presetSource?: string }>();
 const { t } = useI18n();
 const { runWithNotification } = useOperationNotification();
-const source = ref(localStorage.getItem('skills-manager-last-source') || '');
+const source = ref(props.presetSource || localStorage.getItem('skills-manager-last-source') || '');
 if (source.value) localStorage.removeItem('skills-manager-last-source');
+watch(() => props.presetSource, (value) => {
+  if (value) source.value = value;
+});
 
 const discovered = ref<Discovered[]>([]);
 const selected = ref<string[]>([]);
@@ -85,44 +89,55 @@ async function install() {
 </script>
 
 <template>
-  <n-space vertical size="large">
-    <n-card :title="t('discover.stepSource')">
-      <n-input-group>
-        <n-input v-model:value="source" :placeholder="t('discover.sourcePlaceholder')" clearable />
-        <n-button type="primary" :disabled="!source" :loading="discovering" @click="discover">{{ t('common.run') }}</n-button>
-      </n-input-group>
-    </n-card>
+  <n-card class="wizard-card">
+    <n-space vertical size="large">
+      <div class="wizard-header">
+        <div class="action-center-copy">
+          <n-text strong>{{ t('discover.title') }}</n-text>
+          <n-text depth="3">{{ t('discover.compactHint') }}</n-text>
+        </div>
+        <n-input-group class="wizard-source-input">
+          <n-input v-model:value="source" :placeholder="t('discover.sourcePlaceholder')" clearable />
+          <n-button type="primary" :disabled="!source" :loading="discovering" @click="discover">{{ t('common.run') }}</n-button>
+        </n-input-group>
+      </div>
 
-    <n-card :title="t('discover.stepSkills')">
-      <n-space vertical>
-        <n-alert v-if="discovered.length" type="info" :show-icon="false">
-          {{ t('discover.discovered', { count: discovered.length }) }}
-        </n-alert>
-<n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
-      </n-space>
-    </n-card>
+      <n-alert v-if="discovered.length" type="info" :show-icon="false">
+        {{ t('discover.discovered', { count: discovered.length }) }}
+      </n-alert>
 
-    <n-card :title="t('discover.stepConsumers')">
-      <n-checkbox-group v-model:value="consumers">
-        <n-space>
-          <n-checkbox value="agents">agents</n-checkbox>
-          <n-checkbox value="claude">claude</n-checkbox>
-        </n-space>
-      </n-checkbox-group>
-    </n-card>
+      <n-data-table :columns="columns" :data="discovered" :row-key="(row: Discovered) => row.subpath" size="small" :bordered="false" />
 
-    <n-card :title="t('discover.stepReview')">
-      <n-space vertical>
-        <n-alert :type="requiresOverwrite ? 'warning' : 'success'">
-          {{ requiresOverwrite ? t('discover.overwrite') : t('discover.noOverwriteRequired') }}
-        </n-alert>
-        <n-checkbox v-model:checked="confirmOverwrite" :disabled="!requiresOverwrite">
-          {{ t('discover.overwriteConfirm') }}
-        </n-checkbox>
-        <n-button type="primary" :disabled="!canInstall" :loading="installing" @click="install">
-          {{ t('common.install') }} {{ selected.length }}
-        </n-button>
-      </n-space>
-    </n-card>
-  </n-space>
+      <div class="wizard-review">
+        <n-card size="small" :title="t('discover.stepConsumers')">
+          <n-checkbox-group v-model:value="consumers">
+            <n-space>
+              <n-checkbox value="agents">agents</n-checkbox>
+              <n-checkbox value="claude">claude</n-checkbox>
+            </n-space>
+          </n-checkbox-group>
+        </n-card>
+
+        <n-card size="small" :title="t('discover.stepReview')">
+          <n-space vertical>
+            <n-alert :type="requiresOverwrite ? 'warning' : 'success'">
+              {{ requiresOverwrite ? t('discover.overwrite') : t('discover.noOverwriteRequired') }}
+            </n-alert>
+            <n-checkbox v-model:checked="confirmOverwrite" :disabled="!requiresOverwrite">
+              {{ t('discover.overwriteConfirm') }}
+            </n-checkbox>
+          </n-space>
+        </n-card>
+
+        <n-card size="small" class="wizard-submit">
+          <n-space vertical>
+            <n-text depth="3">{{ t('discover.selectedCount', { count: selected.length }) }}</n-text>
+            <n-button block type="primary" :disabled="!canInstall" :loading="installing" @click="install">
+              {{ t('common.install') }}
+            </n-button>
+          </n-space>
+        </n-card>
+      </div>
+    </n-space>
+  </n-card>
 </template>

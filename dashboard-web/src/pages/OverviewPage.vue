@@ -3,11 +3,10 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import StatusBadge from '../components/StatusBadge.vue';
 import EmptyState from '../components/EmptyState.vue';
-import LogPanel from '../components/LogPanel.vue';
-import { api, state } from '../composables/useApi';
+import { api, state, type ActivityRecord } from '../composables/useApi';
 import { useOperationNotification } from '../composables/useOperationNotification';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { runWithNotification } = useOperationNotification();
 const doctorLoading = ref(false);
 async function runDoctor() {
@@ -18,7 +17,29 @@ async function runDoctor() {
     doctorLoading.value = false;
   }
 }
+
 const healthy = computed(() => !(state.value?.doctor?.warnings?.length || state.value?.doctor?.brokenLinks?.length));
+const recentActivities = computed(() => (state.value?.activity || []).slice(0, 6));
+
+function formatActivityTime(timestamp: string) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return timestamp || '—';
+  return new Intl.DateTimeFormat(String(locale.value), {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function activityTitle(activity: ActivityRecord) {
+  return activity.summary || activity.subject || activity.action || t('activity.operations');
+}
+
+function activityMeta(activity: ActivityRecord) {
+  const parts = [activity.action, activity.hash ? activity.hash.slice(0, 7) : ''].filter(Boolean);
+  return parts.length ? parts.join(' · ') : t('overview.activityRecord');
+}
 </script>
 
 <template>
@@ -76,23 +97,35 @@ const healthy = computed(() => !(state.value?.doctor?.warnings?.length || state.
         </n-card>
       </n-gi>
       <n-gi>
-        <n-card :title="t('overview.git')">
-          <n-space vertical size="large">
-            <n-log :log="state?.doctor?.gitStatus || t('common.clean')" trim />
-            <section>
-              <n-h3>{{ t('overview.recent') }}</n-h3>
-              <n-list v-if="state?.activity?.length" hoverable>
-                <n-list-item v-for="activity in state?.activity?.slice(0, 5)" :key="activity.id || activity.timestamp">
-                  <n-thing :title="activity.summary" :description="activity.timestamp" />
-                </n-list-item>
-              </n-list>
-              <EmptyState v-else :title="t('overview.noRecent')" />
-            </section>
-          </n-space>
+        <n-card class="recent-card">
+          <template #header>
+            <n-space align="center" justify="space-between" class="recent-header">
+              <div class="action-center-copy">
+                <n-text strong>{{ t('overview.recent') }}</n-text>
+                <n-text depth="3">{{ t('overview.recentHint') }}</n-text>
+              </div>
+              <n-button text tag="a" href="#/activity">{{ t('overview.viewAllActivity') }}</n-button>
+            </n-space>
+          </template>
+
+          <div v-if="recentActivities.length" class="recent-list">
+            <article v-for="activity in recentActivities" :key="activity.id || activity.timestamp" class="recent-item">
+              <time class="recent-time">{{ formatActivityTime(activity.timestamp) }}</time>
+              <div class="recent-dot" aria-hidden="true" />
+              <div class="recent-main">
+                <div class="recent-title-row">
+                  <n-text strong>{{ activityTitle(activity) }}</n-text>
+                  <n-tag size="small" round>{{ activityMeta(activity) }}</n-tag>
+                </div>
+                <n-text v-if="activity.details" depth="3" class="recent-detail">
+                  {{ t('overview.hasDetails') }}
+                </n-text>
+              </div>
+            </article>
+          </div>
+          <EmptyState v-else :title="t('overview.noRecent')" />
         </n-card>
       </n-gi>
     </n-grid>
-
-    <LogPanel />
   </n-space>
 </template>

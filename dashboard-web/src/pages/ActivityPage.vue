@@ -1,13 +1,45 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { state } from '../composables/useApi';
+import { api, state } from '../composables/useApi';
+import { useOperationNotification } from '../composables/useOperationNotification';
 
 const { t } = useI18n();
+const { runWithNotification } = useOperationNotification();
+const packing = ref(false);
+async function pack() {
+  packing.value = true;
+  try {
+    await runWithNotification(() => api('/api/package/dry-run', { method: 'POST', body: JSON.stringify({}) }), { loading: t('loading.packing'), success: t('notification.packageDone'), error: t('notification.failed') });
+  } finally {
+    packing.value = false;
+  }
+}
 </script>
 
 <template>
   <n-space vertical size="large">
-    <n-page-header :title="t('activity.title')" />
+    <n-page-header :title="t('activity.title')">
+      <template #subtitle>{{ t('activity.subtitle') }}</template>
+    </n-page-header>
+
+    <n-card :title="t('activity.workspace')" size="small">
+      <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
+        <n-gi>
+          <n-text depth="3">{{ t('settings.home') }}</n-text>
+          <n-code :code="state?.skillHome || '—'" word-wrap />
+        </n-gi>
+        <n-gi>
+          <n-text depth="3">{{ t('settings.package') }}</n-text>
+          <div><n-tag round>{{ state?.package?.info?.name || '@shenysun/skills-manager' }}</n-tag></div>
+        </n-gi>
+        <n-gi>
+          <n-text depth="3">{{ t('settings.pack') }}</n-text>
+          <div><n-button type="primary" secondary :loading="packing" @click="pack">{{ t('settings.pack') }}</n-button></div>
+        </n-gi>
+      </n-grid>
+    </n-card>
+
     <n-grid :cols="2" :x-gap="18" :y-gap="18" responsive="screen">
       <n-gi>
         <n-card :title="t('activity.operations')">

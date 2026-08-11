@@ -14,7 +14,8 @@
     "smoke:core": "npm run build:cli && node scripts/smoke-core-services.mjs",
     "smoke:cli": "npm run build:cli && node scripts/smoke-cli-resolution.mjs",
     "smoke:api": "npm run build:cli && node scripts/smoke-dashboard-api.mjs",
-    "smoke:package": "npm run build && node scripts/smoke-package.mjs"
+    "smoke:package": "npm run build && node scripts/smoke-package.mjs",
+    "test:dashboard-hash": "tsx --test dashboard-web/src/routing/resolveDashboardHash.test.ts"
   },
   "keywords": [],
   "author": "",

@@ -8,7 +8,31 @@ export type UpdateCandidate = { skill: string; url: string; subpath: string; ref
 export type SourceGroup = { key: string; url: string; ref?: string; skills: UpdateCandidate[]; installedSkills?: string[] };
 export type Doctor = { skillHome: string; skillCount: number; viewLinks: Record<string, number>; brokenLinks: string[]; warnings: string[]; gitStatus: string };
 export type ActivityRecord = { id?: string; timestamp: string; action?: string; summary?: string; subject?: string; hash?: string; details?: unknown };
-export type DashboardState = { skillHome: string; skills: Skill[]; candidates: UpdateCandidate[]; sources: SourceGroup[]; doctor: Doctor; registry: { skills: Record<string, unknown> }; activity: ActivityRecord[]; gitHistory: ActivityRecord[]; package: { ok: boolean; warnings: string[]; info: Record<string, unknown> }; counts: Record<string, number> };
+export type RegistrySkillEntry = {
+  title?: string;
+  category?: string;
+  tags?: string[];
+  consumers?: string[];
+  description?: string;
+  source?: {
+    url?: string | null;
+    subpath?: string | null;
+    ref?: string | null;
+    upstream_commit?: string | null;
+  };
+};
+export type DashboardState = {
+  skillHome: string;
+  skills: Skill[];
+  candidates: UpdateCandidate[];
+  sources: SourceGroup[];
+  doctor: Doctor;
+  registry: { skills: Record<string, RegistrySkillEntry> };
+  activity: ActivityRecord[];
+  gitHistory: ActivityRecord[];
+  package: { ok: boolean; warnings: string[]; info: Record<string, unknown> };
+  counts: Record<string, number>;
+};
 
 export const state = ref<DashboardState | null>(null);
 export const logText = ref('');
