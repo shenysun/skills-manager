@@ -99,6 +99,7 @@ export default {
     modeCopy: 'copy — 可携带',
     modeDefault: '使用目标默认',
     forceOverwrite: '强制覆盖非托管路径',
+    foreignTitle: '运行时已有非托管 skill',
     redistributeOutdated: '重分发过期目标',
     rollback: '回滚上次分发',
     updateCenter: '更新中心',

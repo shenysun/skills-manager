@@ -30,10 +30,10 @@ const { t } = useI18n();
         <n-card :title="t('common.actions')" size="small">
           <n-space wrap>
             <n-button type="primary" :loading="busyAction === `update-${skill.name}`" @click="$emit('update', skill.name)">{{ t('common.update') }}</n-button>
-            <n-button :loading="busyAction === 'expose-agents'" @click="$emit('expose', skill.name, 'agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button :loading="busyAction === 'expose-claude'" @click="$emit('expose', skill.name, 'claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
-            <n-button :loading="busyAction === 'hide-agents'" tertiary @click="$emit('hide', skill.name, 'agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button :loading="busyAction === 'hide-claude'" tertiary @click="$emit('hide', skill.name, 'claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button :loading="busyAction === 'distribute-agents'" @click="$emit('expose', skill.name, 'agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
+            <n-button :loading="busyAction === 'distribute-claude'" @click="$emit('expose', skill.name, 'claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button :loading="busyAction === 'undistribute-agents'" tertiary @click="$emit('hide', skill.name, 'agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
+            <n-button :loading="busyAction === 'undistribute-claude'" tertiary @click="$emit('hide', skill.name, 'claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
             <n-button :loading="busyAction === 'archive'" type="error" secondary @click="$emit('archive', skill.name)">{{ t('common.archive') }}</n-button>
           </n-space>
         </n-card>

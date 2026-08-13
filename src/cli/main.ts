@@ -34,7 +34,20 @@ program.command('dashboard')
     return startDashboardServer({ home: globalOpts.home, port: Number(opts.port), host: opts.host, open: opts.open, projectRoot });
   });
 
-program.command('doctor').description('Run health checks').action((_opts, cmd) => print(services(cmd).doctor.check()));
+program.command('doctor')
+  .description('Run health checks')
+  .option('--migrate-views', 'distribute leftover hub views to user runtimes')
+  .option('--delete-views', 'with --migrate-views, remove generated view symlinks')
+  .option('--force', 'with --migrate-views, overwrite unmanaged runtime paths')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    if (opts.migrateViews) {
+      const migrated = s.distribute.migrateViews({ deleteViews: Boolean(opts.deleteViews), force: Boolean(opts.force) });
+      s.activity.record({ action: 'cli-migrate-views', summary: 'Migrated leftover hub views', details: migrated });
+      return print({ migrated, doctor: s.doctor.check() });
+    }
+    print(s.doctor.check());
+  });
 
 program.command('list')
   .description('List installed skills')
@@ -76,20 +89,36 @@ program.command('update')
     print(result);
   });
 
-program.command('distribute')
+const distribute = program.command('distribute')
   .description('Distribute hub skills to user or project runtime directories')
-  .requiredOption('--to <kind>', 'user or project')
+  .option('--to <kind>', 'user or project')
   .option('--project <path>', 'project root (required when --to project)')
   .option('-s, --skill <skill...>', 'canonical skill names')
   .option('-c, --consumer <consumer...>', `consumers: ${CONSUMERS.join(', ')}`)
   .option('--mode <mode>', 'symlink or copy')
   .option('--force', 'overwrite unmanaged runtime paths')
+  .enablePositionalOptions()
   .action((opts, cmd) => {
+    if (!opts.to) throw new Error('--to is required (user or project)');
     const s = services(cmd);
     const result = s.distribute.apply({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], consumers: opts.consumer, mode: opts.mode, force: Boolean(opts.force) });
     s.activity.record({ action: 'cli-distribute', summary: `Distributed ${(opts.skill || []).join(', ')} to ${opts.to}`, details: opts });
     print(result);
   });
+
+function runDistributeRollback(opts: { to: string; project?: string }, cmd: Command) {
+  const s = services(cmd);
+  if (opts.to !== 'user' && opts.to !== 'project') throw new Error('--to must be user or project');
+  const result = s.distribute.rollback(opts.to, opts.project);
+  s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${opts.to} distribution`, details: opts });
+  print(result);
+}
+
+distribute.command('rollback')
+  .description('Restore the last distribute snapshot for a target')
+  .requiredOption('--to <kind>', 'user or project')
+  .option('--project <path>', 'project root (required when --to project)')
+  .action((opts, cmd) => runDistributeRollback(opts, cmd));
 
 program.command('undistribute')
   .description('Remove managed runtime entries without deleting hub skills')
@@ -118,16 +147,11 @@ program.command('redistribute')
     print(result);
   });
 
-program.command('distribute-rollback')
-  .description('Restore the last distribute snapshot for a target (spec: distribute rollback)')
+program.command('distribute-rollback', { hidden: true })
+  .description('Deprecated alias for distribute rollback')
   .requiredOption('--to <kind>', 'user or project')
   .option('--project <path>', 'project root (required when --to project)')
-  .action((opts, cmd) => {
-    const s = services(cmd);
-    const result = s.distribute.rollback(opts.to, opts.project);
-    s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${opts.to} distribution`, details: opts });
-    print(result);
-  });
+  .action((opts, cmd) => runDistributeRollback(opts, cmd));
 
 program.command('migrate-views')
   .description('Distribute leftover hub views to user runtimes')

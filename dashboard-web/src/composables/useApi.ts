@@ -65,11 +65,18 @@ function finishOperation(operationId: number | null) {
   activeOperations.value = activeOperations.value.filter((operation) => operation.id !== operationId);
 }
 
+export class ApiError extends Error {
+  constructor(readonly code: string, message: string, readonly details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { 'content-type': 'application/json' }, ...init });
   const payload = (await res.json().catch(() => null)) as ApiResponse<T> | null;
   if (!payload) throw new Error(res.statusText);
-  if (!payload.ok) throw new Error(payload.error.message);
+  if (!payload.ok) throw new ApiError(payload.error.code, payload.error.message, payload.error.details);
   return payload.data;
 }
 

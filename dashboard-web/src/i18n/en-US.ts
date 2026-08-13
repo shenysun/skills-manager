@@ -99,6 +99,7 @@ export default {
     modeCopy: 'copy — portable',
     modeDefault: 'Default for target',
     forceOverwrite: 'Force overwrite unmanaged paths',
+    foreignTitle: 'Unmanaged skill already exists',
     redistributeOutdated: 'Redistribute outdated',
     rollback: 'Rollback last distribute',
     updateCenter: 'Update center',

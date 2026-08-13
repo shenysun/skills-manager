@@ -21,6 +21,14 @@ try {
   const envResult = spawnSync(process.execPath, ['dist/cli.js', 'doctor'], { encoding: 'utf8', env: { ...process.env, SKILL_HOME: envHome } });
   assert.equal(envResult.status, 0, envResult.stderr || envResult.stdout);
   assert.equal(JSON.parse(envResult.stdout).skillHome, envHome);
+  const doctorHelp = spawnSync(process.execPath, ['dist/cli.js', 'doctor', '--help'], { encoding: 'utf8' });
+  assert.match(doctorHelp.stdout, /migrate-views/);
+  const rollbackHelp = spawnSync(process.execPath, ['dist/cli.js', 'distribute', 'rollback', '--help'], { encoding: 'utf8' });
+  assert.equal(rollbackHelp.status, 0, rollbackHelp.stderr || rollbackHelp.stdout);
+  assert.match(rollbackHelp.stdout, /Restore the last distribute snapshot/);
+  const migrate = spawnSync(process.execPath, ['dist/cli.js', '--home', home, 'doctor', '--migrate-views'], { encoding: 'utf8' });
+  assert.equal(migrate.status, 0, migrate.stderr || migrate.stdout);
+  assert.equal(JSON.parse(migrate.stdout).doctor.skillHome, home);
   console.log('cli resolution smoke test passed');
 } finally {
   rmSync(temp, { recursive: true, force: true });
