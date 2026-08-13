@@ -187,8 +187,26 @@ async function runSkillAction<T>(action: string, loading: string, success: strin
 
 const updateCandidates = (skills: string[]) => runSkillAction('update-candidates', t('loading.updatingSelected'), t('notification.updateDone'), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills }) }));
 const updateOne = (skill: string) => runSkillAction(`update-${skill}`, t('loading.updatingSkill', { skill }), t('notification.updateDone'), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: [skill] }) }));
-const expose = (consumerName: string, only?: string) => runSkillAction(`expose-${consumerName}`, t('loading.exposing'), t('notification.exposeDone'), () => api('/api/skills/expose', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value, consumer: consumerName }) }));
-const hide = (consumerName: string, only?: string) => runSkillAction(`hide-${consumerName}`, t('loading.hiding'), t('notification.hideDone'), () => api('/api/skills/hide', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value, consumer: consumerName }) }));
+const targetKind = ref<'user' | 'project'>('user');
+const projectRoot = ref('');
+const mode = ref<string | null>(null);
+const force = ref(false);
+
+function distributePayload(consumerName: string, only?: string) {
+  return {
+    to: targetKind.value,
+    projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined,
+    skills: only ? [only] : selected.value,
+    consumers: [consumerName],
+    mode: mode.value || undefined,
+    force: force.value,
+  };
+}
+
+const distribute = (consumerName: string, only?: string) => runSkillAction(`expose-${consumerName}`, t('loading.distributing'), t('notification.distributeDone'), () => api('/api/distribute', { method: 'POST', body: JSON.stringify(distributePayload(consumerName, only)) }));
+const undistribute = (consumerName: string, only?: string) => runSkillAction(`hide-${consumerName}`, t('loading.undistributing'), t('notification.undistributeDone'), () => api('/api/undistribute', { method: 'POST', body: JSON.stringify({ to: targetKind.value, projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined, skills: only ? [only] : selected.value, consumers: [consumerName] }) }));
+const redistributeOutdated = () => runSkillAction('redistribute', t('loading.distributing'), t('notification.redistributeDone'), () => api('/api/redistribute', { method: 'POST', body: JSON.stringify({ outdated: true, to: targetKind.value, projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined, force: force.value }) }));
+const rollbackDistribute = () => runSkillAction('rollback', t('loading.distributing'), t('notification.rollbackDone'), () => api('/api/distribute/rollback', { method: 'POST', body: JSON.stringify({ to: targetKind.value, projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined }) }));
 const archive = (only?: string) => runSkillAction('archive', t('loading.archiving'), t('notification.archiveDone'), () => api('/api/skills/archive', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value }) }));
 </script>
 
@@ -229,10 +247,16 @@ const archive = (only?: string) => runSkillAction('archive', t('loading.archivin
               {{ t('installed.updateChecked', { count: selectedUpdateableNames.length }) }}
             </n-button>
             <n-button :disabled="!updateCandidateNames.length" :loading="busyAction === 'update-candidates'" @click="updateCandidates(updateCandidateNames)">{{ t('installed.updateAllCandidates') }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'expose-agents'" @click="expose('agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'expose-claude'" @click="expose('claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'hide-agents'" tertiary @click="hide('agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'hide-claude'" tertiary @click="hide('claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-select v-model:value="targetKind" :options="[{ label: t('installed.distributeUser'), value: 'user' }, { label: t('installed.distributeProject'), value: 'project' }]" style="min-width: 280px" />
+            <n-input v-if="targetKind === 'project'" v-model:value="projectRoot" :placeholder="t('installed.projectRoot')" style="min-width: 280px" />
+            <n-select v-model:value="mode" clearable :placeholder="t('installed.modeDefault')" :options="[{ label: t('installed.modeSymlink'), value: 'symlink' }, { label: t('installed.modeCopy'), value: 'copy' }]" style="min-width: 220px" />
+            <n-checkbox v-model:checked="force">{{ t('installed.forceOverwrite') }}</n-checkbox>
+            <n-button :disabled="!selected.length" :loading="busyAction === 'expose-agents'" @click="distribute('agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
+            <n-button :disabled="!selected.length" :loading="busyAction === 'expose-claude'" @click="distribute('claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button :disabled="!selected.length" :loading="busyAction === 'hide-agents'" tertiary @click="undistribute('agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
+            <n-button :disabled="!selected.length" :loading="busyAction === 'hide-claude'" tertiary @click="undistribute('claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button secondary :loading="busyAction === 'redistribute'" @click="redistributeOutdated">{{ t('installed.redistributeOutdated') }}</n-button>
+            <n-button secondary :loading="busyAction === 'rollback'" @click="rollbackDistribute">{{ t('installed.rollback') }}</n-button>
             <n-button :disabled="!selected.length" :loading="busyAction === 'archive'" type="error" secondary @click="archive()">{{ t('installed.archiveSelected') }}</n-button>
           </n-space>
         </n-space>
@@ -273,6 +297,6 @@ const archive = (only?: string) => runSkillAction('archive', t('loading.archivin
       </n-space>
     </n-card>
 
-    <SkillDrawer :busy-action="busyAction" :skill="openSkill" @close="openSkill = null" @update="updateOne" @expose="(skill, selectedConsumer) => expose(selectedConsumer, skill)" @hide="(skill, selectedConsumer) => hide(selectedConsumer, skill)" @archive="archive" />
+    <SkillDrawer :busy-action="busyAction" :skill="openSkill" @close="openSkill = null" @update="updateOne" @expose="(skill, selectedConsumer) => distribute(selectedConsumer, skill)" @hide="(skill, selectedConsumer) => undistribute(selectedConsumer, skill)" @archive="archive" />
   </n-space>
 </template>

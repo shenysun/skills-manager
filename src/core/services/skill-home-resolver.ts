@@ -31,8 +31,6 @@ export class SkillHomeResolver {
 
   isSkillHome(root: string) {
     return this.fs.kind(path.join(root, 'skills')) === 'directory'
-      && this.fs.kind(path.join(root, 'views')) === 'directory'
-      && this.fs.kind(path.join(root, 'collections')) === 'directory'
       && this.fs.kind(path.join(root, 'registry.yaml')) === 'file';
   }
 

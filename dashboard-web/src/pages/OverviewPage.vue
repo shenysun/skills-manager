@@ -50,7 +50,7 @@ function activityMeta(activity: ActivityRecord) {
       </template>
     </n-page-header>
 
-    <n-grid :cols="4" :x-gap="14" :y-gap="14" responsive="screen">
+    <n-grid :cols="5" :x-gap="14" :y-gap="14" responsive="screen">
       <n-gi>
         <n-card><n-statistic :label="t('overview.skills')" :value="state?.counts?.skills || 0" /></n-card>
       </n-gi>
@@ -62,6 +62,9 @@ function activityMeta(activity: ActivityRecord) {
       </n-gi>
       <n-gi>
         <n-card><n-statistic :label="t('overview.claude')" :value="state?.counts?.claude || 0" /></n-card>
+      </n-gi>
+      <n-gi>
+        <n-card><n-statistic :label="t('overview.outdated')" :value="state?.counts?.outdated || 0" /></n-card>
       </n-gi>
     </n-grid>
 

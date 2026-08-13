@@ -6,7 +6,7 @@ import { createDashboardApp } from '../dist/dashboard/server/main.js';
 
 const temp = mkdtempSync(path.join(os.tmpdir(), 'skills-api-smoke-'));
 try {
-  const app = createDashboardApp({ home: path.join(temp, 'home'), port: 0, host: '127.0.0.1', open: false, projectRoot: process.cwd() });
+  const app = createDashboardApp({ home: path.join(temp, 'home'), port: 0, host: '127.0.0.1', open: false, projectRoot: process.cwd(), userHome: path.join(temp, 'user-home') });
   const state = await app.inject({ method: 'GET', url: '/api/state' });
   assert.equal(state.statusCode, 200);
   assert.equal(JSON.parse(state.body).ok, true);
@@ -32,6 +32,12 @@ try {
   assert.deepEqual(JSON.parse(selectedSourceUpdate.body).data.updated, ['api-smoke']);
   const doctor = await app.inject({ method: 'GET', url: '/api/doctor' });
   assert.equal(JSON.parse(doctor.body).ok, true);
+  assert.equal(JSON.parse(doctor.body).data.distribution.agents, 0);
+  const distributed = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['api-smoke'], consumers: ['agents'] } });
+  assert.equal(JSON.parse(distributed.body).ok, true);
+  const after = await app.inject({ method: 'GET', url: '/api/state' });
+  assert.equal(JSON.parse(after.body).data.doctor.distribution.agents, 1);
+  assert.ok(JSON.parse(after.body).data.distributions.user);
   await app.close();
   console.log('dashboard api smoke test passed');
 } finally {

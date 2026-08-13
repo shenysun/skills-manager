@@ -18,15 +18,12 @@ export class SkillHomeService {
 
   isSkillHome(root = this.home.root) {
     return this.fs.kind(path.join(root, 'skills')) === 'directory'
-      && this.fs.kind(path.join(root, 'views')) === 'directory'
-      && this.fs.kind(path.join(root, 'collections')) === 'directory'
       && this.fs.kind(path.join(root, 'registry.yaml')) === 'file';
   }
 
   ensure() {
     this.fs.makeDirectory(this.home.root);
     this.fs.makeDirectory(this.home.skillsDir);
-    this.fs.makeDirectory(this.home.viewsDir);
     this.fs.makeDirectory(this.home.collectionsDir);
     if (!this.fs.exists(this.home.registryFile)) this.fs.writeText(this.home.registryFile, 'skills: {}\n');
     return this.home;

@@ -76,9 +76,83 @@ program.command('update')
     print(result);
   });
 
-program.command('expose').description('Expose skills to a consumer').argument('<consumer>').argument('<skills...>').action((consumer, skills, cmd) => { const s = services(cmd); for (const skill of skills) s.views.expose(skill, [consumer]); print({ ok: true, consumer, skills }); });
-program.command('hide').description('Hide skills from a consumer').argument('<consumer>').argument('<skills...>').action((consumer, skills, cmd) => { const s = services(cmd); for (const skill of skills) s.views.hide(skill, [consumer]); print({ ok: true, consumer, skills }); });
-program.command('rebuild-views').description('Regenerate consumer views').action((_opts, cmd) => { services(cmd).views.rebuildViews(); print('views rebuilt'); });
+program.command('distribute')
+  .description('Distribute hub skills to user or project runtime directories')
+  .requiredOption('--to <kind>', 'user or project')
+  .option('--project <path>', 'project root (required when --to project)')
+  .option('-s, --skill <skill...>', 'canonical skill names')
+  .option('-c, --consumer <consumer...>', `consumers: ${CONSUMERS.join(', ')}`)
+  .option('--mode <mode>', 'symlink or copy')
+  .option('--force', 'overwrite unmanaged runtime paths')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.distribute.apply({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], consumers: opts.consumer, mode: opts.mode, force: Boolean(opts.force) });
+    s.activity.record({ action: 'cli-distribute', summary: `Distributed ${(opts.skill || []).join(', ')} to ${opts.to}`, details: opts });
+    print(result);
+  });
+
+program.command('undistribute')
+  .description('Remove managed runtime entries without deleting hub skills')
+  .requiredOption('--to <kind>', 'user or project')
+  .option('--project <path>', 'project root (required when --to project)')
+  .option('-s, --skill <skill...>', 'canonical skill names')
+  .option('-c, --consumer <consumer...>', `consumers: ${CONSUMERS.join(', ')}`)
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.distribute.undistribute({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], consumers: opts.consumer });
+    s.activity.record({ action: 'cli-undistribute', summary: `Undistributed ${(opts.skill || []).join(', ')} from ${opts.to}`, details: opts });
+    print(result);
+  });
+
+program.command('redistribute')
+  .description('Re-apply managed distributions')
+  .option('--outdated', 'only outdated fingerprints')
+  .option('--to <kind>', 'user or project')
+  .option('--project <path>', 'project root filter')
+  .option('--force', 'overwrite unmanaged runtime paths')
+  .action((opts, cmd) => {
+    if (!opts.outdated) throw new Error('Pass --outdated to refresh managed targets');
+    const s = services(cmd);
+    const result = s.distribute.redistributeOutdated({ to: opts.to, projectRoot: opts.project, force: Boolean(opts.force) });
+    s.activity.record({ action: 'cli-redistribute', summary: 'Redistributed outdated targets', details: opts });
+    print(result);
+  });
+
+program.command('distribute-rollback')
+  .description('Restore the last distribute snapshot for a target (spec: distribute rollback)')
+  .requiredOption('--to <kind>', 'user or project')
+  .option('--project <path>', 'project root (required when --to project)')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.distribute.rollback(opts.to, opts.project);
+    s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${opts.to} distribution`, details: opts });
+    print(result);
+  });
+
+program.command('migrate-views')
+  .description('Distribute leftover hub views to user runtimes')
+  .option('--delete-views', 'remove generated view symlinks after migrate')
+  .option('--force', 'overwrite unmanaged runtime paths')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.distribute.migrateViews({ deleteViews: Boolean(opts.deleteViews), force: Boolean(opts.force) });
+    s.activity.record({ action: 'cli-migrate-views', summary: 'Migrated leftover hub views', details: result });
+    print(result);
+  });
+
+program.command('expose').description('Deprecated alias: distribute selected skills to the user runtime').argument('<consumer>').argument('<skills...>').action((consumer, skills, cmd) => {
+  const s = services(cmd);
+  const result = s.distribute.apply({ to: 'user', skills, consumers: [consumer] });
+  s.activity.record({ action: 'cli-expose', summary: `Distributed ${skills.join(', ')} to user ${consumer}`, details: { consumer, skills } });
+  print(result);
+});
+program.command('hide').description('Deprecated alias: undistribute selected skills from the user runtime').argument('<consumer>').argument('<skills...>').action((consumer, skills, cmd) => {
+  const s = services(cmd);
+  const result = s.distribute.undistribute({ to: 'user', skills, consumers: [consumer] });
+  s.activity.record({ action: 'cli-hide', summary: `Undistributed ${skills.join(', ')} from user ${consumer}`, details: { consumer, skills } });
+  print(result);
+});
+program.command('rebuild-views').description('Deprecated: hub views are no longer generated').action(() => { print({ ok: true, deprecated: true, message: 'rebuild-views is deprecated. Use distribute / redistribute --outdated. Hub views/ is not rebuilt.' }); });
 program.command('rebuild-collections').description('Regenerate category collections').action((_opts, cmd) => { services(cmd).views.rebuildCollections(); print('collections rebuilt'); });
 program.command('archive').description('Archive canonical skills without permanent deletion').argument('<skills...>').action((skills, cmd) => print(services(cmd).archive.archiveSkills(skills)));
 program.command('adopt').description('Adopt a real directory from a generated view into canonical skills').argument('<view>').argument('<skill>').argument('[alsoConsumers...]').action((view, skill, alsoConsumers, cmd) => print(services(cmd).adopt.adopt(view, skill, alsoConsumers || [])));

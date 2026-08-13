@@ -2,6 +2,7 @@ import { createSkillHome, SkillHomeService } from './skill-home-service.js';
 import { RegistryService } from './registry-service.js';
 import { SourceService } from './source-service.js';
 import { ViewService } from './view-service.js';
+import { DistributeService } from './distribute-service.js';
 import { InstallService } from './install-service.js';
 import { UpdateService } from './update-service.js';
 import { DoctorService } from './doctor-service.js';
@@ -21,6 +22,7 @@ export type CoreServicesOptions = {
   git: GitPort;
   processRunner: ProcessRunnerPort;
   tempRoot?: string;
+  userHome?: string;
 };
 
 export function createCoreServices(options: CoreServicesOptions) {
@@ -29,20 +31,22 @@ export function createCoreServices(options: CoreServicesOptions) {
   const registry = new RegistryService(options.fs, home);
   const source = new SourceService(options.fs, options.git, options.tempRoot);
   const views = new ViewService(options.fs, home, registry);
+  const distribute = new DistributeService(options.fs, home, registry, options.userHome);
   const install = new InstallService(options.fs, home, registry, source, views);
   const update = new UpdateService(registry, source, install);
-  const doctor = new DoctorService(options.fs, options.git, home, registry, views);
+  const doctor = new DoctorService(options.fs, options.git, home, registry, distribute);
   const activity = new ActivityService(options.fs, options.git, home);
   const archive = new ArchiveService(options.fs, home, registry, views);
-  const adopt = new AdoptService(options.fs, home, registry, views);
+  const adopt = new AdoptService();
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, install, update, doctor, activity, archive, adopt, package: packageService };
+  return { home, skillHome, registry, source, views, distribute, install, update, doctor, activity, archive, adopt, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
 export { RegistryService } from './registry-service.js';
 export { SourceService } from './source-service.js';
 export { ViewService } from './view-service.js';
+export { DistributeService } from './distribute-service.js';
 export { InstallService } from './install-service.js';
 export { UpdateService } from './update-service.js';
 export { DoctorService } from './doctor-service.js';

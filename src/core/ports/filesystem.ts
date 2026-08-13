@@ -15,6 +15,7 @@ export interface FileSystemPort {
   targetKind(path: string): FileKind;
   makeDirectory(path: string): void;
   removeFileOrSymlink(path: string): void;
+  removeTree(path: string): void;
   copyDirectoryContents(sourceDir: string, destinationDir: string): void;
   move(source: string, destination: string): void;
   symlink(target: string, path: string): void;

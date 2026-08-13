@@ -56,6 +56,10 @@ export class NodeFileSystem implements FileSystemPort {
     rmSync(filePath, { force: true });
   }
 
+  removeTree(filePath: string): void {
+    rmSync(filePath, { recursive: true, force: true });
+  }
+
   copyDirectoryContents(sourceDir: string, destinationDir: string): void {
     mkdirSync(destinationDir, { recursive: true });
     rmSync(destinationDir, { recursive: true, force: true });

@@ -11,10 +11,12 @@ try {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   const data = JSON.parse(result.stdout);
   assert.equal(data.skillHome, home);
-  for (const file of ['skills', 'views', 'collections', 'registry.yaml']) {
+  for (const file of ['skills', 'collections', 'registry.yaml']) {
     const check = spawnSync('test', ['-e', path.join(home, file)]);
     assert.equal(check.status, 0, `${file} was not initialized`);
   }
+  const viewsCheck = spawnSync('test', ['-e', path.join(home, 'views')]);
+  assert.notEqual(viewsCheck.status, 0, 'views/ should not be required or created');
   const envHome = path.join(temp, 'env-home');
   const envResult = spawnSync(process.execPath, ['dist/cli.js', 'doctor'], { encoding: 'utf8', env: { ...process.env, SKILL_HOME: envHome } });
   assert.equal(envResult.status, 0, envResult.stderr || envResult.stdout);

@@ -6,7 +6,14 @@ export type ApiResponse<T> = ApiOk<T> | ApiErr;
 export type Skill = { name: string; path: string; title: string; category: string; tags: string[]; consumers: string[]; description: string; source: { url?: string | null; subpath?: string | null; ref?: string | null; upstream_commit?: string | null }; files?: string[] };
 export type UpdateCandidate = { skill: string; url: string; subpath: string; ref?: string; title: string; description: string; consumers: string[] };
 export type SourceGroup = { key: string; url: string; ref?: string; skills: UpdateCandidate[]; installedSkills?: string[] };
-export type Doctor = { skillHome: string; skillCount: number; viewLinks: Record<string, number>; brokenLinks: string[]; warnings: string[]; gitStatus: string };
+export type Doctor = {
+  skillHome: string;
+  skillCount: number;
+  distribution: { agents: number; claude: number; outdated: number; foreign: number; leftoverViews: boolean };
+  brokenLinks: string[];
+  warnings: string[];
+  gitStatus: string;
+};
 export type ActivityRecord = { id?: string; timestamp: string; action?: string; summary?: string; subject?: string; hash?: string; details?: unknown };
 export type RegistrySkillEntry = {
   title?: string;

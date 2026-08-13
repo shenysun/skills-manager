@@ -1,26 +1,35 @@
 import path from 'node:path';
-import { CONSUMERS, type DoctorReport, type SkillHome } from '../model/index.js';
+import type { DoctorReport, SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
 import type { RegistryService } from './registry-service.js';
-import type { ViewService } from './view-service.js';
+import type { DistributeService } from './distribute-service.js';
 
 export class DoctorService {
-  constructor(private readonly fs: FileSystemPort, private readonly git: GitPort, private readonly home: SkillHome, private readonly registry: RegistryService, private readonly views: ViewService) {}
+  constructor(
+    private readonly fs: FileSystemPort,
+    private readonly git: GitPort,
+    private readonly home: SkillHome,
+    private readonly registry: RegistryService,
+    private readonly distribute: DistributeService,
+  ) {}
 
   check(): DoctorReport {
     const warnings: string[] = [];
     if (this.fs.kind(this.home.registryFile) !== 'file') warnings.push(`Missing registry: ${this.home.registryFile}`);
     if (this.fs.kind(this.home.skillsDir) !== 'directory') warnings.push(`Missing skills directory: ${this.home.skillsDir}`);
-    const brokenLinks = this.findBrokenLinks([this.home.viewsDir, this.home.collectionsDir]);
+    const leftover = this.distribute.leftoverViewWarning();
+    if (leftover) warnings.push(leftover);
+    warnings.push(...this.distribute.archivedDistributedWarnings());
+    const brokenLinks = [...this.findBrokenLinks([this.home.collectionsDir]), ...this.distribute.runtimeBrokenLinks()].sort();
     const gitStatus = this.git.statusShort(this.home.root);
+    const distribution = this.distribute.status();
+    if (distribution.outdated > 0) warnings.push(`${distribution.outdated} distributed skill(s) are outdated versus the hub`);
+    if (distribution.foreign > 0) warnings.push(`${distribution.foreign} unmanaged file(s) in consumer runtime skill directories`);
     return {
       skillHome: this.home.root,
       skillCount: this.registry.listCanonicalSkills().length,
-      viewLinks: {
-        agents: this.views.countLinks('agents'),
-        claude: this.views.countLinks('claude'),
-      },
+      distribution,
       brokenLinks,
       warnings,
       gitStatus,

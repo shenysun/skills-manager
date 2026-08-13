@@ -29,7 +29,6 @@ export class InstallService {
 
   installPlan(plan: InstallPlan): InstallResult {
     for (const skill of plan.selected) this.copySkillToCanonical(skill, plan.source, plan.consumers);
-    this.views.rebuildViews();
     this.views.rebuildCollections();
     return { installed: plan.selected.map((skill) => skill.name), plan };
   }

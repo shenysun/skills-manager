@@ -24,7 +24,6 @@ export class ArchiveService {
       this.registry.ensureEntry(skill, { ...existing, archived: true, consumers: [], archived_at: new Date().toISOString(), archive_path: path.relative(this.home.root, destination) });
       archived.push(skill);
     }
-    this.views.rebuildViews();
     this.views.rebuildCollections();
     return { archived, archiveRoot };
   }

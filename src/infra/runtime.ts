@@ -10,6 +10,7 @@ export type RuntimeOptions = {
   home?: string;
   cwd?: string;
   env?: Record<string, string | undefined>;
+  userHome?: string;
 };
 
 export function projectRootFromImportMeta(metaUrl: string) {
@@ -22,7 +23,9 @@ export function createRuntimeServices(options: RuntimeOptions = {}, projectRoot 
   const resolution = resolver.resolve({ explicitHome: options.home, cwd: options.cwd || process.cwd(), env: options.env || process.env });
   const git = new GitCli();
   const processRunner = new ShellRunner();
-  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner });
+  const env = options.env || process.env;
+  const userHome = options.userHome || env.SKILLS_MANAGER_USER_HOME;
+  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome });
   services.skillHome.ensure();
   return { ...services, resolution } satisfies ReturnType<typeof createCoreServices> & { resolution: SkillHomeResolution };
 }

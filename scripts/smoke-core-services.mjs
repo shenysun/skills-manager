@@ -50,7 +50,21 @@ try {
 
   const doctor = services.doctor.check();
   assert.equal(doctor.skillCount, 1);
-  assert.equal(doctor.viewLinks.agents, 1);
+  assert.equal(doctor.distribution.agents, 0);
+
+  const userHome = path.join(tempRoot, 'user-home');
+  const distServices = createCoreServices({
+    skillHomeRoot: home,
+    projectRoot: repoRoot,
+    fs: new NodeFileSystem(),
+    git: new SmokeGit(),
+    processRunner: new ShellRunner(),
+    tempRoot,
+    userHome,
+  });
+  distServices.distribute.apply({ to: 'user', skills: ['alpha'], consumers: ['agents'] });
+  const after = distServices.doctor.check();
+  assert.equal(after.distribution.agents, 1);
 
   const record = services.activity.record({ action: 'smoke', summary: 'Core services smoke test' });
   assert.equal(services.activity.list({ limit: 1 })[0].id, record.id);

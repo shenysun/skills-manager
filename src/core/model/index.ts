@@ -109,13 +109,40 @@ export type UpdatePlan = {
   groups: SourceUpdateGroup[];
 };
 
+export type DistributeMode = 'symlink' | 'copy';
+export type DistributionTargetKind = 'user' | 'project';
+
+export type DistributionHealth = {
+  agents: number;
+  claude: number;
+  outdated: number;
+  foreign: number;
+  leftoverViews: boolean;
+};
+
 export type DoctorReport = {
   skillHome: string;
   skillCount: number;
-  viewLinks: Record<Consumer, number>;
+  distribution: DistributionHealth;
   brokenLinks: string[];
   warnings: string[];
   gitStatus: string;
+};
+
+export type DistributionIndexEntry = {
+  skill: SkillName;
+  consumer: Consumer;
+  mode: DistributeMode;
+  fingerprint: string;
+  runtimePath: string;
+};
+
+export type DistributionIndexRecord = {
+  id: string;
+  kind: DistributionTargetKind;
+  targetRoot: string;
+  updatedAt: string;
+  entries: DistributionIndexEntry[];
 };
 
 export type ActivityRecord = {

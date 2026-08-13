@@ -77,13 +77,29 @@ const skillsBody = {
   properties: { skills: { type: 'array', items: { type: 'string' } } },
 } as const;
 
-const consumerBody = {
+const distributeBody = {
   type: 'object',
-  required: ['skills', 'consumer'],
+  required: ['to', 'skills', 'consumers'],
   additionalProperties: false,
   properties: {
+    to: { type: 'string', enum: ['user', 'project'] },
+    projectRoot: { type: 'string' },
     skills: { type: 'array', items: { type: 'string' } },
-    consumer: { type: 'string', enum: ['agents', 'claude'] },
+    consumers: { type: 'array', items: { type: 'string', enum: ['agents', 'claude'] } },
+    mode: { type: 'string', enum: ['symlink', 'copy'] },
+    force: { type: 'boolean' },
+  },
+} as const;
+
+const undistributeBody = {
+  type: 'object',
+  required: ['to', 'skills', 'consumers'],
+  additionalProperties: false,
+  properties: {
+    to: { type: 'string', enum: ['user', 'project'] },
+    projectRoot: { type: 'string' },
+    skills: { type: 'array', items: { type: 'string' } },
+    consumers: { type: 'array', items: { type: 'string', enum: ['agents', 'claude'] } },
   },
 } as const;
 
@@ -111,9 +127,15 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   const app = fastify({ logger: false });
 
   app.setErrorHandler((error: any, _request, reply) => {
-    reply.status(error.statusCode && error.statusCode >= 400 ? error.statusCode : 500).send({
+    const code = errorCode(error);
+    const status = error.statusCode && error.statusCode >= 400
+      ? error.statusCode
+      : code === 'distribute_foreign_exists'
+        ? 409
+        : 500;
+    reply.status(status).send({
       ok: false,
-      error: { code: errorCode(error), message: errorMessage(error), details: (error as { details?: unknown }).details },
+      error: { code, message: errorMessage(error), details: (error as { details?: unknown }).details },
     });
   });
 
@@ -127,6 +149,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const doctor = services.doctor.check();
     const registry = services.registry.load();
     const sources = updatePlan.groups.map((group) => ({ ...group, installedSkills: group.skills.map((skill) => skill.skill) }));
+    const index = services.distribute.listIndex();
     return {
       skillHome: services.home.root,
       resolution: services.resolution,
@@ -142,8 +165,13 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
       counts: {
         skills: skills.length,
         sources: sources.length,
-        agents: doctor.viewLinks.agents,
-        claude: doctor.viewLinks.claude,
+        agents: doctor.distribution.agents,
+        claude: doctor.distribution.claude,
+        outdated: doctor.distribution.outdated,
+      },
+      distributions: {
+        user: index.find((record) => record.kind === 'user') || null,
+        projects: index.filter((record) => record.kind === 'project'),
       },
     };
   };
@@ -188,27 +216,100 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return data(result);
   });
 
-  app.post('/api/skills/expose', { schema: { body: consumerBody } }, async (request) => {
-    const body = request.body as { skills: string[]; consumer: string };
+  app.post('/api/distribute', { schema: { body: distributeBody } }, async (request) => {
+    const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; consumers: string[]; mode?: 'symlink' | 'copy'; force?: boolean };
     const services = getServices();
-    for (const skill of body.skills) services.views.expose(skill, [body.consumer]);
-    services.activity.record({ action: 'expose', summary: `Exposed ${body.skills.length} skill(s) to ${body.consumer}`, details: body });
-    return data({ skills: body.skills, consumer: body.consumer });
+    const result = services.distribute.apply(body);
+    services.activity.record({ action: 'distribute', summary: `Distributed ${body.skills.length} skill(s) to ${body.to}`, details: body });
+    return data(result);
   });
 
-  app.post('/api/skills/hide', { schema: { body: consumerBody } }, async (request) => {
+  app.post('/api/undistribute', { schema: { body: undistributeBody } }, async (request) => {
+    const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; consumers: string[] };
+    const services = getServices();
+    const result = services.distribute.undistribute(body);
+    services.activity.record({ action: 'undistribute', summary: `Undistributed ${body.skills.length} skill(s) from ${body.to}`, details: body });
+    return data(result);
+  });
+
+  app.post('/api/redistribute', { schema: { body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      outdated: { type: 'boolean' },
+      to: { type: 'string', enum: ['user', 'project'] },
+      projectRoot: { type: 'string' },
+      force: { type: 'boolean' },
+    },
+  } } }, async (request) => {
+    const body = request.body as { outdated?: boolean; to?: 'user' | 'project'; projectRoot?: string; force?: boolean };
+    const services = getServices();
+    const result = services.distribute.redistributeOutdated(body);
+    services.activity.record({ action: 'redistribute', summary: 'Redistributed outdated targets', details: body });
+    return data(result);
+  });
+
+  app.post('/api/distribute/rollback', { schema: { body: {
+    type: 'object',
+    required: ['to'],
+    additionalProperties: false,
+    properties: { to: { type: 'string', enum: ['user', 'project'] }, projectRoot: { type: 'string' } },
+  } } }, async (request) => {
+    const body = request.body as { to: 'user' | 'project'; projectRoot?: string };
+    const services = getServices();
+    const result = services.distribute.rollback(body.to, body.projectRoot);
+    services.activity.record({ action: 'distribute-rollback', summary: `Rolled back ${body.to} distribution`, details: body });
+    return data(result);
+  });
+
+  app.post('/api/migrate-views', { schema: { body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: { deleteViews: { type: 'boolean' }, force: { type: 'boolean' } },
+  } } }, async (request) => {
+    const body = (request.body || {}) as { deleteViews?: boolean; force?: boolean };
+    const services = getServices();
+    const result = services.distribute.migrateViews(body);
+    services.activity.record({ action: 'migrate-views', summary: 'Migrated leftover hub views to user distribute', details: result });
+    return data(result);
+  });
+
+  app.post('/api/skills/expose', { schema: { body: {
+    type: 'object',
+    required: ['skills', 'consumer'],
+    additionalProperties: false,
+    properties: {
+      skills: { type: 'array', items: { type: 'string' } },
+      consumer: { type: 'string', enum: ['agents', 'claude'] },
+    },
+  } } }, async (request) => {
     const body = request.body as { skills: string[]; consumer: string };
     const services = getServices();
-    for (const skill of body.skills) services.views.hide(skill, [body.consumer]);
-    services.activity.record({ action: 'hide', summary: `Hid ${body.skills.length} skill(s) from ${body.consumer}`, details: body });
-    return data({ skills: body.skills, consumer: body.consumer });
+    const result = services.distribute.apply({ to: 'user', skills: body.skills, consumers: [body.consumer] });
+    services.activity.record({ action: 'expose', summary: `Distributed ${body.skills.length} skill(s) to user ${body.consumer}`, details: body });
+    return data(result);
+  });
+
+  app.post('/api/skills/hide', { schema: { body: {
+    type: 'object',
+    required: ['skills', 'consumer'],
+    additionalProperties: false,
+    properties: {
+      skills: { type: 'array', items: { type: 'string' } },
+      consumer: { type: 'string', enum: ['agents', 'claude'] },
+    },
+  } } }, async (request) => {
+    const body = request.body as { skills: string[]; consumer: string };
+    const services = getServices();
+    const result = services.distribute.undistribute({ to: 'user', skills: body.skills, consumers: [body.consumer] });
+    services.activity.record({ action: 'hide', summary: `Undistributed ${body.skills.length} skill(s) from user ${body.consumer}`, details: body });
+    return data(result);
   });
 
   app.post('/api/registry/edit', { schema: { body: registryEditBody } }, async (request) => {
     const body = request.body as { skill: string; patch: Record<string, unknown> };
     const services = getServices();
     const entry = services.registry.editSafeFields(body.skill, body.patch);
-    services.views.rebuildViews();
     services.views.rebuildCollections();
     services.activity.record({ action: 'registry-edit', summary: `Edited registry metadata for ${body.skill}`, details: { skill: body.skill, patch: body.patch } });
     return data(entry);
