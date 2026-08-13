@@ -1,0 +1,18 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "Dashboard Linear quiet": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-08-13T11:21:57.412Z",
+          "status": "needs-review"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-08-13T11:21:57.413Z",
+  "updatedAt": "2026-08-13T11:21:57.413Z"
+}

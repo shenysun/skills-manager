@@ -6,7 +6,10 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 
 - **Skill**: A directory containing a `SKILL.md` file and optional supporting files.
 - **Canonical skill**: The maintained copy under hub `skills/<skill-name>/` — the only content tree for that skill identity.
-- **Consumer**: A runtime that loads skills. v1: **`agents`** and **`claude`**. Exposure to a consumer means **distribution** into that consumer’s runtime skill directory, not a hub-side view tree.
+- **Agent**: An id from the **vercel-labs/skills agent table** (the only catalog): e.g. `claude-code`, `cursor`, `codex`. Each row has a project path and a global path. Skills-manager does not invent a parallel list of consumers.
+  _Avoid_: A closed set of two consumers named `agents` and `claude`; calling the shared `.agents/skills/` bucket “the Agents product”.
+- **Runtime skill directory**: The folder an agent actually loads (`~/.claude/skills`, `~/.cursor/skills`, project `.agents/skills`, …). Several agents can share one directory.
+- **Consumer** (legacy word): Prefer **Agent**. Old registry tags `agents`/`claude` are not the catalog.
 - **Registry**: `registry.yaml`, the metadata source for skill paths, categories, consumers (desired/default consumer tags), source repositories, refs, and upstream commits.
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
 - **Source-first install**: The preferred install flow: provide a source first, discover available `SKILL.md` files, then choose skills to install or update.
@@ -91,7 +94,7 @@ After distribute, skill entries are written under consumer runtime directories:
 - **`mode=symlink`:** runtime `…/skills/<name>` → hub **`skills/<name>/`** (direct; one hop).
 - **`mode=copy`:** materialize from hub **`skills/<name>/`**.
 - **Delete / do not require `views/`:** hub layout no longer includes `views/agents` or `views/claude` as product surface. Legacy `expose`/`hide`/`rebuild-views` become **distribute / undistribute** (or aliases) against R1 runtime paths.
-- Registry may still store consumer *tags* as metadata defaults for “suggest distribute to agents/claude”; they do not imply a views tree.
+- Registry may still store agent *tags* as metadata defaults; they must be catalog ids (or migrate from legacy `agents`/`claude`), and they do not imply a views tree.
 - **Collections** (category symlink trees under hub `collections/`) **remain** for organization/browsing only — not a consumer load path. Distinct from removed `views/`.
 
 ### Distribution receipts (ratified — L1)
