@@ -1,7 +1,8 @@
 import path from 'node:path';
 import YAML from 'yaml';
-import type { Consumer, Registry, RegistryEntry, Skill, SkillName, SkillHome } from '../model/index.js';
+import { CONSUMERS, type Consumer, type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
+import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, normalizeTags, parseConsumers, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
 
 export class RegistryService {
@@ -10,7 +11,14 @@ export class RegistryService {
   load(): Registry {
     if (!this.fs.exists(this.home.registryFile)) return { skills: {} };
     const parsed = YAML.parse(this.fs.readText(this.home.registryFile)) as Registry | null;
-    return parsed && typeof parsed === 'object' && parsed.skills ? parsed : { skills: {} };
+    const registry = parsed && typeof parsed === 'object' && parsed.skills ? parsed : { skills: {} };
+    const legacy = Object.entries(registry.skills || {})
+      .filter(([, entry]) => (entry.consumers || []).some((value) => (CONSUMERS as readonly string[]).includes(value)))
+      .map(([name]) => name);
+    if (legacy.length > 0) {
+      throw new SkillsManagerError('legacy_consumer_tags', `registry.yaml still uses legacy consumer tags (agents/claude) on: ${legacy.join(', ')}. Run \`skills-manager migrate-consumers\` to migrate them to catalog agent ids.`);
+    }
+    return registry;
   }
 
   save(registry: Registry) {
@@ -88,7 +96,8 @@ export class RegistryService {
 
   defaultEntry(skill: SkillName, patch: Partial<RegistryEntry> = {}): RegistryEntry {
     assertSafeSkillName(skill);
-    const consumers = patch.consumers !== undefined ? parseConsumers(patch.consumers, undefined, { allowEmpty: true }) : ['agents', 'claude'] satisfies Consumer[];
+    // No legacy default tags: desired agents are catalog ids (see ADR-0004).
+    const consumers = patch.consumers !== undefined ? parseConsumers(patch.consumers, undefined, { allowEmpty: true }) : [];
     const entry: RegistryEntry = {
       path: `skills/${skill}`,
       title: skill,

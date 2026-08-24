@@ -74,4 +74,12 @@ describe('distribute CLI surface', () => {
     run(['undistribute', '--to', 'user', '--skill', 'alpha', '--agent', 'zed']);
     expect(existsSync(path.join(userHome, '.agents', 'skills', 'alpha'))).toBe(false);
   });
+
+  it('exposes migrate-consumers and catalog commands', () => {
+    const migration = run(['migrate-consumers', '--dry-run']);
+    expect(migration.status).toBe(0);
+    expect(JSON.parse(migration.stdout).agentMapping.claude).toEqual(['claude-code']);
+    const info = run(['catalog', 'info']);
+    expect(info.status).toBe(0);
+  });
 });

@@ -392,11 +392,16 @@ export class DistributeService {
 
   private loadIndex(): DistributionIndexRecord[] {
     if (this.fs.kind(this.indexPath()) !== 'file') return [];
-    return this.fs.readText(this.indexPath())
+    const records = this.fs.readText(this.indexPath())
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => JSON.parse(line) as DistributionIndexRecord);
+    const legacy = records.some((record) => record.entries.some((entry) => (CONSUMERS as readonly string[]).includes((entry as { consumer?: string }).consumer ?? '')));
+    if (legacy) {
+      throw new SkillsManagerError('legacy_consumer_tags', 'The hub distribution index still uses legacy consumer entries. Run `skills-manager migrate-consumers` to migrate them to catalog agent ids.');
+    }
+    return records;
   }
 
   private loadRecord(id: string) {

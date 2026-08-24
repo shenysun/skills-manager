@@ -178,6 +178,23 @@ program.command('migrate-views')
     print(result);
   });
 
+program.command('migrate-consumers')
+  .description('One-shot migration of legacy agents/claude tags to catalog agent ids (registry, hub index, project receipts)')
+  .option('--dry-run', 'print the migration plan without touching disk')
+  .option('--rollback', 'restore the files backed up by the last migration')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    if (opts.rollback) {
+      s.migration.rollback();
+      s.activity.record({ action: 'cli-migrate-consumers-rollback', summary: 'Rolled back migrate-consumers' });
+      return print({ rolledBack: true });
+    }
+    if (opts.dryRun) return print(s.migration.plan());
+    const result = s.migration.apply();
+    s.activity.record({ action: 'cli-migrate-consumers', summary: `Migrated legacy consumer tags (${result.migrated.indexEntries} index entries)`, details: result });
+    print(result);
+  });
+
 program.command('rebuild-collections').description('Regenerate category collections').action((_opts, cmd) => { services(cmd).views.rebuildCollections(); print('collections rebuilt'); });
 program.command('archive').description('Archive canonical skills without permanent deletion').argument('<skills...>').action((skills, cmd) => print(services(cmd).archive.archiveSkills(skills)));
 program.command('adopt').description('Adopt a real directory from a generated view into canonical skills').argument('<view>').argument('<skill>').argument('[alsoConsumers...]').action((view, skill, alsoConsumers, cmd) => print(services(cmd).adopt.adopt(view, skill, alsoConsumers || [])));
