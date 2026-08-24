@@ -3,6 +3,7 @@ import { computed, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { NCheckbox, NCode, NEllipsis, NSpace, NTag, NText, useDialog, type DataTableColumns } from 'naive-ui';
 import SkillDrawer from '../components/SkillDrawer.vue';
+import AgentPickerSheet, { type AgentPickerPayload } from '../components/AgentPickerSheet.vue';
 import ConsumerBadges from '../components/ConsumerBadges.vue';
 import { ApiError, api, state, type Skill, type UpdateCandidate } from '../composables/useApi';
 import { useOperationNotification } from '../composables/useOperationNotification';
@@ -206,9 +207,9 @@ async function confirmForeignThenRetry(retry: () => Promise<unknown>, message: s
 async function runDistributeAction(action: string, fn: (forceFlag: boolean) => Promise<unknown>, success: string) {
   busyAction.value = action;
   try {
-    await runWithNotification(() => fn(force.value), { loading: t('loading.distributing'), success, error: t('notification.failed') });
+    await runWithNotification(() => fn(false), { loading: t('loading.distributing'), success, error: t('notification.failed') });
   } catch (error) {
-    if (error instanceof ApiError && error.code === 'distribute_foreign_exists' && !force.value) {
+    if (error instanceof ApiError && error.code === 'distribute_foreign_exists') {
       await confirmForeignThenRetry(
         () => runWithNotification(() => fn(true), { loading: t('loading.distributing'), success, error: t('notification.failed') }),
         error.message,
@@ -225,22 +226,31 @@ const updateCandidates = (skills: string[]) => runSkillAction('update-candidates
 const updateOne = (skill: string) => runSkillAction(`update-${skill}`, t('loading.updatingSkill', { skill }), t('notification.updateDone'), () => api('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills: [skill] }) }));
 const targetKind = ref<'user' | 'project'>('user');
 const projectRoot = ref('');
-const mode = ref<string | null>(null);
-const force = ref(false);
 
-function distributePayload(consumerName: string, only?: string, forceFlag = false) {
-  return {
-    to: targetKind.value,
-    projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined,
-    skills: only ? [only] : selected.value,
-    consumers: [consumerName],
-    mode: mode.value || undefined,
-    force: forceFlag,
-  };
+const pickerVisible = ref(false);
+const pickerSkills = ref<string[]>([]);
+const picker = ref<InstanceType<typeof AgentPickerSheet> | null>(null);
+
+function openPicker(skills?: string) {
+  pickerSkills.value = skills ? [skills] : selected.value;
+  pickerVisible.value = true;
 }
 
-const distribute = (consumerName: string, only?: string) => runDistributeAction(`distribute-${consumerName}`, (forceFlag) => api('/api/distribute', { method: 'POST', body: JSON.stringify(distributePayload(consumerName, only, forceFlag)) }), t('notification.distributeDone'));
-const undistribute = (consumerName: string, only?: string) => runSkillAction(`undistribute-${consumerName}`, t('loading.undistributing'), t('notification.undistributeDone'), () => api('/api/undistribute', { method: 'POST', body: JSON.stringify({ to: targetKind.value, projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined, skills: only ? [only] : selected.value, consumers: [consumerName] }) }));
+function pickerBody(payload: AgentPickerPayload) {
+  return JSON.stringify({ to: payload.to, projectRoot: payload.projectRoot, skills: payload.skills, agents: payload.agents, mode: payload.mode, force: payload.force });
+}
+
+async function applyPicker(payload: AgentPickerPayload) {
+  await runDistributeAction('picker-apply', (forceFlag) => api('/api/distribute', { method: 'POST', body: pickerBody({ ...payload, force: forceFlag || payload.force }) }), t('notification.distributeDone'));
+  picker.value?.remember();
+  pickerVisible.value = false;
+}
+
+async function removePicker(payload: AgentPickerPayload) {
+  await runSkillAction('picker-remove', t('loading.undistributing'), t('notification.undistributeDone'), () => api('/api/undistribute', { method: 'POST', body: JSON.stringify({ to: payload.to, projectRoot: payload.projectRoot, skills: payload.skills, agents: payload.agents }) }));
+  pickerVisible.value = false;
+}
+
 const redistributeOutdated = () => runDistributeAction('redistribute', (forceFlag) => api('/api/redistribute', { method: 'POST', body: JSON.stringify({ outdated: true, to: targetKind.value, projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined, force: forceFlag }) }), t('notification.redistributeDone'));
 const rollbackDistribute = () => runSkillAction('rollback', t('loading.distributing'), t('notification.rollbackDone'), () => api('/api/distribute/rollback', { method: 'POST', body: JSON.stringify({ to: targetKind.value, projectRoot: targetKind.value === 'project' ? projectRoot.value : undefined }) }));
 const archive = (only?: string) => runSkillAction('archive', t('loading.archiving'), t('notification.archiveDone'), () => api('/api/skills/archive', { method: 'POST', body: JSON.stringify({ skills: only ? [only] : selected.value }) }));
@@ -285,12 +295,7 @@ const archive = (only?: string) => runSkillAction('archive', t('loading.archivin
             <n-button :disabled="!updateCandidateNames.length" :loading="busyAction === 'update-candidates'" @click="updateCandidates(updateCandidateNames)">{{ t('installed.updateAllCandidates') }}</n-button>
             <n-select v-model:value="targetKind" :options="[{ label: t('installed.distributeUser'), value: 'user' }, { label: t('installed.distributeProject'), value: 'project' }]" style="min-width: 280px" />
             <n-input v-if="targetKind === 'project'" v-model:value="projectRoot" :placeholder="t('installed.projectRoot')" style="min-width: 280px" />
-            <n-select v-model:value="mode" clearable :placeholder="t('installed.modeDefault')" :options="[{ label: t('installed.modeSymlink'), value: 'symlink' }, { label: t('installed.modeCopy'), value: 'copy' }]" style="min-width: 220px" />
-            <n-checkbox v-model:checked="force">{{ t('installed.forceOverwrite') }}</n-checkbox>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'distribute-agents'" @click="distribute('agents')">{{ t('installed.exposeConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'distribute-claude'" @click="distribute('claude')">{{ t('installed.exposeConsumer', { consumer: 'claude' }) }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'undistribute-agents'" tertiary @click="undistribute('agents')">{{ t('installed.hideConsumer', { consumer: 'agents' }) }}</n-button>
-            <n-button :disabled="!selected.length" :loading="busyAction === 'undistribute-claude'" tertiary @click="undistribute('claude')">{{ t('installed.hideConsumer', { consumer: 'claude' }) }}</n-button>
+            <n-button type="primary" :disabled="!selected.length" :loading="busyAction === 'picker-apply'" @click="openPicker()">{{ t('installed.connect') }}</n-button>
             <n-button secondary :loading="busyAction === 'redistribute'" @click="redistributeOutdated">{{ t('installed.redistributeOutdated') }}</n-button>
             <n-button secondary :loading="busyAction === 'rollback'" @click="rollbackDistribute">{{ t('installed.rollback') }}</n-button>
             <n-button :disabled="!selected.length" :loading="busyAction === 'archive'" type="error" secondary @click="archive()">{{ t('installed.archiveSelected') }}</n-button>
@@ -333,6 +338,7 @@ const archive = (only?: string) => runSkillAction('archive', t('loading.archivin
       </n-space>
     </n-card>
 
-    <SkillDrawer :busy-action="busyAction" :skill="openSkill" @close="openSkill = null" @update="updateOne" @expose="(skill, selectedConsumer) => distribute(selectedConsumer, skill)" @hide="(skill, selectedConsumer) => undistribute(selectedConsumer, skill)" @archive="archive" />
+    <SkillDrawer :busy-action="busyAction" :skill="openSkill" @close="openSkill = null" @update="updateOne" @connect="(skill: string) => openPicker(skill)" @archive="archive" />
+    <AgentPickerSheet ref="picker" :show="pickerVisible" :skills="pickerSkills" :busy-action="busyAction" @close="pickerVisible = false" @apply="applyPicker" @remove="removePicker" />
   </n-space>
 </template>
