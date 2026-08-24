@@ -8,7 +8,9 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Canonical skill**: The maintained copy under hub `skills/<skill-name>/` — the only content tree for that skill identity.
 - **Agent**: An id from the **vercel-labs/skills agent table** (the only catalog): e.g. `claude-code`, `cursor`, `codex`. Each row has a project path and a global path. Skills-manager does not invent a parallel list of consumers.
   _Avoid_: A closed set of two consumers named `agents` and `claude`; calling the shared `.agents/skills/` bucket “the Agents product”.
-- **Runtime skill directory**: The folder an agent actually loads (`~/.claude/skills`, `~/.cursor/skills`, project `.agents/skills`, …). Several agents can share one directory.
+- **Detected agent**: An agent the **`npx skills` CLI would target with no `-a`** on this machine. Skills-manager uses that same determination; it does not invent a second heuristic.
+  _Avoid_: A private PATH/folder scan that disagrees with `npx skills`; writing into every catalog home.
+- **Runtime skill directory**: The folder an agent actually loads (`~/.claude/skills`, `~/.cursor/skills`, project `.agents/skills`, …). Several agents can share one directory. A distribute apply writes each distinct path **once**.
 - **Consumer** (legacy word): Prefer **Agent**. Old registry tags `agents`/`claude` are not the catalog.
 - **Registry**: `registry.yaml`, the metadata source for skill paths, categories, consumers (desired/default consumer tags), source repositories, refs, and upstream commits.
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
@@ -76,18 +78,21 @@ Aim for:
 6. **Doctor visibility** — broken symlinks, outdated copies, unmanaged files in target dirs.
 7. **Subset distribute** — never require shipping the entire hub to a project.
 
-### Runtime destination paths (ratified — R1)
+### Catalog and writer (ratified)
 
-After distribute, skill entries are written under consumer runtime directories:
+- **Catalog + detection:** vercel-labs/skills agent table and the same “detected” set as `npx skills` with no `-a`.
+- **Writer:** skills-manager **distribute** still writes runtime directories (hub remains the only content library). Do **not** shell out to `npx skills` as the apply implementation.
+- Shared runtime paths are written **once** per apply even when several selected agents map to the same folder.
+- **Default apply UI:** The primary action is **接入**, which opens a picker of the **full catalog**. The remembered selection is **exactly the last confirmed apply**. Cancel does not update memory. First open (no confirm yet): detected agents are checked.
+  _Avoid_: Two fixed buttons (Claude / Agents); one-click wire-all; persisting ticks from a cancelled sheet.
 
-| Target kind | agents | claude |
-|-------------|--------|--------|
-| **User** | `~/.agents/skills/<name>` | `~/.claude/skills/<name>` |
-| **Project** | `<project-root>/.agents/skills/<name>` | `<project-root>/.claude/skills/<name>` |
+### Runtime destination paths (ratified — R1, superseded in part)
 
-- Only consumers selected for that distribute operation receive entries.
-- **Live load paths are only the runtime directories above** — there is no intermediate hub `views/` layer.
-- Project portable delivery (default **copy**) places real trees under those project runtime paths so clone-and-use works without skills-manager.
+Paths come from the **vercel-labs/skills agent table** (global vs project column per agent id), not a two-column agents/claude matrix. The old R1 table (`~/.agents` + `~/.claude` only) is a special case of that catalog, not the product limit.
+
+- Only **selected or detected** agents receive entries.
+- **Live load paths are only those runtime directories** — there is no intermediate hub `views/` layer.
+- Project portable delivery (default **copy**) materializes into each selected agent’s **project** path from the catalog.
 
 ### Symlink target and removal of views (ratified)
 
