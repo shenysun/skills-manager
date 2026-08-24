@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCoreServices } from '../core/index.js';
 import { SkillHomeResolver, type SkillHomeResolution } from '../core/services/skill-home-resolver.js';
+import type { CatalogSnapshot } from '../core/model/catalog.js';
 import { NodeFileSystem } from './fs-skill-home.js';
 import { GitCli } from './git-cli.js';
 import { ShellRunner } from './shell-runner.js';
@@ -11,6 +12,7 @@ export type RuntimeOptions = {
   cwd?: string;
   env?: Record<string, string | undefined>;
   userHome?: string;
+  catalogSnapshot?: CatalogSnapshot;
 };
 
 export function projectRootFromImportMeta(metaUrl: string) {
@@ -25,7 +27,7 @@ export function createRuntimeServices(options: RuntimeOptions = {}, projectRoot 
   const processRunner = new ShellRunner();
   const env = options.env || process.env;
   const userHome = options.userHome || env.SKILLS_MANAGER_USER_HOME;
-  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome });
+  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome, env: options.env, catalogSnapshot: options.catalogSnapshot });
   services.skillHome.ensure();
   return { ...services, resolution } satisfies ReturnType<typeof createCoreServices> & { resolution: SkillHomeResolution };
 }

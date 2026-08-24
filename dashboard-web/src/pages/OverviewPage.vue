@@ -58,10 +58,10 @@ function activityMeta(activity: ActivityRecord) {
         <n-card><n-statistic :label="t('overview.sources')" :value="state?.counts?.sources || 0" /></n-card>
       </n-gi>
       <n-gi>
-        <n-card><n-statistic :label="t('overview.agents')" :value="state?.counts?.agents || 0" /></n-card>
+        <n-card><n-statistic :label="t('overview.managedEntries')" :value="state?.counts?.managedEntries || 0" /></n-card>
       </n-gi>
       <n-gi>
-        <n-card><n-statistic :label="t('overview.claude')" :value="state?.counts?.claude || 0" /></n-card>
+        <n-card><n-statistic :label="t('overview.agentCoverage')" :value="state?.counts?.agentCoverage || 0" /></n-card>
       </n-gi>
       <n-gi>
         <n-card><n-statistic :label="t('overview.outdated')" :value="state?.counts?.outdated || 0" /></n-card>

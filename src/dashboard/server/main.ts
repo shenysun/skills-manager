@@ -165,8 +165,8 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
       counts: {
         skills: skills.length,
         sources: sources.length,
-        agents: doctor.distribution.managedEntries,
-        claude: doctor.distribution.agentCoverage,
+        managedEntries: doctor.distribution.managedEntries,
+        agentCoverage: doctor.distribution.agentCoverage,
         outdated: doctor.distribution.outdated,
       },
       distributions: {
@@ -178,6 +178,28 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
 
   app.get('/api/state', async () => data(state()));
   app.get('/api/skills', async () => data(state().skills));
+
+  // Picker data endpoint: the full catalog filtered for a scope, with detected
+  // flags, family keys for shared-path grouping, and invalid reasons.
+  app.get('/api/catalog/agents', async (request) => {
+    const query = request.query as { scope?: string; projectRoot?: string };
+    const scope = query.scope === 'project' ? 'project' : 'user';
+    const services = getServices();
+    const snapshot = services.catalog.load();
+    const detected = new Set(services.catalog.detected());
+    const projectRoot = query.projectRoot ? path.resolve(query.projectRoot) : process.cwd();
+    const agents = snapshot.agents.map((agent) => {
+      if (scope === 'user') {
+        if (!agent.globalSkillsDir) {
+          return { id: agent.id, label: agent.label, detected: detected.has(agent.id), familyKey: null, invalidReason: 'Project-only agent: the catalog has no global runtime path for it. Switch to project scope to use it.' };
+        }
+        const familyKey = services.catalog.resolveGlobalDir(agent.id);
+        return { id: agent.id, label: agent.label, detected: detected.has(agent.id), familyKey, invalidReason: familyKey === null ? 'Global runtime dir cannot be resolved on this machine.' : null };
+      }
+      return { id: agent.id, label: agent.label, detected: detected.has(agent.id), familyKey: path.join(projectRoot, agent.skillsDir), invalidReason: null };
+    });
+    return data({ scope, agents });
+  });
   app.get('/api/sources', async () => data(state().sources));
   app.get('/api/updates', async () => data(getServices().update.plan()));
   app.get('/api/registry', async () => data(getServices().registry.load()));
