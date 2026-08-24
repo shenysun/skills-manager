@@ -8,8 +8,11 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Canonical skill**: The maintained copy under hub `skills/<skill-name>/` — the only content tree for that skill identity.
 - **Agent**: An id from the **vercel-labs/skills agent table** (the only catalog): e.g. `claude-code`, `cursor`, `codex`. Each row has a project path and a global path. Skills-manager does not invent a parallel list of consumers.
   _Avoid_: A closed set of two consumers named `agents` and `claude`; calling the shared `.agents/skills/` bucket “the Agents product”.
-- **Detected agent**: An agent the **`npx skills` CLI would target with no `-a`** on this machine. Skills-manager uses that same determination; it does not invent a second heuristic.
+- **Detected agent**: An agent the **`npx skills` CLI would target with no `-a`** on this machine. Skills-manager uses that same determination; it does not invent a second heuristic. The determination runs **locally against the catalog snapshot** — same rule, same data, refreshed together.
   _Avoid_: A private PATH/folder scan that disagrees with `npx skills`; writing into every catalog home.
+- **Agent catalog snapshot**: The vercel-labs/skills agent table bundled as a versioned data file inside the package (agent id, global path, project path, detection rule; stamped with upstream commit + date). The single source for agent enumeration, destination paths, and detection; updated only by explicit `catalog refresh`.
+  _Avoid_: Runtime fetching of the table; hard-coding agent lists or detection rules in code.
+- **Agent family**: The set of catalog agents sharing one physical runtime directory (e.g. the ~30 agents on `~/.agents/skills`). Selection is always by agent id; a family is never a selection unit — it exists only as picker select-all convenience and badge grouping.
 - **Runtime skill directory**: The folder an agent actually loads (`~/.claude/skills`, `~/.cursor/skills`, project `.agents/skills`, …). Several agents can share one directory. A distribute apply writes each distinct path **once**.
 - **Consumer** (legacy word): Prefer **Agent**. Old registry tags `agents`/`claude` are not the catalog.
 - **Registry**: `registry.yaml`, the metadata source for skill paths, categories, consumers (desired/default consumer tags), source repositories, refs, and upstream commits.
@@ -23,7 +26,7 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Distribution target**: A user- or project-side place that **receives a selected subset** of hub skills for *use*, not a second independent source of truth for the same skill identity.
 - **User distribution**: Publishing hub skills into the operator’s user-level **runtime skill directories**.
 - **Project distribution**: Publishing a subset of hub skills into a given project’s **runtime skill directories**; one hub skill can be distributed to many projects.
-- **Distribution receipt**: Manifest/state recording what was distributed where (mode, consumers, hub fingerprint) — project-side and/or hub-side index; **not** a second canonical skill library.
+- **Distribution receipt**: Manifest/state recording what was distributed where — a **physical layer** (path, mode, fingerprint, managed marker) plus a **logical layer** (the catalog agent ids that motivated the write) — project-side and/or hub-side index; **not** a second canonical skill library.
   _Avoid_: Managing the same logical skill as separate full trees in every project home as the primary model.
 - **View (removed)**: Formerly a generated symlink tree under `views/<consumer>/`. **Superseded by distribute-to-runtime.** Do not reintroduce hub `views/` as a required layout.
 
@@ -98,7 +101,7 @@ Paths come from the **vercel-labs/skills agent table** (global vs project column
 
 - **`mode=symlink`:** runtime `…/skills/<name>` → hub **`skills/<name>/`** (direct; one hop).
 - **`mode=copy`:** materialize from hub **`skills/<name>/`**.
-- **Delete / do not require `views/`:** hub layout no longer includes `views/agents` or `views/claude` as product surface. Legacy `expose`/`hide`/`rebuild-views` become **distribute / undistribute** (or aliases) against R1 runtime paths.
+- **Delete / do not require `views/`:** hub layout no longer includes `views/agents` or `views/claude` as product surface. Legacy `expose`/`hide`/`rebuild-views` were deprecated aliases, then **deleted outright** (2026-08-24, pre-publish clean break — see any-agent distribute section).
 - Registry may still store agent *tags* as metadata defaults; they must be catalog ids (or migrate from legacy `agents`/`claude`), and they do not imply a views tree.
 - **Collections** (category symlink trees under hub `collections/`) **remain** for organization/browsing only — not a consumer load path. Distinct from removed `views/`.
 
@@ -129,11 +132,24 @@ When a runtime path `…/skills/<name>` already exists:
 
 Hub **`collections/`** stays as a generated category organization tree. It is not used for agents/claude loading. Consumer loading is only via **distribute** to R1 runtime paths.
 
+### Any-agent distribute via catalog snapshot (ratified — grill 2026-08-24)
+
+Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agents`/`claude` pair. Recorded in [ADR-0004](docs/adr/0004-any-agent-distribute-catalog-snapshot.md); research notes in `.scratch/agent-catalog-distribute/research-agent-catalog.md`.
+
+1. **Catalog data** — bundled snapshot (extracted from upstream `src/agents.ts`; MIT, attribution kept; stamped with upstream commit + date) + explicit `catalog refresh` command. No runtime fetch, no shelling out to `npx skills`.
+2. **Detection** — detection rules ship **as data inside the snapshot**; the same rule runs locally against the same data. Detected is only: the CLI default target when no `--agent` is given, and first-open picker checks. Never a gate.
+3. **Receipts are dual-layer** — the physical entry (path, mode, fingerprint, managed marker) carries undistribute / outdated / foreign-refusal; the logical layer (agent id list) carries provenance and display. Shared-path undistribute uses **reference counting**: the physical entry is removed only when its last referencing agent is undistributed.
+4. **No-baggage migration** — the loader **hard-fails** on legacy `agents`/`claude` tags with an actionable error pointing at `migrate-consumers`, which rewrites `registry.yaml` **and** existing hub receipts/index in one shot (dry-run + rollback). Mapping is identity-preserving: `claude` → `claude-code`; `agents` → every catalog id whose global path is `~/.agents/skills` (≈30 ids; the file gets verbose — accepted). Zero permanent translation layer. (Supersedes an earlier in-grill lean toward permanent read-time normalization.)
+5. **Scope axis** — user/project stays orthogonal to agent selection and is chosen first; the picker filters validity per scope. Project-only agents (`eve`, `promptscript`) appear **grayed with a reason** on user scope, not hidden.
+6. **CLI surface** — `--agent <id...>` is the only selection flag; `--consumer`, `expose`, `hide`, `rebuild-views` are **deleted** (pre-publish break; the package has zero external users today). `--migrate-views` stays.
+7. **Picker shape** — search box + two sections (已检测 / 全部目录); family **select-all** on shared paths is pure UI sugar over an agent-id selection; one mode selector per apply (defaults user→symlink, project→copy); scope toggle at sheet top; memory is **per scope** and equals exactly the last confirmed apply.
+8. **Physical-first display & doctor** — badges show one chip per physical target with agent drill-down; Overview reports managed-entry count + unique agent coverage (replacing the `agents`/`claude` count fields); doctor scans only paths known from the hub index (plus the active project receipt), never the whole catalog.
+
 ### Design status
 
-**Shared understanding confirmed** (grill). Recorded in [ADR-0003](docs/adr/0003-hub-distribute-no-views.md).
+**Hub + distribute: shipped** — ADR-0003's open items (receipt/index schema, views migration, command shapes) were implemented in the `hub-distribute-no-views` feature.
 
-Remaining for `/to-spec` (not open product forks): exact receipt/index schema fields; migration steps for legacy hub `views/` on disk; CLI/Dashboard command shapes.
+**Any-agent distribute: shared understanding confirmed** (grill 2026-08-24). Recorded in ADR-0004; ready for `/to-spec`.
 
 ## Current product direction
 
@@ -179,8 +195,8 @@ Primary navigation is **five surfaces** (object-centric), not eight verb pages. 
 
 | Surface | Domain object / purpose | Hosted capabilities |
 |---------|-------------------------|---------------------|
-| Overview | Health and status at a glance | Counts (skills/sources/agents/claude), doctor warnings & broken links, Run Doctor, recent activity preview (link to Activity). **No** dedicated git-status card. |
-| Installed | Canonical skills already in the skill home | Search/filter, category workbench, multi-select, **by-skill update** (selected / all candidates / per drawer), expose/hide consumers, archive, skill detail drawer. |
+| Overview | Health and status at a glance | Counts (skills/sources, managed runtime entries + unique agent coverage), doctor warnings & broken links, Run Doctor, recent activity preview (link to Activity). **No** dedicated git-status card. |
+| Installed | Canonical skills already in the skill home | Search/filter, category workbench, multi-select, **by-skill update** (selected / all candidates / per drawer), distribute/undistribute via the 接入 picker, archive, skill detail drawer. |
 | Sources | Provenance groups and source-first install | **Library** tab: group by source, search, per-source select, **by-source update** (all/selected), discover-more-from-source. **Discover** tab: compact embedded source-first install wizard (not a standalone multi-step page; safety checks required, step chrome optional). |
 | Registry | Structured registry metadata | Structured edit of safe fields only (unchanged intent). |
 | Activity | Operation history + workspace snapshot | Operations timeline, git history list, skill home path, package name, npm pack dry-run. |
