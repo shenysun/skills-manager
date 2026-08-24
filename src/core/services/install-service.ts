@@ -19,7 +19,9 @@ export class InstallService {
   planInstall(sourceCheckout: SourceCheckout, discovered: DiscoveredSkill[], selectors: readonly string[], consumerValues?: readonly string[], options: { overwrite?: boolean } = {}): InstallPlan {
     const selected = this.selectDiscovered(discovered, selectors);
     this.source.assertUniqueSkillDestinations(selected);
-    const consumers = parseConsumers(consumerValues, ['agents', 'claude'] satisfies Consumer[]);
+    // No legacy default: installs stop tagging 'agents'/'claude' (see ADR-0004;
+    // registry tags are catalog ids, migrated by `migrate-consumers`).
+    const consumers = parseConsumers(consumerValues, [], { allowEmpty: true });
     const existing = selected.filter((skill) => this.registry.skillExists(skill.name)).map((skill) => skill.name);
     if (existing.length > 0 && !options.overwrite) {
       throw new SkillsManagerError('install_would_overwrite', `Install would overwrite existing skills: ${existing.join(', ')}`, { existing });

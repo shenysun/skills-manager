@@ -2,7 +2,6 @@
 import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
 import { startDashboardServer } from '../dashboard/server/main.js';
-import { CONSUMERS } from '../core/model/index.js';
 
 const projectRoot = projectRootFromImportMeta(import.meta.url);
 
@@ -67,10 +66,9 @@ catalog.command('info')
 
 program.command('list')
   .description('List installed skills')
-  .option('-c, --consumer <consumer>', `filter consumer: ${CONSUMERS.join(', ')}`)
   .option('--category <category>', 'filter category')
   .option('--include-archived', 'include archived entries')
-  .action((opts, cmd) => print(services(cmd).registry.listSkills({ consumer: opts.consumer, category: opts.category, includeArchived: opts.includeArchived })));
+  .action((opts, cmd) => print(services(cmd).registry.listSkills({ category: opts.category, includeArchived: opts.includeArchived })));
 
 program.command('add')
   .description('Discover from a source, then install selected skills')
@@ -78,7 +76,6 @@ program.command('add')
   .option('--list', 'only list discovered skills')
   .option('--all', 'install all discovered skills')
   .option('-s, --skill <skill...>', 'skill name or source subpath to install')
-  .option('-c, --consumer <consumer...>', `consumers: ${CONSUMERS.join(', ')}`)
   .option('-y, --yes', 'overwrite existing skills without prompting')
   .action((source, opts, cmd) => {
     const s = services(cmd);
@@ -87,7 +84,7 @@ program.command('add')
     if (opts.list) return print({ source: checkout, discovered });
     const selectors = opts.all ? discovered.map((skill) => skill.subpath) : (opts.skill || []);
     if (!opts.all && selectors.length === 0) throw new Error('Use --all or --skill <name-or-subpath> to choose skills in this non-interactive CLI.');
-    const result = s.install.installFromSourceSelection({ source, selectors, consumers: opts.consumer, overwrite: Boolean(opts.yes) });
+    const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes) });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
     print(result);
   });
@@ -110,15 +107,15 @@ const distribute = program.command('distribute')
   .option('--to <kind>', 'user or project')
   .option('--project <path>', 'project root (required when --to project)')
   .option('-s, --skill <skill...>', 'canonical skill names')
-  .option('-c, --consumer <consumer...>', `consumers: ${CONSUMERS.join(', ')}`)
+  .option('-a, --agent <id...>', 'catalog agent ids (repeatable); defaults to the detected set')
   .option('--mode <mode>', 'symlink or copy')
   .option('--force', 'overwrite unmanaged runtime paths')
   .enablePositionalOptions()
   .action((opts, cmd) => {
     if (!opts.to) throw new Error('--to is required (user or project)');
     const s = services(cmd);
-    const result = s.distribute.apply({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], consumers: opts.consumer, mode: opts.mode, force: Boolean(opts.force) });
-    s.activity.record({ action: 'cli-distribute', summary: `Distributed ${(opts.skill || []).join(', ')} to ${opts.to}`, details: opts });
+    const result = s.distribute.apply({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], agents: opts.agent, mode: opts.mode, force: Boolean(opts.force) });
+    s.activity.record({ action: 'cli-distribute', summary: `Distributed ${(opts.skill || []).join(', ')} to ${opts.to} for ${result.agents.join(', ')}`, details: opts });
     print(result);
   });
 
@@ -141,10 +138,10 @@ program.command('undistribute')
   .requiredOption('--to <kind>', 'user or project')
   .option('--project <path>', 'project root (required when --to project)')
   .option('-s, --skill <skill...>', 'canonical skill names')
-  .option('-c, --consumer <consumer...>', `consumers: ${CONSUMERS.join(', ')}`)
+  .option('-a, --agent <id...>', 'catalog agent ids (repeatable); defaults to the detected set')
   .action((opts, cmd) => {
     const s = services(cmd);
-    const result = s.distribute.undistribute({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], consumers: opts.consumer });
+    const result = s.distribute.undistribute({ to: opts.to, projectRoot: opts.project, skills: opts.skill || [], agents: opts.agent });
     s.activity.record({ action: 'cli-undistribute', summary: `Undistributed ${(opts.skill || []).join(', ')} from ${opts.to}`, details: opts });
     print(result);
   });
@@ -180,19 +177,6 @@ program.command('migrate-views')
     print(result);
   });
 
-program.command('expose').description('Deprecated alias: distribute selected skills to the user runtime').argument('<consumer>').argument('<skills...>').action((consumer, skills, cmd) => {
-  const s = services(cmd);
-  const result = s.distribute.apply({ to: 'user', skills, consumers: [consumer] });
-  s.activity.record({ action: 'cli-expose', summary: `Distributed ${skills.join(', ')} to user ${consumer}`, details: { consumer, skills } });
-  print(result);
-});
-program.command('hide').description('Deprecated alias: undistribute selected skills from the user runtime').argument('<consumer>').argument('<skills...>').action((consumer, skills, cmd) => {
-  const s = services(cmd);
-  const result = s.distribute.undistribute({ to: 'user', skills, consumers: [consumer] });
-  s.activity.record({ action: 'cli-hide', summary: `Undistributed ${skills.join(', ')} from user ${consumer}`, details: { consumer, skills } });
-  print(result);
-});
-program.command('rebuild-views').description('Deprecated: hub views are no longer generated').action(() => { print({ ok: true, deprecated: true, message: 'rebuild-views is deprecated. Use distribute / redistribute --outdated. Hub views/ is not rebuilt.' }); });
 program.command('rebuild-collections').description('Regenerate category collections').action((_opts, cmd) => { services(cmd).views.rebuildCollections(); print('collections rebuilt'); });
 program.command('archive').description('Archive canonical skills without permanent deletion').argument('<skills...>').action((skills, cmd) => print(services(cmd).archive.archiveSkills(skills)));
 program.command('adopt').description('Adopt a real directory from a generated view into canonical skills').argument('<view>').argument('<skill>').argument('[alsoConsumers...]').action((view, skill, alsoConsumers, cmd) => print(services(cmd).adopt.adopt(view, skill, alsoConsumers || [])));

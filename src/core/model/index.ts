@@ -113,8 +113,8 @@ export type DistributeMode = 'symlink' | 'copy';
 export type DistributionTargetKind = 'user' | 'project';
 
 export type DistributionHealth = {
-  agents: number;
-  claude: number;
+  managedEntries: number;
+  agentCoverage: number;
   outdated: number;
   foreign: number;
   leftoverViews: boolean;
@@ -130,12 +130,20 @@ export type DoctorReport = {
   catalog: { source: 'injected' | 'hub' | 'bundled'; commit: string; date: string; ageDays: number };
 };
 
+/**
+ * Dual-layer distribution entry (ADR-0004): the physical layer (runtimePath,
+ * mode, fingerprint, managed) is what undistribute/outdated/foreign-refusal
+ * operate on; the logical layer (agents) records which catalog agent ids
+ * motivated the write and drives reference counting on shared paths.
+ */
 export type DistributionIndexEntry = {
   skill: SkillName;
-  consumer: Consumer;
+  runtimePath: string;
   mode: DistributeMode;
   fingerprint: string;
-  runtimePath: string;
+  managed: boolean;
+  agents: string[];
+  appliedAt: string;
 };
 
 export type DistributionIndexRecord = {

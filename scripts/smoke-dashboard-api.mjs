@@ -20,9 +20,9 @@ try {
   });
   const discovered = await app.inject({ method: 'POST', url: '/api/discover', payload: { source: sourceRoot } });
   assert.equal(JSON.parse(discovered.body).ok, true);
-  const installed = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['api-smoke'], consumers: ['agents'], overwrite: false } });
+  const installed = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['api-smoke'], overwrite: false } });
   assert.equal(JSON.parse(installed.body).ok, true);
-  const overwriteBlocked = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['api-smoke'], consumers: ['agents'] } });
+  const overwriteBlocked = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['api-smoke'] } });
   assert.equal(overwriteBlocked.statusCode, 500);
   assert.equal(JSON.parse(overwriteBlocked.body).ok, false);
   const updates = await app.inject({ method: 'GET', url: '/api/updates' });
@@ -32,11 +32,11 @@ try {
   assert.deepEqual(JSON.parse(selectedSourceUpdate.body).data.updated, ['api-smoke']);
   const doctor = await app.inject({ method: 'GET', url: '/api/doctor' });
   assert.equal(JSON.parse(doctor.body).ok, true);
-  assert.equal(JSON.parse(doctor.body).data.distribution.agents, 0);
-  const distributed = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['api-smoke'], consumers: ['agents'] } });
+  assert.equal(JSON.parse(doctor.body).data.distribution.managedEntries, 0);
+  const distributed = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['api-smoke'], agents: ['zed'] } });
   assert.equal(JSON.parse(distributed.body).ok, true);
   const after = await app.inject({ method: 'GET', url: '/api/state' });
-  assert.equal(JSON.parse(after.body).data.doctor.distribution.agents, 1);
+  assert.equal(JSON.parse(after.body).data.doctor.distribution.managedEntries, 1);
   assert.ok(JSON.parse(after.body).data.distributions.user);
   await app.close();
   console.log('dashboard api smoke test passed');

@@ -13,16 +13,18 @@ import {
   type SkillHome,
   type SkillName,
 } from '../model/index.js';
+import type { CatalogService } from './catalog-service.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { assertPathInside, assertSafeSkillName, parseConsumers } from '../../shared/validation.js';
+import { assertPathInside, assertSafeSkillName } from '../../shared/validation.js';
 import type { RegistryService } from './registry-service.js';
 
 export type DistributeRequest = {
   to: DistributionTargetKind;
   projectRoot?: string;
   skills: readonly string[];
-  consumers: readonly string[];
+  /** Catalog agent ids; omitted = the detected set on this machine. */
+  agents?: readonly string[];
   mode?: DistributeMode;
   force?: boolean;
 };
@@ -33,11 +35,25 @@ type TargetRef = {
   id: string;
 };
 
+type PhysicalGroup = {
+  runtimeDir: string;
+  agents: string[];
+};
+
+type ReceiptEntry = {
+  path: string;
+  mode: DistributeMode;
+  fingerprint: string;
+  managed: boolean;
+  agents: string[];
+  appliedAt: string;
+};
+
 type ReceiptFile = {
-  version: number;
+  version: 2;
   hubRoot: string;
   updatedAt: string;
-  skills: Record<string, Partial<Record<Consumer, { mode: DistributeMode; fingerprint: string; appliedAt: string }>>>;
+  skills: Record<string, { entries: ReceiptEntry[] }>;
 };
 
 type SnapshotManifest = {
@@ -52,44 +68,56 @@ export class DistributeService {
     private readonly fs: FileSystemPort,
     private readonly home: SkillHome,
     private readonly registry: RegistryService,
+    private readonly catalog: CatalogService,
     private readonly userHome: string = os.homedir(),
   ) {}
 
   apply(request: DistributeRequest) {
     const target = this.resolveTarget(request.to, request.projectRoot);
-    const consumers = parseConsumers(request.consumers);
+    const agents = this.resolveAgents(request.agents);
     const skills = this.requireCanonicalSkills(request.skills);
     const mode = request.mode ?? (request.to === 'user' ? 'symlink' : 'copy');
     this.assertMode(mode);
     this.snapshot(target);
     const appliedAt = new Date().toISOString();
+    const groups = this.physicalGroups(agents, target);
     const entries: DistributionIndexEntry[] = [];
     for (const skill of skills) {
       const fingerprint = this.fingerprint(skill);
-      for (const consumer of consumers) {
-        entries.push(this.applyOne(target, skill, consumer, mode, fingerprint, appliedAt, Boolean(request.force)));
+      for (const group of groups) {
+        entries.push(this.applyOne(target, skill, group, mode, fingerprint, appliedAt, Boolean(request.force)));
       }
     }
-    return { target, mode, entries };
+    return { target, mode, agents, entries };
   }
 
   undistribute(request: Omit<DistributeRequest, 'mode' | 'force'>) {
     const target = this.resolveTarget(request.to, request.projectRoot);
-    const consumers = parseConsumers(request.consumers);
+    const agents = this.resolveAgents(request.agents);
     const skills = [...request.skills];
     for (const skill of skills) assertSafeSkillName(skill);
     this.snapshot(target);
     const record = this.loadRecord(target.id);
+    const kept: DistributionIndexEntry[] = [];
     const removed: DistributionIndexEntry[] = [];
-    for (const skill of skills) {
-      for (const consumer of consumers) {
-        const entry = record?.entries.find((item) => item.skill === skill && item.consumer === consumer);
-        if (!entry) continue;
+    for (const entry of record?.entries || []) {
+      if (!skills.includes(entry.skill)) {
+        kept.push(entry);
+        continue;
+      }
+      const remaining = entry.agents.filter((id) => !agents.includes(id));
+      if (remaining.length === entry.agents.length) {
+        kept.push(entry);
+        continue;
+      }
+      if (remaining.length === 0) {
         this.removeManagedPath(entry.runtimePath);
         removed.push(entry);
+      } else {
+        kept.push({ ...entry, agents: remaining });
       }
     }
-    this.writeRecord(target, (record?.entries || []).filter((entry) => !removed.some((item) => item.skill === entry.skill && item.consumer === entry.consumer)));
+    this.writeRecord(target, kept);
     if (target.kind === 'project') this.syncReceiptFromRecord(target);
     return { target, removed };
   }
@@ -108,7 +136,7 @@ export class DistributeService {
           to: record.kind,
           projectRoot: record.kind === 'project' ? record.targetRoot : undefined,
           skills: [entry.skill],
-          consumers: [entry.consumer],
+          agents: entry.agents,
           mode: entry.mode,
           force: filter.force,
         });
@@ -127,17 +155,14 @@ export class DistributeService {
     for (const entry of current?.entries || []) this.removeManagedPath(entry.runtimePath);
     const trees = path.join(latest, 'trees');
     if (this.fs.kind(trees) === 'directory') {
-      for (const consumerEntry of this.fs.readDirectory(trees)) {
-        const consumerDir = path.join(trees, consumerEntry.name);
-        if (consumerEntry.kind !== 'directory') continue;
-        for (const skillEntry of this.fs.readDirectory(consumerDir)) {
-          const source = path.join(consumerDir, skillEntry.name);
-          const dest = this.runtimeSkillPath(target, consumerEntry.name as Consumer, skillEntry.name);
-          this.fs.makeDirectory(path.dirname(dest));
-          this.replacePath(dest);
-          if (skillEntry.kind === 'symlink') this.fs.symlink(this.fs.readlink(source), dest);
-          else if (skillEntry.kind === 'directory') this.fs.copyDirectoryContents(source, dest);
-        }
+      for (const entry of manifest.record?.entries || []) {
+        const source = path.join(trees, this.safeId(entry.runtimePath), entry.skill);
+        if (this.fs.kind(source) === 'missing') continue;
+        this.fs.makeDirectory(path.dirname(entry.runtimePath));
+        this.replacePath(entry.runtimePath);
+        const kind = this.fs.kind(source);
+        if (kind === 'symlink') this.fs.symlink(this.fs.readlink(source), entry.runtimePath);
+        else if (kind === 'directory') this.fs.copyDirectoryContents(source, entry.runtimePath);
       }
     }
     if (manifest.record) this.replaceIndexRecord(manifest.record);
@@ -153,6 +178,7 @@ export class DistributeService {
     const skipped: string[] = [];
     const distributed: string[] = [];
     for (const consumer of CONSUMERS) {
+      const agentId = this.legacyConsumerAgent(consumer);
       const names = new Set<string>();
       const viewDir = path.join(this.home.viewsDir, consumer);
       if (this.fs.kind(viewDir) === 'directory') {
@@ -165,7 +191,7 @@ export class DistributeService {
       for (const skill of names) {
         if (!this.registry.skillExists(skill)) continue;
         try {
-          this.apply({ to: 'user', skills: [skill], consumers: [consumer], force: options.force });
+          this.apply({ to: 'user', skills: [skill], agents: [agentId], force: options.force });
           distributed.push(`${consumer}:${skill}`);
         } catch (error) {
           if (error instanceof SkillsManagerError && error.code === 'distribute_foreign_exists') skipped.push(`${consumer}:${skill}`);
@@ -179,20 +205,20 @@ export class DistributeService {
 
   status(): DistributionHealth {
     const records = this.loadIndex();
-    let agents = 0;
-    let claude = 0;
+    let managedEntries = 0;
+    const coveredAgents = new Set<string>();
     let outdated = 0;
     for (const record of records) {
       for (const entry of record.entries) {
         if (this.fs.kind(entry.runtimePath) === 'missing') continue;
-        if (entry.consumer === 'agents') agents += 1;
-        if (entry.consumer === 'claude') claude += 1;
+        managedEntries += 1;
+        entry.agents.forEach((id) => coveredAgents.add(id));
         if (this.entryOutdated(entry)) outdated += 1;
       }
     }
     return {
-      agents,
-      claude,
+      managedEntries,
+      agentCoverage: coveredAgents.size,
       outdated,
       foreign: this.countForeign(records),
       leftoverViews: this.fs.kind(this.home.viewsDir) === 'directory',
@@ -210,7 +236,7 @@ export class DistributeService {
     for (const record of this.loadIndex()) {
       for (const entry of record.entries) {
         if (registry.skills?.[entry.skill]?.archived) {
-          warnings.push(`Distributed skill is archived on the hub: ${entry.skill} (${record.kind} ${entry.consumer})`);
+          warnings.push(`Distributed skill is archived on the hub: ${entry.skill} (${record.kind} ${entry.agents.join(',')})`);
         }
         if (!this.registry.skillExists(entry.skill)) {
           warnings.push(`Distributed skill is missing from the hub: ${entry.skill} (${entry.runtimePath})`);
@@ -254,26 +280,65 @@ export class DistributeService {
     return this.loadIndex();
   }
 
-  private applyOne(target: TargetRef, skill: SkillName, consumer: Consumer, mode: DistributeMode, fingerprint: string, appliedAt: string, force: boolean): DistributionIndexEntry {
-    const runtimePath = this.runtimeSkillPath(target, consumer, skill);
-    const consumerRoot = path.dirname(runtimePath);
-    this.fs.makeDirectory(consumerRoot);
-    assertPathInside(runtimePath, consumerRoot);
+  private applyOne(target: TargetRef, skill: SkillName, group: PhysicalGroup, mode: DistributeMode, fingerprint: string, appliedAt: string, force: boolean): DistributionIndexEntry {
+    const runtimePath = path.join(group.runtimeDir, skill);
+    this.fs.makeDirectory(group.runtimeDir);
+    assertPathInside(runtimePath, group.runtimeDir);
     const kind = this.fs.kind(runtimePath);
-    const managed = this.isManaged(target, skill, consumer);
-    if (kind !== 'missing' && !managed && !force) {
-      throw new SkillsManagerError('distribute_foreign_exists', `Refusing to overwrite unmanaged skill at ${runtimePath}`, { runtimePath, skill, consumer });
+    const record = this.loadRecord(target.id);
+    const existing = record?.entries.find((item) => item.skill === skill && item.runtimePath === runtimePath);
+    if (kind !== 'missing' && !existing && !force) {
+      throw new SkillsManagerError('distribute_foreign_exists', `Refusing to overwrite unmanaged skill at ${runtimePath}`, { runtimePath, skill, agents: group.agents });
     }
     this.replacePath(runtimePath);
     const hubSkill = this.registry.skillDir(skill);
     if (mode === 'symlink') this.fs.symlink(hubSkill, runtimePath);
     else this.fs.copyDirectoryContents(hubSkill, runtimePath);
-    const entry: DistributionIndexEntry = { skill, consumer, mode, fingerprint, runtimePath };
-    const record = this.loadRecord(target.id);
-    const next = [...(record?.entries || []).filter((item) => !(item.skill === skill && item.consumer === consumer)), entry];
+    const agents = [...new Set([...(existing?.agents || []), ...group.agents])].sort();
+    const entry: DistributionIndexEntry = { skill, runtimePath, mode, fingerprint, managed: true, agents, appliedAt };
+    const next = [...(record?.entries || []).filter((item) => !(item.skill === skill && item.runtimePath === runtimePath)), entry];
     this.writeRecord(target, next);
-    if (target.kind === 'project') this.upsertReceipt(target, skill, consumer, mode, fingerprint, appliedAt);
+    if (target.kind === 'project') this.upsertReceipt(target, skill, entry);
     return entry;
+  }
+
+  private resolveAgents(requested: readonly string[] | undefined): string[] {
+    const ids = requested !== undefined ? [...new Set(requested)].sort() : this.catalog.detected();
+    if (ids.length === 0) {
+      throw new SkillsManagerError('distribute_no_agents', 'No agents selected and none detected on this machine. Pass --agent <id...>; run `skills-manager catalog info` to see the catalog.');
+    }
+    const known = new Set(this.catalog.load().agents.map((agent) => agent.id));
+    const invalid = ids.filter((id) => !known.has(id));
+    if (invalid.length > 0) {
+      throw new SkillsManagerError('distribute_unknown_agent', `Unknown agent id(s): ${invalid.join(', ')}. Run \`skills-manager catalog info\` to list valid catalog ids.`);
+    }
+    return ids;
+  }
+
+  /** Resolve agent ids into deduplicated physical runtime dirs (one write each). */
+  private physicalGroups(agentIds: readonly string[], target: TargetRef): PhysicalGroup[] {
+    const snapshot = this.catalog.load();
+    const byDir = new Map<string, string[]>();
+    for (const id of agentIds) {
+      const agent = snapshot.agents.find((item) => item.id === id);
+      if (!agent) throw new SkillsManagerError('distribute_unknown_agent', `Unknown agent id: ${id}`);
+      if (target.kind === 'user') {
+        if (!agent.globalSkillsDir) {
+          throw new SkillsManagerError('distribute_agent_project_only', `Agent "${id}" has no global runtime path in the catalog (project-only). Use --to project for this agent.`);
+        }
+        const resolved = this.catalog.resolveGlobalDir(id);
+        if (resolved === null) {
+          throw new SkillsManagerError('distribute_path_unresolvable', `Cannot resolve global runtime dir for agent "${id}": ${agent.globalSkillsDir}`);
+        }
+        const members = byDir.get(resolved) || [];
+        byDir.set(resolved, [...members, id]);
+      } else {
+        const dir = path.join(target.targetRoot, agent.skillsDir);
+        const members = byDir.get(dir) || [];
+        byDir.set(dir, [...members, id]);
+      }
+    }
+    return [...byDir.entries()].map(([runtimeDir, agents]) => ({ runtimeDir, agents: agents.sort() }));
   }
 
   private requireCanonicalSkills(names: readonly string[]) {
@@ -297,26 +362,20 @@ export class DistributeService {
     return { kind, targetRoot, id: `user:${targetRoot}` };
   }
 
-  private runtimeSkillPath(target: TargetRef, consumer: Consumer, skill: string) {
-    const base = path.join(target.targetRoot, `.${consumer}`, 'skills', skill);
-    try {
-      assertPathInside(base, path.join(target.targetRoot, `.${consumer}`, 'skills'));
-    } catch {
-      throw new SkillsManagerError('distribute_path_escape', `Runtime path escaped consumer skill dir: ${base}`);
-    }
-    return base;
-  }
-
   private assertMode(mode: DistributeMode) {
     if (mode !== 'symlink' && mode !== 'copy') throw new SkillsManagerError('invalid_distribute_mode', `Unknown mode: ${mode}`);
   }
 
-  private isManaged(target: TargetRef, skill: string, consumer: Consumer) {
-    const record = this.loadRecord(target.id);
-    const entry = record?.entries.find((item) => item.skill === skill && item.consumer === consumer);
-    if (!entry) return false;
-    const kind = this.fs.kind(entry.runtimePath);
-    return kind === 'symlink' || kind === 'directory' || kind === 'file';
+  /** Family representative for a legacy consumer tag: one catalog id whose global dir matches the old hardcoded path. */
+  private legacyConsumerAgent(consumer: Consumer): string {
+    if (consumer === 'claude') {
+      const agent = this.catalog.load().agents.find((item) => item.globalSkillsDir?.startsWith('$claudeHome') || item.globalSkillsDir === '~/.claude/skills');
+      if (!agent) throw new SkillsManagerError('distribute_unknown_agent', 'Catalog has no agent for the legacy claude runtime path');
+      return agent.id;
+    }
+    const family = this.catalog.load().agents.filter((item) => item.globalSkillsDir === '~/.agents/skills');
+    if (family.length === 0) throw new SkillsManagerError('distribute_unknown_agent', 'Catalog has no shared ~/.agents/skills family for the legacy agents tag');
+    return family.map((item) => item.id).sort()[0];
   }
 
   private entryOutdated(entry: DistributionIndexEntry) {
@@ -345,7 +404,7 @@ export class DistributeService {
       updatedAt: new Date().toISOString(),
       entries,
     };
-    this.replaceIndexRecord(entries.length === 0 ? { ...record, entries: [] } : record, entries.length === 0);
+    this.replaceIndexRecord(record, entries.length === 0);
   }
 
   private replaceIndexRecord(record: DistributionIndexRecord, drop = false) {
@@ -363,17 +422,22 @@ export class DistributeService {
     const file = this.receiptPath(projectRoot);
     if (this.fs.kind(file) !== 'file') return null;
     const parsed = YAML.parse(this.fs.readText(file)) as ReceiptFile;
-    if (!parsed || parsed.version !== 1) throw new SkillsManagerError('distribute_unknown_receipt_version', `Unsupported receipt version in ${file}`);
+    if (!parsed || parsed.version !== 2) throw new SkillsManagerError('distribute_unknown_receipt_version', `Unsupported receipt version in ${file} (expected 2). Run \`skills-manager migrate-consumers\` to migrate legacy data.`);
     return parsed;
   }
 
-  private upsertReceipt(target: TargetRef, skill: string, consumer: Consumer, mode: DistributeMode, fingerprint: string, appliedAt: string) {
-    const current = this.loadReceipt(target.targetRoot) || { version: 1, hubRoot: this.home.root, updatedAt: appliedAt, skills: {} };
-    current.hubRoot = this.home.root;
-    current.updatedAt = appliedAt;
-    current.skills[skill] = { ...(current.skills[skill] || {}), [consumer]: { mode, fingerprint, appliedAt } };
+  private upsertReceipt(target: TargetRef, skill: string, entry: DistributionIndexEntry) {
+    const current = this.safeLoadReceipt(target.targetRoot) || { version: 2 as const, hubRoot: this.home.root, updatedAt: entry.appliedAt, skills: {} };
+    const skillReceipt = current.skills[skill] || { entries: [] };
+    const entries = [...skillReceipt.entries.filter((item) => item.path !== entry.runtimePath), this.toReceiptEntry(entry)];
+    const receipt: ReceiptFile = {
+      ...current,
+      hubRoot: this.home.root,
+      updatedAt: entry.appliedAt,
+      skills: { ...current.skills, [skill]: { entries } },
+    };
     this.fs.makeDirectory(path.dirname(this.receiptPath(target.targetRoot)));
-    this.fs.writeText(this.receiptPath(target.targetRoot), YAML.stringify(current, { lineWidth: 0 }));
+    this.fs.writeText(this.receiptPath(target.targetRoot), YAML.stringify(receipt, { lineWidth: 0 }));
   }
 
   private syncReceiptFromRecord(target: TargetRef) {
@@ -384,14 +448,16 @@ export class DistributeService {
     }
     const skills: ReceiptFile['skills'] = {};
     for (const entry of record.entries) {
-      skills[entry.skill] = {
-        ...(skills[entry.skill] || {}),
-        [entry.consumer]: { mode: entry.mode, fingerprint: entry.fingerprint, appliedAt: record.updatedAt },
-      };
+      const existing = skills[entry.skill] || { entries: [] };
+      skills[entry.skill] = { entries: [...existing.entries, this.toReceiptEntry(entry)] };
     }
-    const receipt: ReceiptFile = { version: 1, hubRoot: this.home.root, updatedAt: record.updatedAt, skills };
+    const receipt: ReceiptFile = { version: 2, hubRoot: this.home.root, updatedAt: record.updatedAt, skills };
     this.fs.makeDirectory(path.dirname(this.receiptPath(target.targetRoot)));
     this.fs.writeText(this.receiptPath(target.targetRoot), YAML.stringify(receipt, { lineWidth: 0 }));
+  }
+
+  private toReceiptEntry(entry: DistributionIndexEntry): ReceiptEntry {
+    return { path: entry.runtimePath, mode: entry.mode, fingerprint: entry.fingerprint, managed: entry.managed, agents: entry.agents, appliedAt: entry.appliedAt };
   }
 
   private backupRoot(target: TargetRef) {
@@ -413,8 +479,10 @@ export class DistributeService {
     const trees = path.join(dir, 'trees');
     for (const entry of record?.entries || []) {
       if (this.fs.kind(entry.runtimePath) === 'missing') continue;
-      const dest = path.join(trees, entry.consumer, entry.skill);
+      const dest = path.join(trees, this.safeId(entry.runtimePath), entry.skill);
       this.fs.makeDirectory(path.dirname(dest));
+      // Same-millisecond snapshots reuse the timestamped dir; keep the write idempotent.
+      this.replacePath(dest);
       const kind = this.fs.kind(entry.runtimePath);
       if (kind === 'symlink') this.fs.symlink(this.fs.readlink(entry.runtimePath), dest);
       else if (kind === 'directory') this.fs.copyDirectoryContents(entry.runtimePath, dest);
@@ -463,20 +531,12 @@ export class DistributeService {
 
   private countForeign(records: DistributionIndexRecord[]) {
     const managed = new Set(records.flatMap((record) => record.entries.map((entry) => entry.runtimePath)));
-    const roots = new Set<string>();
-    roots.add(path.join(this.userHome, '.agents', 'skills'));
-    roots.add(path.join(this.userHome, '.claude', 'skills'));
-    for (const record of records) {
-      if (record.kind !== 'project') continue;
-      roots.add(path.join(record.targetRoot, '.agents', 'skills'));
-      roots.add(path.join(record.targetRoot, '.claude', 'skills'));
-    }
+    const roots = new Set(records.flatMap((record) => record.entries.map((entry) => path.dirname(entry.runtimePath))));
     let foreign = 0;
     for (const root of roots) {
       if (this.fs.kind(root) !== 'directory') continue;
       for (const entry of this.fs.readDirectory(root)) {
-        const full = path.join(root, entry.name);
-        if (!managed.has(full)) foreign += 1;
+        if (!managed.has(path.join(root, entry.name))) foreign += 1;
       }
     }
     return foreign;

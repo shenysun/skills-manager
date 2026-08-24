@@ -6,6 +6,7 @@ import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { detectAgents } from '../catalog/evaluate-detection.js';
 import { extractCatalogSnapshot } from '../catalog/extract.js';
+import { resolveCatalogTemplate } from '../catalog/resolve-path.js';
 import { validateCatalogSnapshot } from '../catalog/validate-snapshot.js';
 
 const RAW_BASE = 'https://raw.githubusercontent.com/vercel-labs/skills/main';
@@ -110,6 +111,17 @@ export class CatalogService {
 
   overridePath() {
     return path.join(this.home.root, '.skills', 'agent-catalog.json');
+  }
+
+  /** Resolve an agent's global runtime dir against this machine's env/user home; null when it cannot resolve here. */
+  resolveGlobalDir(agentId: string): string | null {
+    const agent = this.load().agents.find((item) => item.id === agentId);
+    if (!agent || !agent.globalSkillsDir) return null;
+    return resolveCatalogTemplate(agent.globalSkillsDir, {
+      variables: this.load().pathVariables,
+      homeDir: this.options.userHomeDir ?? os.homedir(),
+      env: this.options.env ?? process.env,
+    });
   }
 
   private parseJson(text: string, origin: string): unknown {

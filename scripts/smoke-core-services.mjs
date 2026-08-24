@@ -39,7 +39,7 @@ try {
   assert.equal(discovered.length, 1);
   assert.equal(discovered[0].name, 'alpha');
 
-  const installed = services.install.installFromSourceSelection({ source: sourceRoot, selectors: ['alpha'], consumers: ['agents'], overwrite: true });
+  const installed = services.install.installFromSourceSelection({ source: sourceRoot, selectors: ['alpha'], overwrite: true });
   assert.deepEqual(installed.installed, ['alpha']);
   assert.equal(services.registry.skillExists('alpha'), true);
   assert.equal(services.registry.getEntry('alpha')?.source?.subpath, 'skills/alpha');
@@ -50,7 +50,7 @@ try {
 
   const doctor = services.doctor.check();
   assert.equal(doctor.skillCount, 1);
-  assert.equal(doctor.distribution.agents, 0);
+  assert.equal(doctor.distribution.managedEntries, 0);
 
   const userHome = path.join(tempRoot, 'user-home');
   const distServices = createCoreServices({
@@ -61,10 +61,12 @@ try {
     processRunner: new ShellRunner(),
     tempRoot,
     userHome,
+    env: {},
   });
-  distServices.distribute.apply({ to: 'user', skills: ['alpha'], consumers: ['agents'] });
+  distServices.distribute.apply({ to: 'user', skills: ['alpha'], agents: ['zed'] });
   const after = distServices.doctor.check();
-  assert.equal(after.distribution.agents, 1);
+  assert.equal(after.distribution.managedEntries, 1);
+  assert.equal(after.distribution.agentCoverage, 1);
 
   const record = services.activity.record({ action: 'smoke', summary: 'Core services smoke test' });
   assert.equal(services.activity.list({ limit: 1 })[0].id, record.id);

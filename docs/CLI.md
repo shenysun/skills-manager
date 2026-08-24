@@ -21,17 +21,19 @@ skills-manager doctor --home ./my-skill-home
 skills-manager catalog info --home ./my-skill-home
 skills-manager catalog refresh --home ./my-skill-home
 skills-manager list --home ./my-skill-home
-skills-manager add <source> --all --consumer agents --consumer claude --yes
+skills-manager add <source> --all --yes
 skills-manager update --plan
 skills-manager update --skill my-skill
 skills-manager update --source '<source-key>'
-skills-manager expose agents my-skill
-skills-manager hide claude my-skill
+skills-manager distribute --to user --skill my-skill --agent claude-code --agent zed
+skills-manager distribute --to project --project ./repo --skill my-skill --agent cursor --mode copy
+skills-manager undistribute --to user --skill my-skill --agent claude-code
+skills-manager redistribute --outdated
 skills-manager archive old-skill
-skills-manager adopt agents skill-installed-in-view
-skills-manager rebuild-views
 skills-manager rebuild-collections
 ```
+
+Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--agent` applies to the detected set on this machine. User scope defaults to `--mode symlink`, project scope to `--mode copy`; one mode per apply.
 
 ## Agent catalog snapshot
 

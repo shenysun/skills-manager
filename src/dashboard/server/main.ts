@@ -79,13 +79,13 @@ const skillsBody = {
 
 const distributeBody = {
   type: 'object',
-  required: ['to', 'skills', 'consumers'],
+  required: ['to', 'skills'],
   additionalProperties: false,
   properties: {
     to: { type: 'string', enum: ['user', 'project'] },
     projectRoot: { type: 'string' },
     skills: { type: 'array', items: { type: 'string' } },
-    consumers: { type: 'array', items: { type: 'string', enum: ['agents', 'claude'] } },
+    agents: { type: 'array', items: { type: 'string' } },
     mode: { type: 'string', enum: ['symlink', 'copy'] },
     force: { type: 'boolean' },
   },
@@ -93,13 +93,13 @@ const distributeBody = {
 
 const undistributeBody = {
   type: 'object',
-  required: ['to', 'skills', 'consumers'],
+  required: ['to', 'skills'],
   additionalProperties: false,
   properties: {
     to: { type: 'string', enum: ['user', 'project'] },
     projectRoot: { type: 'string' },
     skills: { type: 'array', items: { type: 'string' } },
-    consumers: { type: 'array', items: { type: 'string', enum: ['agents', 'claude'] } },
+    agents: { type: 'array', items: { type: 'string' } },
   },
 } as const;
 
@@ -165,8 +165,8 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
       counts: {
         skills: skills.length,
         sources: sources.length,
-        agents: doctor.distribution.agents,
-        claude: doctor.distribution.claude,
+        agents: doctor.distribution.managedEntries,
+        claude: doctor.distribution.agentCoverage,
         outdated: doctor.distribution.outdated,
       },
       distributions: {
@@ -217,7 +217,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   });
 
   app.post('/api/distribute', { schema: { body: distributeBody } }, async (request) => {
-    const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; consumers: string[]; mode?: 'symlink' | 'copy'; force?: boolean };
+    const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; agents?: string[]; mode?: 'symlink' | 'copy'; force?: boolean };
     const services = getServices();
     const result = services.distribute.apply(body);
     services.activity.record({ action: 'distribute', summary: `Distributed ${body.skills.length} skill(s) to ${body.to}`, details: body });
@@ -225,7 +225,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   });
 
   app.post('/api/undistribute', { schema: { body: undistributeBody } }, async (request) => {
-    const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; consumers: string[] };
+    const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; agents?: string[] };
     const services = getServices();
     const result = services.distribute.undistribute(body);
     services.activity.record({ action: 'undistribute', summary: `Undistributed ${body.skills.length} skill(s) from ${body.to}`, details: body });
@@ -274,6 +274,14 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return data(result);
   });
 
+  // Legacy UI bridge (removed with the four-button UI in a later ticket):
+  // translate the old consumer word into the catalog agent that owns that path.
+  const legacyAgentFor = (services: ReturnType<typeof getServices>, consumer: string) => {
+    if (consumer === 'claude') return 'claude-code';
+    const family = services.catalog.load().agents.filter((agent) => agent.globalSkillsDir === '~/.agents/skills').map((agent) => agent.id).sort();
+    return family[0];
+  };
+
   app.post('/api/skills/expose', { schema: { body: {
     type: 'object',
     required: ['skills', 'consumer'],
@@ -285,8 +293,9 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   } } }, async (request) => {
     const body = request.body as { skills: string[]; consumer: string };
     const services = getServices();
-    const result = services.distribute.apply({ to: 'user', skills: body.skills, consumers: [body.consumer] });
-    services.activity.record({ action: 'expose', summary: `Distributed ${body.skills.length} skill(s) to user ${body.consumer}`, details: body });
+    const agent = legacyAgentFor(services, body.consumer);
+    const result = services.distribute.apply({ to: 'user', skills: body.skills, agents: [agent] });
+    services.activity.record({ action: 'expose', summary: `Distributed ${body.skills.length} skill(s) to user ${agent}`, details: body });
     return data(result);
   });
 
@@ -301,8 +310,9 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   } } }, async (request) => {
     const body = request.body as { skills: string[]; consumer: string };
     const services = getServices();
-    const result = services.distribute.undistribute({ to: 'user', skills: body.skills, consumers: [body.consumer] });
-    services.activity.record({ action: 'hide', summary: `Undistributed ${body.skills.length} skill(s) from user ${body.consumer}`, details: body });
+    const agent = legacyAgentFor(services, body.consumer);
+    const result = services.distribute.undistribute({ to: 'user', skills: body.skills, agents: [agent] });
+    services.activity.record({ action: 'hide', summary: `Undistributed ${body.skills.length} skill(s) from user ${agent}`, details: body });
     return data(result);
   });
 

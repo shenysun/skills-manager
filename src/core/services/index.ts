@@ -25,6 +25,8 @@ export type CoreServicesOptions = {
   processRunner: ProcessRunnerPort;
   tempRoot?: string;
   userHome?: string;
+  /** Environment override for detection evaluation and path variables; defaults to process.env. */
+  env?: Record<string, string | undefined>;
   /** Fixture catalog snapshot for tests; defaults to bundled + hub override. */
   catalogSnapshot?: CatalogSnapshot;
 };
@@ -35,8 +37,8 @@ export function createCoreServices(options: CoreServicesOptions) {
   const registry = new RegistryService(options.fs, home);
   const source = new SourceService(options.fs, options.git, options.tempRoot);
   const views = new ViewService(options.fs, home, registry);
-  const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot });
-  const distribute = new DistributeService(options.fs, home, registry, options.userHome);
+  const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot, env: options.env, userHomeDir: options.userHome });
+  const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);
   const install = new InstallService(options.fs, home, registry, source, views);
   const update = new UpdateService(registry, source, install);
   const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog);
