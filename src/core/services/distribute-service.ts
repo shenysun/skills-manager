@@ -280,6 +280,13 @@ export class DistributeService {
     return this.loadIndex();
   }
 
+  /** Physical entries recorded in a project's receipt — the scan source for machines without the hub index. */
+  projectReceiptEntries(projectRoot: string) {
+    const receipt = this.safeLoadReceipt(path.resolve(projectRoot));
+    if (!receipt) return [];
+    return Object.entries(receipt.skills).flatMap(([skill, item]) => item.entries.map((entry) => ({ skill, ...entry })));
+  }
+
   private applyOne(target: TargetRef, skill: SkillName, group: PhysicalGroup, mode: DistributeMode, fingerprint: string, appliedAt: string, force: boolean): DistributionIndexEntry {
     const runtimePath = path.join(group.runtimeDir, skill);
     this.fs.makeDirectory(group.runtimeDir);

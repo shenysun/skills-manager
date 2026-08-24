@@ -35,6 +35,7 @@ program.command('dashboard')
 
 program.command('doctor')
   .description('Run health checks')
+  .option('--project <path>', 'also scan this project\'s distribution receipt paths')
   .option('--migrate-views', 'distribute leftover hub views to user runtimes')
   .option('--delete-views', 'with --migrate-views, remove generated view symlinks')
   .option('--force', 'with --migrate-views, overwrite unmanaged runtime paths')
@@ -45,7 +46,7 @@ program.command('doctor')
       s.activity.record({ action: 'cli-migrate-views', summary: 'Migrated leftover hub views', details: migrated });
       return print({ migrated, doctor: s.doctor.check() });
     }
-    print(s.doctor.check());
+    print(s.doctor.check({ projectRoot: opts.project }));
   });
 
 const catalog = program.command('catalog').description('Manage the bundled agent catalog snapshot');
