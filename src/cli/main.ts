@@ -49,6 +49,22 @@ program.command('doctor')
     print(s.doctor.check());
   });
 
+const catalog = program.command('catalog').description('Manage the bundled agent catalog snapshot');
+catalog.command('refresh')
+  .description('Pull the upstream agent table and overwrite the local catalog snapshot')
+  .action(async (_opts, cmd) => {
+    const s = services(cmd);
+    const result = await s.catalog.refresh();
+    s.activity.record({ action: 'cli-catalog-refresh', summary: `Refreshed agent catalog to ${result.commit.slice(0, 10)} (${result.agentCount} agents)`, details: result });
+    print(result);
+  });
+catalog.command('info')
+  .description('Show the current catalog snapshot stamp and detected agents')
+  .action((_opts, cmd) => {
+    const s = services(cmd);
+    print({ snapshot: s.catalog.snapshotInfo(), detected: s.catalog.detected() });
+  });
+
 program.command('list')
   .description('List installed skills')
   .option('-c, --consumer <consumer>', `filter consumer: ${CONSUMERS.join(', ')}`)

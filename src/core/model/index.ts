@@ -127,6 +127,7 @@ export type DoctorReport = {
   brokenLinks: string[];
   warnings: string[];
   gitStatus: string;
+  catalog: { source: 'injected' | 'hub' | 'bundled'; commit: string; date: string; ageDays: number };
 };
 
 export type DistributionIndexEntry = {

@@ -2,8 +2,11 @@ import path from 'node:path';
 import type { DoctorReport, SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
-import type { RegistryService } from './registry-service.js';
-import type { DistributeService } from './distribute-service.js';
+import { RegistryService } from './registry-service.js';
+import { DistributeService } from './distribute-service.js';
+import { CatalogService } from './catalog-service.js';
+
+const CATALOG_STALE_DAYS = 90;
 
 export class DoctorService {
   constructor(
@@ -12,6 +15,7 @@ export class DoctorService {
     private readonly home: SkillHome,
     private readonly registry: RegistryService,
     private readonly distribute: DistributeService,
+    private readonly catalog: CatalogService,
   ) {}
 
   check(): DoctorReport {
@@ -26,6 +30,10 @@ export class DoctorService {
     const distribution = this.distribute.status();
     if (distribution.outdated > 0) warnings.push(`${distribution.outdated} distributed skill(s) are outdated versus the hub`);
     if (distribution.foreign > 0) warnings.push(`${distribution.foreign} unmanaged file(s) in consumer runtime skill directories`);
+    const catalog = this.catalog.snapshotInfo();
+    if (catalog.ageDays > CATALOG_STALE_DAYS) {
+      warnings.push(`Agent catalog snapshot is ${catalog.ageDays} days old (upstream ${catalog.commit.slice(0, 10)}); run \`skills-manager catalog refresh\` to update`);
+    }
     return {
       skillHome: this.home.root,
       skillCount: this.registry.listCanonicalSkills().length,
@@ -33,6 +41,7 @@ export class DoctorService {
       brokenLinks,
       warnings,
       gitStatus,
+      catalog,
     };
   }
 

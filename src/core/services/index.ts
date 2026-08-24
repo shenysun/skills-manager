@@ -11,6 +11,8 @@ import { PackageService } from './package-service.js';
 import { ArchiveService } from './archive-service.js';
 import { SkillHomeResolver } from './skill-home-resolver.js';
 import { AdoptService } from './adopt-service.js';
+import { CatalogService } from './catalog-service.js';
+import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
 import type { ProcessRunnerPort } from '../ports/process-runner.js';
@@ -23,6 +25,8 @@ export type CoreServicesOptions = {
   processRunner: ProcessRunnerPort;
   tempRoot?: string;
   userHome?: string;
+  /** Fixture catalog snapshot for tests; defaults to bundled + hub override. */
+  catalogSnapshot?: CatalogSnapshot;
 };
 
 export function createCoreServices(options: CoreServicesOptions) {
@@ -31,15 +35,16 @@ export function createCoreServices(options: CoreServicesOptions) {
   const registry = new RegistryService(options.fs, home);
   const source = new SourceService(options.fs, options.git, options.tempRoot);
   const views = new ViewService(options.fs, home, registry);
+  const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot });
   const distribute = new DistributeService(options.fs, home, registry, options.userHome);
   const install = new InstallService(options.fs, home, registry, source, views);
   const update = new UpdateService(registry, source, install);
-  const doctor = new DoctorService(options.fs, options.git, home, registry, distribute);
+  const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog);
   const activity = new ActivityService(options.fs, options.git, home);
   const archive = new ArchiveService(options.fs, home, registry, views);
   const adopt = new AdoptService();
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, distribute, install, update, doctor, activity, archive, adopt, package: packageService };
+  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
@@ -55,3 +60,4 @@ export { PackageService } from './package-service.js';
 export { ArchiveService } from './archive-service.js';
 export { SkillHomeResolver } from './skill-home-resolver.js';
 export { AdoptService } from './adopt-service.js';
+export { CatalogService } from './catalog-service.js';

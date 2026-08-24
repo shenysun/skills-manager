@@ -18,6 +18,8 @@ Initialization creates `skills/`, `views/`, `collections/`, `registry.yaml`, and
 ```sh
 skills-manager dashboard --home ./my-skill-home
 skills-manager doctor --home ./my-skill-home
+skills-manager catalog info --home ./my-skill-home
+skills-manager catalog refresh --home ./my-skill-home
 skills-manager list --home ./my-skill-home
 skills-manager add <source> --all --consumer agents --consumer claude --yes
 skills-manager update --plan
@@ -30,6 +32,12 @@ skills-manager adopt agents skill-installed-in-view
 skills-manager rebuild-views
 skills-manager rebuild-collections
 ```
+
+## Agent catalog snapshot
+
+The agent table (ids, runtime paths, detection rules) ships as a bundled snapshot extracted from [vercel-labs/skills](https://github.com/vercel-labs/skills) (MIT; attribution inside the file). `skills-manager catalog info` shows the snapshot stamp (upstream commit, date, age) and the detected agent set — the same determination `npx skills` makes with no `-a`. `skills-manager catalog refresh` re-downloads upstream, re-extracts, and stores the newer snapshot as a hub-local override at `<home>/.skills/agent-catalog.json`; doctor warns when the effective snapshot is older than 90 days.
+
+To regenerate the checked-in snapshot during development: `npm run catalog:extract` (downloads `src/agents.ts` + `src/detect-agent.ts`, extracts, writes `src/core/catalog/agent-catalog.json`).
 
 `<source>` can be a GitHub shorthand (`owner/repo`), Git URL, GitHub tree URL, or local path.
 

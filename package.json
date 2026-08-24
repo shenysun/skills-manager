@@ -4,8 +4,8 @@
   "description": "Local-first CLI and dashboard for managing agent, Claude, and Codex skills",
   "scripts": {
     "skills-manager": "tsx src/cli.ts",
-    "build": "npm run clean && tsc -p tsconfig.json && vite build --config dashboard-web/vite.config.ts",
-    "build:cli": "npm run clean && tsc -p tsconfig.json",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/copy-catalog-snapshot.mjs && vite build --config dashboard-web/vite.config.ts",
+    "build:cli": "npm run clean && tsc -p tsconfig.json && node scripts/copy-catalog-snapshot.mjs",
     "build:web": "vite build --config dashboard-web/vite.config.ts",
     "dev:web": "vite --config dashboard-web/vite.config.ts",
     "doctor": "tsx src/cli.ts doctor",
@@ -16,6 +16,9 @@
     "smoke:cli": "npm run build:cli && node scripts/smoke-cli-resolution.mjs",
     "smoke:api": "npm run build:cli && node scripts/smoke-dashboard-api.mjs",
     "smoke:package": "npm run build && node scripts/smoke-package.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "catalog:extract": "tsx scripts/extract-agent-catalog.ts",
     "test:dashboard-hash": "tsx --test dashboard-web/src/routing/resolveDashboardHash.test.ts"
   },
   "keywords": [],
@@ -37,7 +40,8 @@
     "@vitejs/plugin-vue": "^6.0.8",
     "tsx": "^4.23.7",
     "typescript": "^7.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
   },
   "private": false,
   "bin": {

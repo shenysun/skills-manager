@@ -1,0 +1,1134 @@
+{
+  "version": 1,
+  "source": {
+    "repo": "vercel-labs/skills",
+    "files": [
+      "src/agents.ts",
+      "src/detect-agent.ts"
+    ],
+    "commit": "dd3ca3c85581e593434546a4016fb3a7e7b7f937",
+    "date": "2026-08-18T20:06:26Z",
+    "license": "MIT",
+    "notice": "Agent table extracted from vercel-labs/skills (src/agents.ts, src/detect-agent.ts, mirroring @vercel/detect-agent runtime detection). All MIT. Copyright (c) 2026 Vercel, Inc."
+  },
+  "pathVariables": [
+    {
+      "name": "configHome",
+      "envVar": "XDG_CONFIG_HOME",
+      "default": "~/.config"
+    },
+    {
+      "name": "codexHome",
+      "envVar": "CODEX_HOME",
+      "default": "~/.codex"
+    },
+    {
+      "name": "claudeHome",
+      "envVar": "CLAUDE_CONFIG_DIR",
+      "default": "~/.claude"
+    },
+    {
+      "name": "vibeHome",
+      "envVar": "VIBE_HOME",
+      "default": "~/.vibe"
+    },
+    {
+      "name": "hermesHome",
+      "envVar": "HERMES_HOME",
+      "default": "~/.hermes"
+    },
+    {
+      "name": "autohandHome",
+      "envVar": "AUTOHAND_HOME",
+      "default": "~/.autohand"
+    },
+    {
+      "name": "grokHome",
+      "envVar": "GROK_HOME",
+      "default": "~/.grok"
+    },
+    {
+      "name": "zedAppDataHome",
+      "envVar": "APPDATA"
+    },
+    {
+      "name": "zedFlatpakConfigHome",
+      "envVar": "FLATPAK_XDG_CONFIG_HOME"
+    }
+  ],
+  "agents": [
+    {
+      "id": "aider-desk",
+      "label": "AiderDesk",
+      "skillsDir": ".aider-desk/skills",
+      "globalSkillsDir": "~/.aider-desk/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.aider-desk"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "amp",
+      "label": "Amp",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "$configHome/agents/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$configHome/amp"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "antigravity",
+      "label": "Antigravity",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.gemini/antigravity/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.gemini/antigravity"
+      },
+      "envProbe": {
+        "kind": "env-set",
+        "variable": "ANTIGRAVITY_AGENT"
+      }
+    },
+    {
+      "id": "antigravity-cli",
+      "label": "Antigravity CLI",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.gemini/antigravity-cli/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.gemini/antigravity-cli"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "astrbot",
+      "label": "AstrBot",
+      "skillsDir": "data/skills",
+      "globalSkillsDir": "~/.astrbot/data/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "cwd-path-exists",
+            "path": "data/skills"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.astrbot"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "autohand-code",
+      "label": "Autohand Code CLI",
+      "skillsDir": ".autohand/skills",
+      "globalSkillsDir": "$autohandHome/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$autohandHome"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "augment",
+      "label": "Augment",
+      "skillsDir": ".augment/skills",
+      "globalSkillsDir": "~/.augment/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.augment"
+      },
+      "envProbe": {
+        "kind": "env-set",
+        "variable": "AUGMENT_AGENT"
+      }
+    },
+    {
+      "id": "bob",
+      "label": "IBM Bob",
+      "skillsDir": ".bob/skills",
+      "globalSkillsDir": "~/.bob/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.bob"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "claude-code",
+      "label": "Claude Code",
+      "skillsDir": ".claude/skills",
+      "globalSkillsDir": "$claudeHome/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$claudeHome"
+      },
+      "envProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "any",
+            "conditions": [
+              {
+                "kind": "env-set",
+                "variable": "CLAUDECODE"
+              },
+              {
+                "kind": "env-set",
+                "variable": "CLAUDE_CODE"
+              }
+            ]
+          },
+          {
+            "kind": "all",
+            "conditions": [
+              {
+                "kind": "env-set",
+                "variable": "CLAUDE_CODE_IS_COWORK"
+              },
+              {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "env-set",
+                    "variable": "CLAUDECODE"
+                  },
+                  {
+                    "kind": "env-set",
+                    "variable": "CLAUDE_CODE"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "openclaw",
+      "label": "OpenClaw",
+      "skillsDir": "skills",
+      "globalSkillsDir": "~/.openclaw/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "~/.openclaw"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.clawdbot"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.moltbot"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "cline",
+      "label": "Cline",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.cline"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "codearts-agent",
+      "label": "CodeArts Agent",
+      "skillsDir": ".codeartsdoer/skills",
+      "globalSkillsDir": "~/.codeartsdoer/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.codeartsdoer"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "codebuddy",
+      "label": "CodeBuddy",
+      "skillsDir": ".codebuddy/skills",
+      "globalSkillsDir": "~/.codebuddy/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "cwd-path-exists",
+            "path": ".codebuddy"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.codebuddy"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "codemaker",
+      "label": "Codemaker",
+      "skillsDir": ".codemaker/skills",
+      "globalSkillsDir": "~/.codemaker/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.codemaker"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "codestudio",
+      "label": "Code Studio",
+      "skillsDir": ".codestudio/skills",
+      "globalSkillsDir": "~/.codestudio/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.codestudio"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "$codexHome/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "$codexHome"
+          },
+          {
+            "kind": "path-exists",
+            "path": "/etc/codex"
+          }
+        ]
+      },
+      "envProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "env-set",
+            "variable": "CODEX_SANDBOX"
+          },
+          {
+            "kind": "env-set",
+            "variable": "CODEX_CI"
+          },
+          {
+            "kind": "env-set",
+            "variable": "CODEX_THREAD_ID"
+          }
+        ]
+      }
+    },
+    {
+      "id": "command-code",
+      "label": "Command Code",
+      "skillsDir": ".commandcode/skills",
+      "globalSkillsDir": "~/.commandcode/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.commandcode"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "continue",
+      "label": "Continue",
+      "skillsDir": ".continue/skills",
+      "globalSkillsDir": "~/.continue/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "cwd-path-exists",
+            "path": ".continue"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.continue"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "cortex",
+      "label": "Cortex Code",
+      "skillsDir": ".cortex/skills",
+      "globalSkillsDir": "~/.snowflake/cortex/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.snowflake/cortex"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "crush",
+      "label": "Crush",
+      "skillsDir": ".crush/skills",
+      "globalSkillsDir": "~/.config/crush/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.config/crush"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "cursor",
+      "label": "Cursor",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.cursor/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.cursor"
+      },
+      "envProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "env-set",
+            "variable": "CURSOR_AGENT"
+          },
+          {
+            "kind": "env-value",
+            "variable": "CURSOR_EXTENSION_HOST_ROLE",
+            "equals": "agent-exec"
+          }
+        ]
+      }
+    },
+    {
+      "id": "deepagents",
+      "label": "Deep Agents",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.deepagents/agent/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.deepagents"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "devin",
+      "label": "Devin for Terminal",
+      "skillsDir": ".devin/skills",
+      "globalSkillsDir": "$configHome/devin/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$configHome/devin"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "dexto",
+      "label": "Dexto",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.dexto"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "droid",
+      "label": "Droid",
+      "skillsDir": ".factory/skills",
+      "globalSkillsDir": "~/.factory/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.factory"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "eve",
+      "label": "Eve",
+      "skillsDir": "agent/skills",
+      "globalSkillsDir": null,
+      "installProbe": {
+        "kind": "all",
+        "conditions": [
+          {
+            "kind": "cwd-path-exists",
+            "path": "agent"
+          },
+          {
+            "kind": "cwd-package-dep",
+            "package": "eve"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "firebender",
+      "label": "Firebender",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.firebender/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.firebender"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "forgecode",
+      "label": "ForgeCode",
+      "skillsDir": ".forge/skills",
+      "globalSkillsDir": "~/.forge/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.forge"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "gemini-cli",
+      "label": "Gemini CLI",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.gemini/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.gemini"
+      },
+      "envProbe": {
+        "kind": "env-set",
+        "variable": "GEMINI_CLI"
+      }
+    },
+    {
+      "id": "github-copilot",
+      "label": "GitHub Copilot",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.copilot/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.copilot"
+      },
+      "envProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "env-set",
+            "variable": "COPILOT_MODEL"
+          },
+          {
+            "kind": "env-set",
+            "variable": "COPILOT_ALLOW_ALL"
+          },
+          {
+            "kind": "env-set",
+            "variable": "COPILOT_GITHUB_TOKEN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "goose",
+      "label": "Goose",
+      "skillsDir": ".goose/skills",
+      "globalSkillsDir": "$configHome/goose/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$configHome/goose"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "grok",
+      "label": "Grok Build",
+      "skillsDir": ".grok/skills",
+      "globalSkillsDir": "$grokHome/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$grokHome"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "hermes-agent",
+      "label": "Hermes Agent",
+      "skillsDir": ".hermes/skills",
+      "globalSkillsDir": "$hermesHome/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$hermesHome"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "inference-sh",
+      "label": "inference.sh",
+      "skillsDir": ".inferencesh/skills",
+      "globalSkillsDir": "~/.inferencesh/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.inferencesh"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "jazz",
+      "label": "Jazz",
+      "skillsDir": ".jazz/skills",
+      "globalSkillsDir": "~/.jazz/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "~/.jazz"
+          },
+          {
+            "kind": "cwd-path-exists",
+            "path": ".jazz"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "junie",
+      "label": "Junie",
+      "skillsDir": ".junie/skills",
+      "globalSkillsDir": "~/.junie/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.junie"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "iflow-cli",
+      "label": "iFlow CLI",
+      "skillsDir": ".iflow/skills",
+      "globalSkillsDir": "~/.iflow/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.iflow"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "kilo",
+      "label": "Kilo Code",
+      "skillsDir": ".kilocode/skills",
+      "globalSkillsDir": "~/.kilocode/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.kilocode"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "kimchi",
+      "label": "Kimchi",
+      "skillsDir": ".kimchi/skills",
+      "globalSkillsDir": "~/.config/kimchi/harness/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.config/kimchi"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "kimi-code-cli",
+      "label": "Kimi Code CLI",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "~/.kimi-code"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.kimi"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "kiro-cli",
+      "label": "Kiro CLI",
+      "skillsDir": ".kiro/skills",
+      "globalSkillsDir": "~/.kiro/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.kiro"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "kode",
+      "label": "Kode",
+      "skillsDir": ".kode/skills",
+      "globalSkillsDir": "~/.kode/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.kode"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "lingma",
+      "label": "Lingma",
+      "skillsDir": ".lingma/skills",
+      "globalSkillsDir": "~/.lingma/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.lingma"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "loaf",
+      "label": "Loaf",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.loaf"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "mcpjam",
+      "label": "MCPJam",
+      "skillsDir": ".mcpjam/skills",
+      "globalSkillsDir": "~/.mcpjam/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.mcpjam"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "minimax-code",
+      "label": "MiniMax Code",
+      "skillsDir": ".minimax/skills",
+      "globalSkillsDir": "~/.minimax/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "~/.minimax"
+          },
+          {
+            "kind": "path-exists",
+            "path": "/Applications/MiniMax Code.app"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "mistral-vibe",
+      "label": "Mistral Vibe",
+      "skillsDir": ".vibe/skills",
+      "globalSkillsDir": "$vibeHome/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$vibeHome"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "moxby",
+      "label": "Moxby",
+      "skillsDir": ".moxby/skills",
+      "globalSkillsDir": "~/.moxby/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.moxby"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "mux",
+      "label": "Mux",
+      "skillsDir": ".mux/skills",
+      "globalSkillsDir": "~/.mux/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.mux"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "opencode",
+      "label": "OpenCode",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "$configHome/opencode/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "$configHome/opencode"
+      },
+      "envProbe": {
+        "kind": "env-set",
+        "variable": "OPENCODE_CLIENT"
+      }
+    },
+    {
+      "id": "openhands",
+      "label": "OpenHands",
+      "skillsDir": ".openhands/skills",
+      "globalSkillsDir": "~/.openhands/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.openhands"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "ona",
+      "label": "Ona",
+      "skillsDir": ".ona/skills",
+      "globalSkillsDir": "~/.ona/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.ona"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "pi",
+      "label": "Pi",
+      "skillsDir": ".pi/skills",
+      "globalSkillsDir": "~/.pi/agent/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.pi/agent"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "posit-assistant",
+      "label": "Posit Assistant",
+      "skillsDir": ".posit/assistant/skills",
+      "globalSkillsDir": "~/.posit/assistant/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "~/.posit/assistant"
+          },
+          {
+            "kind": "path-exists",
+            "path": "~/.positai"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "qoder",
+      "label": "Qoder",
+      "skillsDir": ".qoder/skills",
+      "globalSkillsDir": "~/.qoder/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.qoder"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "qoder-cn",
+      "label": "Qoder CN",
+      "skillsDir": ".qoder/skills",
+      "globalSkillsDir": "~/.qoder-cn/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.qoder-cn"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "qwen-code",
+      "label": "Qwen Code",
+      "skillsDir": ".qwen/skills",
+      "globalSkillsDir": "~/.qwen/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.qwen"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "replit",
+      "label": "Replit",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "$configHome/agents/skills",
+      "installProbe": {
+        "kind": "cwd-path-exists",
+        "path": ".replit"
+      },
+      "envProbe": {
+        "kind": "env-set",
+        "variable": "REPL_ID"
+      }
+    },
+    {
+      "id": "reasonix",
+      "label": "Reasonix",
+      "skillsDir": ".reasonix/skills",
+      "globalSkillsDir": "~/.reasonix/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.reasonix"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "rovodev",
+      "label": "Rovo Dev",
+      "skillsDir": ".rovodev/skills",
+      "globalSkillsDir": "~/.rovodev/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.rovodev"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "roo",
+      "label": "Roo Code",
+      "skillsDir": ".roo/skills",
+      "globalSkillsDir": "~/.roo/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.roo"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "tabnine-cli",
+      "label": "Tabnine CLI",
+      "skillsDir": ".tabnine/agent/skills",
+      "globalSkillsDir": "~/.tabnine/agent/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.tabnine"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "terramind",
+      "label": "Terramind",
+      "skillsDir": ".terramind/skills",
+      "globalSkillsDir": "~/.terramind/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.terramind"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "tinycloud",
+      "label": "Tinycloud",
+      "skillsDir": ".tinycloud/skills",
+      "globalSkillsDir": "~/.tinycloud/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.tinycloud"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "trae",
+      "label": "Trae",
+      "skillsDir": ".trae/skills",
+      "globalSkillsDir": "~/.trae/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.trae"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "trae-cn",
+      "label": "Trae CN",
+      "skillsDir": ".trae/skills",
+      "globalSkillsDir": "~/.trae-cn/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.trae-cn"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "warp",
+      "label": "Warp",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.warp"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "windsurf",
+      "label": "Windsurf",
+      "skillsDir": ".windsurf/skills",
+      "globalSkillsDir": "~/.codeium/windsurf/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.codeium/windsurf"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "zed",
+      "label": "Zed",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "$configHome/zed"
+          },
+          {
+            "kind": "path-exists",
+            "path": "$zedAppDataHome/Zed"
+          },
+          {
+            "kind": "path-exists",
+            "path": "$zedFlatpakConfigHome/zed"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "zcode",
+      "label": "ZCode",
+      "skillsDir": ".zcode/skills",
+      "globalSkillsDir": "~/.zcode/skills",
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "path-exists",
+            "path": "~/.zcode"
+          },
+          {
+            "kind": "path-exists",
+            "path": "/Applications/ZCode.app"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "zencoder",
+      "label": "Zencoder",
+      "skillsDir": ".zencoder/skills",
+      "globalSkillsDir": "~/.zencoder/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.zencoder"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "zenflow",
+      "label": "Zenflow",
+      "skillsDir": ".zencoder/skills",
+      "globalSkillsDir": "~/.zencoder/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.zencoder"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "neovate",
+      "label": "Neovate",
+      "skillsDir": ".neovate/skills",
+      "globalSkillsDir": "~/.neovate/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.neovate"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "pochi",
+      "label": "Pochi",
+      "skillsDir": ".pochi/skills",
+      "globalSkillsDir": "~/.pochi/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.pochi"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "promptscript",
+      "label": "PromptScript",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": null,
+      "installProbe": {
+        "kind": "any",
+        "conditions": [
+          {
+            "kind": "cwd-path-exists",
+            "path": ".promptscript"
+          },
+          {
+            "kind": "cwd-path-exists",
+            "path": "promptscript.yaml"
+          }
+        ]
+      },
+      "envProbe": null
+    },
+    {
+      "id": "adal",
+      "label": "AdaL",
+      "skillsDir": ".adal/skills",
+      "globalSkillsDir": "~/.adal/skills",
+      "installProbe": {
+        "kind": "path-exists",
+        "path": "~/.adal"
+      },
+      "envProbe": null
+    },
+    {
+      "id": "universal",
+      "label": "Universal",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "$configHome/agents/skills",
+      "installProbe": {
+        "kind": "never"
+      },
+      "envProbe": {
+        "kind": "path-exists",
+        "path": "/opt/.devin"
+      }
+    }
+  ]
+}
