@@ -1,9 +1,9 @@
 import path from 'node:path';
 import YAML from 'yaml';
-import { CONSUMERS, type Consumer, type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
+import { LEGACY_CONSUMERS, type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { assertPathInside, assertSafeSkillName, normalizeTags, parseConsumers, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
+import { assertPathInside, assertSafeSkillName, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
 
 export class RegistryService {
   constructor(private readonly fs: FileSystemPort, private readonly home: SkillHome) {}
@@ -13,7 +13,7 @@ export class RegistryService {
     const parsed = YAML.parse(this.fs.readText(this.home.registryFile)) as Registry | null;
     const registry = parsed && typeof parsed === 'object' && parsed.skills ? parsed : { skills: {} };
     const legacy = Object.entries(registry.skills || {})
-      .filter(([, entry]) => (entry.consumers || []).some((value) => (CONSUMERS as readonly string[]).includes(value)))
+      .filter(([, entry]) => (entry.consumers || []).some((value) => (LEGACY_CONSUMERS as readonly string[]).includes(value)))
       .map(([name]) => name);
     if (legacy.length > 0) {
       throw new SkillsManagerError('legacy_consumer_tags', `registry.yaml still uses legacy consumer tags (agents/claude) on: ${legacy.join(', ')}. Run \`skills-manager migrate-consumers\` to migrate them to catalog agent ids.`);
@@ -45,7 +45,7 @@ export class RegistryService {
       .sort();
   }
 
-  listSkills(options: { includeArchived?: boolean; consumer?: Consumer; category?: string } = {}): Skill[] {
+  listSkills(options: { includeArchived?: boolean; consumer?: string; category?: string } = {}): Skill[] {
     const registry = this.load();
     return Object.entries(registry.skills || {})
       .filter(([name, entry]) => (options.includeArchived || !entry.archived) && this.skillExists(name))
@@ -97,7 +97,7 @@ export class RegistryService {
   defaultEntry(skill: SkillName, patch: Partial<RegistryEntry> = {}): RegistryEntry {
     assertSafeSkillName(skill);
     // No legacy default tags: desired agents are catalog ids (see ADR-0004).
-    const consumers = patch.consumers !== undefined ? parseConsumers(patch.consumers, undefined, { allowEmpty: true }) : [];
+    const consumers = patch.consumers !== undefined ? parseAgentTags(patch.consumers, undefined, { allowEmpty: true }) : [];
     const entry: RegistryEntry = {
       path: `skills/${skill}`,
       title: skill,
@@ -121,7 +121,7 @@ export class RegistryService {
       title: entry.title || name,
       category: entry.category || 'experimental',
       tags: normalizeTags(entry.tags || []),
-      consumers: entry.consumers !== undefined ? parseConsumers(entry.consumers, undefined, { allowEmpty: true }) : [],
+      consumers: entry.consumers !== undefined ? parseAgentTags(entry.consumers, undefined, { allowEmpty: true }) : [],
       description: entry.description || '',
       source: entry.source || {},
       archived: Boolean(entry.archived),

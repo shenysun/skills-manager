@@ -3,8 +3,8 @@ import { computed, h, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { NCheckbox, NCode, NEllipsis, NSpace, NTag, NText, useDialog, type DataTableColumns } from 'naive-ui';
 import SkillDrawer from '../components/SkillDrawer.vue';
+import DistributionBadges from '../components/DistributionBadges.vue';
 import AgentPickerSheet, { type AgentPickerPayload } from '../components/AgentPickerSheet.vue';
-import ConsumerBadges from '../components/ConsumerBadges.vue';
 import { ApiError, api, state, type Skill, type UpdateCandidate } from '../composables/useApi';
 import { useOperationNotification } from '../composables/useOperationNotification';
 
@@ -12,20 +12,16 @@ const { t } = useI18n();
 const { runWithNotification } = useOperationNotification();
 const dialog = useDialog();
 const search = ref('');
-const consumer = ref<string | null>(null);
 const selected = ref<string[]>([]);
 const openSkill = ref<Skill | null>(null);
 const busyAction = ref('');
-const consumerOptions = computed(() => [{ label: t('common.all'), value: '' }, { label: 'agents', value: 'agents' }, { label: 'claude', value: 'claude' }]);
 const candidateByName = computed(() => new Map((state.value?.candidates || []).map((candidate) => [candidate.skill, candidate])));
 const updateCandidateNames = computed(() => (state.value?.candidates || []).map((candidate) => candidate.skill));
 
 const filteredSkills = computed(() => {
   const query = search.value.trim().toLowerCase();
-  const selectedConsumer = consumer.value || '';
   return (state.value?.skills || []).filter((skill) => {
     const candidate = candidateByName.value.get(skill.name);
-    const matchesConsumer = !selectedConsumer || skill.consumers.includes(selectedConsumer);
     const values = [
       skill.name,
       skill.title || '',
@@ -39,7 +35,7 @@ const filteredSkills = computed(() => {
       ...(skill.tags || []),
       ...(skill.consumers || []),
     ];
-    return matchesConsumer && (!query || values.some((value) => value.toLowerCase().includes(query)));
+    return !query || values.some((value) => value.toLowerCase().includes(query));
   });
 });
 
@@ -163,10 +159,10 @@ function skillColumnsFor(groupNames: string[]): DataTableColumns<Skill> {
       render: (skill) => h(NCode, { code: pathFor(skill, candidateByName.value.get(skill.name)), wordWrap: true }),
     },
     {
-      title: t('common.consumers'),
-      key: 'consumers',
+      title: t('common.distributions'),
+      key: 'distributions',
       width: 150,
-      render: (skill) => h(ConsumerBadges, { consumers: skill.consumers || [] }),
+      render: (skill) => h(DistributionBadges, { skill: skill.name }),
     },
   ];
 }
@@ -283,7 +279,6 @@ const archive = (only?: string) => runSkillAction('archive', t('loading.archivin
         <n-space align="center" justify="space-between" wrap class="update-center-toolbar">
           <n-space align="center" wrap>
             <n-input v-model:value="search" clearable :placeholder="t('installed.unifiedSearchPlaceholder')" style="min-width: 340px" />
-            <n-select v-model:value="consumer" :options="consumerOptions" clearable style="width: 140px" />
           </n-space>
           <n-space wrap>
             <n-button secondary :disabled="!visibleSkillNames.length" @click="selectNames(visibleSkillNames)">{{ t('installed.selectVisibleCandidates') }}</n-button>

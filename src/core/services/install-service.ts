@@ -1,8 +1,8 @@
 import path from 'node:path';
-import type { Consumer, DiscoveredSkill, InstallPlan, InstallResult, SourceCheckout, SkillHome } from '../model/index.js';
+import type { DiscoveredSkill, InstallPlan, InstallResult, SourceCheckout, SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { assertPathInside, parseConsumers } from '../../shared/validation.js';
+import { assertPathInside, parseAgentTags } from '../../shared/validation.js';
 import type { RegistryService } from './registry-service.js';
 import type { SourceService } from './source-service.js';
 import type { ViewService } from './view-service.js';
@@ -21,7 +21,7 @@ export class InstallService {
     this.source.assertUniqueSkillDestinations(selected);
     // No legacy default: installs stop tagging 'agents'/'claude' (see ADR-0004;
     // registry tags are catalog ids, migrated by `migrate-consumers`).
-    const consumers = parseConsumers(consumerValues, [], { allowEmpty: true });
+    const consumers = parseAgentTags(consumerValues, [], { allowEmpty: true });
     const existing = selected.filter((skill) => this.registry.skillExists(skill.name)).map((skill) => skill.name);
     if (existing.length > 0 && !options.overwrite) {
       throw new SkillsManagerError('install_would_overwrite', `Install would overwrite existing skills: ${existing.join(', ')}`, { existing });
@@ -52,7 +52,7 @@ export class InstallService {
     return selected;
   }
 
-  private copySkillToCanonical(skill: DiscoveredSkill, source: SourceCheckout, consumers: Consumer[]) {
+  private copySkillToCanonical(skill: DiscoveredSkill, source: SourceCheckout, consumers: string[]) {
     assertPathInside(skill.absoluteDir, source.repoDir);
     if (this.fs.kind(skill.absoluteDir) !== 'directory') throw new SkillsManagerError('source_skill_missing', `Skill source path does not exist: ${skill.absoluteDir}`);
     const destination = this.registry.skillDir(skill.name);

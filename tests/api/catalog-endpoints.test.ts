@@ -93,3 +93,19 @@ describe('overview statistics', () => {
     expect('claude' in state.counts).toBe(false);
   });
 });
+
+describe('registry structured edit accepts catalog ids only', () => {
+  it('rejects legacy and unknown ids with migrate-consumers guidance', async () => {
+    const legacy = await app.inject({ method: 'POST', url: '/api/registry/edit', payload: { skill: 'alpha', patch: { consumers: ['agents'] } } });
+    expect(legacy.statusCode).toBe(400);
+    expect(JSON.parse(legacy.body).error.message).toMatch(/migrate-consumers/);
+    const unknown = await app.inject({ method: 'POST', url: '/api/registry/edit', payload: { skill: 'alpha', patch: { consumers: ['not-an-agent'] } } });
+    expect(unknown.statusCode).toBe(400);
+  });
+
+  it('accepts catalog ids as desired default agents', async () => {
+    const ok = await app.inject({ method: 'POST', url: '/api/registry/edit', payload: { skill: 'alpha', patch: { consumers: ['claude-code', 'zed'] } } });
+    expect(ok.statusCode).toBe(200);
+    expect(JSON.parse(ok.body).data.consumers.sort()).toEqual(['claude-code', 'zed']);
+  });
+});

@@ -26,6 +26,7 @@ export default {
     category: '分类',
     tags: '标签',
     consumers: '消费者',
+    distributions: '接入位置',
     actions: '操作',
     update: '更新',
     install: '安装',
@@ -179,6 +180,7 @@ export default {
     noCandidates: '暂无更新候选项',
   },
   registry: {
+    consumersPlaceholder: '期望默认 agent id（catalog，逗号分隔；旧值需先 migrate-consumers）',
     title: '注册表',
     safeEdit: '仅支持结构化安全字段编辑；原始 YAML 不是主流程。',
     editSkill: '编辑注册表条目',
@@ -246,6 +248,11 @@ export default {
     modeDefaultCopy: '默认：copy',
     apply: '接入',
     remove: '取消接入',
+  },
+
+  distribution: {
+    mode: '模式',
+    agents: 'Agents',
   },
 },
 };

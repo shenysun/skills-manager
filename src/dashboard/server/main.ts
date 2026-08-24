@@ -65,7 +65,7 @@ const installBody = {
   properties: {
     source: { type: 'string', minLength: 1 },
     subpaths: { type: 'array', items: { type: 'string' } },
-    consumers: { type: 'array', items: { type: 'string', enum: ['agents', 'claude'] } },
+    consumers: { type: 'array', items: { type: 'string' } },
     overwrite: { type: 'boolean' },
   },
 } as const;
@@ -156,7 +156,6 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
       skills,
       candidates: updatePlan.candidates,
       sources,
-      consumers: ['agents', 'claude'],
       doctor,
       registry,
       activity: services.activity.list({ limit: 25 }),
@@ -296,51 +295,18 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return data(result);
   });
 
-  // Legacy UI bridge (removed with the four-button UI in a later ticket):
-  // translate the old consumer word into the catalog agent that owns that path.
-  const legacyAgentFor = (services: ReturnType<typeof getServices>, consumer: string) => {
-    if (consumer === 'claude') return 'claude-code';
-    const family = services.catalog.load().agents.filter((agent) => agent.globalSkillsDir === '~/.agents/skills').map((agent) => agent.id).sort();
-    return family[0];
-  };
-
-  app.post('/api/skills/expose', { schema: { body: {
-    type: 'object',
-    required: ['skills', 'consumer'],
-    additionalProperties: false,
-    properties: {
-      skills: { type: 'array', items: { type: 'string' } },
-      consumer: { type: 'string', enum: ['agents', 'claude'] },
-    },
-  } } }, async (request) => {
-    const body = request.body as { skills: string[]; consumer: string };
-    const services = getServices();
-    const agent = legacyAgentFor(services, body.consumer);
-    const result = services.distribute.apply({ to: 'user', skills: body.skills, agents: [agent] });
-    services.activity.record({ action: 'expose', summary: `Distributed ${body.skills.length} skill(s) to user ${agent}`, details: body });
-    return data(result);
-  });
-
-  app.post('/api/skills/hide', { schema: { body: {
-    type: 'object',
-    required: ['skills', 'consumer'],
-    additionalProperties: false,
-    properties: {
-      skills: { type: 'array', items: { type: 'string' } },
-      consumer: { type: 'string', enum: ['agents', 'claude'] },
-    },
-  } } }, async (request) => {
-    const body = request.body as { skills: string[]; consumer: string };
-    const services = getServices();
-    const agent = legacyAgentFor(services, body.consumer);
-    const result = services.distribute.undistribute({ to: 'user', skills: body.skills, agents: [agent] });
-    services.activity.record({ action: 'hide', summary: `Undistributed ${body.skills.length} skill(s) from user ${agent}`, details: body });
-    return data(result);
-  });
-
-  app.post('/api/registry/edit', { schema: { body: registryEditBody } }, async (request) => {
+  app.post('/api/registry/edit', { schema: { body: registryEditBody } }, async (request, reply) => {
     const body = request.body as { skill: string; patch: Record<string, unknown> };
     const services = getServices();
+    // Desired default agents are catalog ids only; legacy values have exactly
+    // one path back in: `skills-manager migrate-consumers`.
+    if (Array.isArray(body.patch.consumers)) {
+      const catalogIds = new Set(services.catalog.load().agents.map((agent) => agent.id));
+      const invalid = (body.patch.consumers as unknown[]).map(String).filter((id) => !catalogIds.has(id));
+      if (invalid.length > 0) {
+        return reply.status(400).send({ ok: false, error: { code: 'invalid_agent', message: `Unknown agent id(s): ${invalid.join(', ')}. Desired default agents must be catalog ids; legacy values (agents/claude) must go through \`skills-manager migrate-consumers\`.` } });
+      }
+    }
     const entry = services.registry.editSafeFields(body.skill, body.patch);
     services.views.rebuildCollections();
     services.activity.record({ action: 'registry-edit', summary: `Edited registry metadata for ${body.skill}`, details: { skill: body.skill, patch: body.patch } });

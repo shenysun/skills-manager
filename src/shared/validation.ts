@@ -1,7 +1,7 @@
 import path from 'node:path';
 import YAML from 'yaml';
 import { SkillsManagerError } from './errors.js';
-import { CONSUMERS, type Consumer, type RegistryEntry } from '../core/model/index.js';
+import { LEGACY_CONSUMERS, type RegistryEntry } from '../core/model/index.js';
 
 export function assertSafeSkillName(name: string): asserts name is string {
   if (!name || name === '.' || name === '..') throw new SkillsManagerError('invalid_skill_name', `Invalid skill name: ${name}`);
@@ -19,19 +19,23 @@ export function assertPathInside(child: string, parent: string) {
   }
 }
 
-export function isConsumer(value: string): value is Consumer {
-  return (CONSUMERS as readonly string[]).includes(value);
-}
-
-export function parseConsumers(values: readonly string[] | undefined, fallback?: readonly Consumer[], options: { allowEmpty?: boolean } = {}): Consumer[] {
+/**
+ * Parse desired/default agent tags. Catalog membership is NOT checked here —
+ * callers at the catalog boundary (API endpoints) validate ids against the
+ * snapshot; legacy words always fail there, with migrate-consumers as the
+ * only path for old values.
+ */
+export function parseAgentTags(values: readonly string[] | undefined, fallback?: readonly string[], options: { allowEmpty?: boolean } = {}): string[] {
   const raw = values !== undefined ? values : fallback;
   if (!raw || raw.length === 0) {
     if (options.allowEmpty) return [];
-    throw new SkillsManagerError('missing_consumers', `At least one consumer is required: ${CONSUMERS.join(', ')}`);
+    throw new SkillsManagerError('missing_agents', 'At least one agent id is required.');
   }
-  const invalid = raw.filter((value) => !isConsumer(String(value)));
-  if (invalid.length > 0) throw new SkillsManagerError('invalid_consumer', `Unknown consumers: ${invalid.join(', ')}. Valid values: ${CONSUMERS.join(', ')}`);
-  return [...new Set(raw.map((value) => String(value) as Consumer))].sort() as Consumer[];
+  const invalid = raw.map(String).filter((value) => !/^[a-z0-9][a-z0-9-]*$/.test(value) || (LEGACY_CONSUMERS as readonly string[]).includes(value));
+  if (invalid.length > 0) {
+    throw new SkillsManagerError('invalid_agent', `Invalid agent id(s): ${invalid.join(', ')}. Agent ids come from the catalog (kebab-case, e.g. claude-code). Legacy values (agents/claude) must go through \`skills-manager migrate-consumers\`.`);
+  }
+  return [...new Set(raw.map(String))].sort();
 }
 
 export function normalizeTags(value: unknown): string[] {
@@ -68,7 +72,7 @@ export function validateRegistrySafePatch(patch: Partial<RegistrySafePatch>): Pa
   if ('title' in patch && patch.title !== undefined) next.title = String(patch.title).trim();
   if ('category' in patch && patch.category !== undefined) next.category = String(patch.category).trim() || 'experimental';
   if ('tags' in patch && patch.tags !== undefined) next.tags = normalizeTags(patch.tags);
-  if ('consumers' in patch && patch.consumers !== undefined) next.consumers = parseConsumers(patch.consumers, undefined, { allowEmpty: true });
+  if ('consumers' in patch && patch.consumers !== undefined) next.consumers = parseAgentTags(patch.consumers, undefined, { allowEmpty: true });
   if ('description' in patch && patch.description !== undefined) next.description = String(patch.description).trim();
   if ('source' in patch && patch.source !== undefined) {
     const source = patch.source || {};

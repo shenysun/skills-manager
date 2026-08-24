@@ -10,7 +10,7 @@ const skill = ref('');
 const title = ref('');
 const category = ref('');
 const tags = ref('');
-const consumers = ref('agents,claude');
+const consumers = ref('');
 const sourceUrl = ref('');
 const sourceSubpath = ref('');
 const sourceRef = ref('');
@@ -77,7 +77,7 @@ async function save() {
             <n-form-item :label="t('common.title')"><n-input v-model:value="title" /></n-form-item>
             <n-form-item :label="t('common.category')"><n-input v-model:value="category" /></n-form-item>
             <n-form-item :label="t('common.tags')"><n-input v-model:value="tags" /></n-form-item>
-            <n-form-item :label="t('common.consumers')"><n-input v-model:value="consumers" /></n-form-item>
+            <n-form-item :label="t('common.consumers')"><n-input v-model:value="consumers" :placeholder="t('registry.consumersPlaceholder')" /></n-form-item>
             <n-form-item :label="t('common.sourceUrl')"><n-input v-model:value="sourceUrl" /></n-form-item>
             <n-form-item :label="t('common.sourceSubpath')"><n-input v-model:value="sourceSubpath" /></n-form-item>
             <n-form-item :label="t('common.sourceRef')"><n-input v-model:value="sourceRef" /></n-form-item>

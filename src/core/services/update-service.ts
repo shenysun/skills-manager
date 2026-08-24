@@ -1,10 +1,10 @@
 import path from 'node:path';
-import type { Consumer, SourceUpdateGroup, UpdateCandidate, UpdatePlan } from '../model/index.js';
+import type { SourceUpdateGroup, UpdateCandidate, UpdatePlan } from '../model/index.js';
 import type { RegistryService } from './registry-service.js';
 import type { SourceService } from './source-service.js';
 import type { InstallService } from './install-service.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { parseConsumers } from '../../shared/validation.js';
+import { parseAgentTags } from '../../shared/validation.js';
 
 export class UpdateService {
   constructor(private readonly registry: RegistryService, private readonly source: SourceService, private readonly installer: InstallService) {}
@@ -24,7 +24,7 @@ export class UpdateService {
         ref: entry.source?.ref || undefined,
         title: entry.title || skill,
         description: entry.description || '',
-        consumers: entry.consumers !== undefined ? parseConsumers(entry.consumers, undefined, { allowEmpty: true }) : ['agents', 'claude'] satisfies Consumer[],
+        consumers: entry.consumers !== undefined ? parseAgentTags(entry.consumers, undefined, { allowEmpty: true }) : [],
       });
     }
     return candidates.sort((a, b) => a.skill.localeCompare(b.skill));

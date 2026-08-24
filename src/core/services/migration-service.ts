@@ -1,11 +1,11 @@
 import path from 'node:path';
 import YAML from 'yaml';
-import type { Consumer, SkillHome } from '../model/index.js';
+import type { SkillHome } from '../model/index.js';
 import type { CatalogService } from './catalog-service.js';
 import type { DistributeService } from './distribute-service.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { CONSUMERS, type DistributionIndexEntry, type DistributionIndexRecord } from '../model/index.js';
+import { LEGACY_CONSUMERS, type DistributionIndexEntry, type DistributionIndexRecord } from '../model/index.js';
 
 /** Legacy one-shot bridge (ADR-0004): rewrite registry tags and hub receipts/index onto catalog ids. No translation code survives it. */
 
@@ -14,7 +14,7 @@ type LegacyRecord = { id: string; kind: 'user' | 'project'; targetRoot: string; 
 type LegacyReceipt = { version: 1; hubRoot: string; updatedAt: string; skills: Record<string, Record<string, { mode: 'symlink' | 'copy'; fingerprint: string; appliedAt: string }>> };
 
 export type MigrationPlan = {
-  agentMapping: Record<Consumer, string[]>;
+  agentMapping: Record<string, string[]>;
   registryChanges: Array<{ skill: string; from: string[]; to: string[] }>;
   indexEntries: number;
   receipts: string[];
@@ -34,7 +34,7 @@ export class MigrationService {
   ) {}
 
   /** Identity-preserving mapping: claude → claude-code; agents → the ~/.agents/skills global family. */
-  agentMapping(): Record<Consumer, string[]> {
+  agentMapping(): Record<string, string[]> {
     const family = this.catalog.load().agents.filter((agent) => agent.globalSkillsDir === '~/.agents/skills').map((agent) => agent.id).sort();
     return { claude: ['claude-code'], agents: family };
   }
@@ -44,14 +44,14 @@ export class MigrationService {
     const registryChanges: MigrationPlan['registryChanges'] = [];
     for (const [skill, entry] of Object.entries(this.readRawRegistry())) {
       const consumers = (entry.consumers || []) as string[];
-      const legacy = consumers.filter((value) => (CONSUMERS as readonly string[]).includes(value));
+      const legacy = consumers.filter((value) => (LEGACY_CONSUMERS as readonly string[]).includes(value));
       if (legacy.length === 0) continue;
-      const to = [...new Set(consumers.flatMap((value) => ((CONSUMERS as readonly string[]).includes(value) ? mapping[value as Consumer] : [value])))].sort();
+      const to = [...new Set(consumers.flatMap((value) => ((LEGACY_CONSUMERS as readonly string[]).includes(value) ? mapping[value] : [value])))].sort();
       registryChanges.push({ skill, from: consumers, to });
     }
     const records = this.readRawIndex();
     const receipts = records.filter((record) => record.kind === 'project').map((record) => this.receiptPath(record.targetRoot)).filter((file) => this.fs.kind(file) === 'file');
-    return { agentMapping: mapping, registryChanges, indexEntries: records.reduce((count, record) => count + record.entries.filter((entry) => (CONSUMERS as readonly string[]).includes(entry.consumer)).length, 0), receipts };
+    return { agentMapping: mapping, registryChanges, indexEntries: records.reduce((count, record) => count + record.entries.filter((entry) => (LEGACY_CONSUMERS as readonly string[]).includes(entry.consumer)).length, 0), receipts };
   }
 
   apply(): MigrationResult {
@@ -77,7 +77,7 @@ export class MigrationService {
     const migratedRecords: DistributionIndexRecord[] = records.map((record) => ({
       ...record,
       entries: record.entries.map((entry): DistributionIndexEntry => {
-        if (!(CONSUMERS as readonly string[]).includes(entry.consumer)) {
+        if (!(LEGACY_CONSUMERS as readonly string[]).includes(entry.consumer)) {
           return entry as unknown as DistributionIndexEntry;
         }
         indexEntries += 1;
@@ -87,7 +87,7 @@ export class MigrationService {
           mode: entry.mode,
           fingerprint: entry.fingerprint,
           managed: true,
-          agents: mapping[entry.consumer as Consumer],
+          agents: mapping[entry.consumer],
           appliedAt: record.updatedAt,
         };
       }),
@@ -104,7 +104,7 @@ export class MigrationService {
       for (const [skill, perConsumer] of Object.entries(legacy.skills || {})) {
         const entries = [];
         for (const [consumer, info] of Object.entries(perConsumer || {})) {
-          if (!(CONSUMERS as readonly string[]).includes(consumer)) continue;
+          if (!(LEGACY_CONSUMERS as readonly string[]).includes(consumer)) continue;
           const fromIndex = record?.entries.find((item) => item.skill === skill && item.consumer === consumer);
           const projectRoot = path.dirname(path.dirname(receiptFile));
           const derived = path.join(projectRoot, `.${consumer}`, 'skills', skill);
@@ -113,7 +113,7 @@ export class MigrationService {
             mode: info.mode,
             fingerprint: info.fingerprint,
             managed: true,
-            agents: mapping[consumer as Consumer],
+            agents: mapping[consumer],
             appliedAt: info.appliedAt,
           });
         }

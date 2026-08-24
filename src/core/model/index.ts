@@ -1,7 +1,11 @@
-export const CONSUMERS = ['agents', 'claude'] as const;
-export type Consumer = (typeof CONSUMERS)[number];
-
 export type SkillName = string;
+
+/**
+ * Legacy consumer words (pre-catalog). Kept as a local constant only where
+ * the one-shot migration bridge and leftover-view cleanup need to recognize
+ * them; they are no longer a model-level closed set.
+ */
+export const LEGACY_CONSUMERS = ['agents', 'claude'] as const;
 
 export type SkillSourceType = 'local' | 'git' | 'github' | string;
 
@@ -19,7 +23,8 @@ export type RegistryEntry = {
   title?: string;
   category?: string;
   tags?: string[];
-  consumers?: Consumer[];
+  /** Desired/default agent ids from the catalog (metadata only; see ADR-0004). */
+  consumers?: string[];
   source?: SkillSource;
   update_policy?: string;
   description?: string;
@@ -37,7 +42,7 @@ export type Skill = {
   title: string;
   category: string;
   tags: string[];
-  consumers: Consumer[];
+  consumers: string[];
   description: string;
   source: SkillSource;
   archived: boolean;
@@ -78,7 +83,7 @@ export type InstallPlan = {
   source: SourceCheckout;
   selected: DiscoveredSkill[];
   existing: SkillName[];
-  consumers: Consumer[];
+  consumers: string[];
   overwrite: boolean;
 };
 
@@ -94,7 +99,7 @@ export type UpdateCandidate = {
   ref?: string;
   title: string;
   description: string;
-  consumers: Consumer[];
+  consumers: string[];
 };
 
 export type SourceUpdateGroup = {

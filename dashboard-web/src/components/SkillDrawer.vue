@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import ConsumerBadges from './ConsumerBadges.vue';
+import DistributionBadges from './DistributionBadges.vue';
 import type { Skill } from '../composables/useApi';
 
 defineProps<{ skill: Skill | null; busyAction?: string }>();
@@ -19,8 +19,8 @@ const { t } = useI18n();
           <n-descriptions-item :label="t('common.path')">
             <n-code :code="skill.path" word-wrap />
           </n-descriptions-item>
-          <n-descriptions-item :label="t('common.consumers')">
-            <ConsumerBadges :consumers="skill.consumers" />
+          <n-descriptions-item :label="t('common.distributions')">
+            <DistributionBadges :skill="skill.name" />
           </n-descriptions-item>
           <n-descriptions-item :label="t('common.source')">
             <n-code :code="JSON.stringify(skill.source, null, 2)" language="json" word-wrap />

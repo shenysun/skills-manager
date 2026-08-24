@@ -26,6 +26,7 @@ export default {
     category: 'Category',
     tags: 'Tags',
     consumers: 'Consumers',
+    distributions: 'Distributions',
     actions: 'Actions',
     update: 'Update',
     install: 'Install',
@@ -179,6 +180,7 @@ export default {
     noCandidates: 'No update candidates',
   },
   registry: {
+    consumersPlaceholder: 'Desired default agent ids (catalog, comma-separated; legacy values need migrate-consumers first)',
     title: 'Registry',
     safeEdit: 'Structured safe-field editing only. Raw YAML is not the primary workflow.',
     editSkill: 'Edit registry entry',
@@ -246,6 +248,11 @@ export default {
     modeDefaultCopy: 'Default: copy',
     apply: 'Apply',
     remove: 'Undistribute',
+  },
+
+  distribution: {
+    mode: 'Mode',
+    agents: 'Agents',
   },
 },
 };

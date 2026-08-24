@@ -3,8 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import YAML from 'yaml';
 import {
-  CONSUMERS,
-  type Consumer,
+  LEGACY_CONSUMERS,
   type DistributeMode,
   type DistributionHealth,
   type DistributionIndexEntry,
@@ -177,7 +176,7 @@ export class DistributeService {
   migrateViews(options: { deleteViews?: boolean; force?: boolean } = {}) {
     const skipped: string[] = [];
     const distributed: string[] = [];
-    for (const consumer of CONSUMERS) {
+    for (const consumer of LEGACY_CONSUMERS) {
       const agentId = this.legacyConsumerAgent(consumer);
       const names = new Set<string>();
       const viewDir = path.join(this.home.viewsDir, consumer);
@@ -374,7 +373,7 @@ export class DistributeService {
   }
 
   /** Family representative for a legacy consumer tag: one catalog id whose global dir matches the old hardcoded path. */
-  private legacyConsumerAgent(consumer: Consumer): string {
+  private legacyConsumerAgent(consumer: string): string {
     if (consumer === 'claude') {
       const agent = this.catalog.load().agents.find((item) => item.globalSkillsDir?.startsWith('$claudeHome') || item.globalSkillsDir === '~/.claude/skills');
       if (!agent) throw new SkillsManagerError('distribute_unknown_agent', 'Catalog has no agent for the legacy claude runtime path');
@@ -397,7 +396,7 @@ export class DistributeService {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => JSON.parse(line) as DistributionIndexRecord);
-    const legacy = records.some((record) => record.entries.some((entry) => (CONSUMERS as readonly string[]).includes((entry as { consumer?: string }).consumer ?? '')));
+    const legacy = records.some((record) => record.entries.some((entry) => (LEGACY_CONSUMERS as readonly string[]).includes((entry as { consumer?: string }).consumer ?? '')));
     if (legacy) {
       throw new SkillsManagerError('legacy_consumer_tags', 'The hub distribution index still uses legacy consumer entries. Run `skills-manager migrate-consumers` to migrate them to catalog agent ids.');
     }
@@ -530,7 +529,7 @@ export class DistributeService {
 
   private deleteGeneratedViews() {
     if (this.fs.kind(this.home.viewsDir) !== 'directory') return;
-    for (const consumer of CONSUMERS) {
+    for (const consumer of LEGACY_CONSUMERS) {
       const dir = path.join(this.home.viewsDir, consumer);
       if (this.fs.kind(dir) !== 'directory') continue;
       for (const entry of this.fs.readDirectory(dir)) {
