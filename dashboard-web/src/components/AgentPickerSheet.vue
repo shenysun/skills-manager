@@ -24,6 +24,7 @@ import {
 } from '../domain/picker';
 import { usePickerMemory } from '../composables/usePickerMemory';
 import { useNotice } from '../composables/useNotice';
+import { useBrowserHistory } from '../composables/useBrowserHistory';
 
 const props = defineProps<{ skills: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
@@ -31,6 +32,7 @@ const emit = defineEmits<{ close: [] }>();
 const { t } = useI18n();
 const { memory, rememberApply } = usePickerMemory();
 const { show } = useNotice();
+const { addPath: addProjectPath, recentPaths } = useBrowserHistory();
 
 const scope = ref<Scope>('user');
 const projectRoot = ref('');
@@ -64,6 +66,13 @@ async function loadAgents() {
 
 const projectPending = computed(() => scope.value === 'project' && projectRoot.value.trim() === '');
 
+function rememberProjectPath() {
+  const path = projectRoot.value.trim();
+  if (path) {
+    addProjectPath(path);
+  }
+}
+
 watch(scope, (next) => {
   mode.value = defaultMode(next);
   if (next === 'project') projectRoot.value = defaultProjectRoot(props.knownProjects);
@@ -89,6 +98,7 @@ function reasonText(agent: CatalogAgent): string {
 
 function onBrowsedPath(path: string) {
   projectRoot.value = path;
+  rememberProjectPath();
   showBrowser.value = false;
   void loadAgents();
 }
@@ -128,9 +138,10 @@ async function apply() {
           type="text"
           :placeholder="t('picker.projectRoot')"
           list="picker-known-projects"
-          @change="loadAgents"
+          @change="loadAgents; rememberProjectPath()"
         />
         <datalist id="picker-known-projects">
+          <option v-for="project in recentPaths" :key="project" :value="project" />
           <option v-for="project in knownProjects" :key="project" :value="project" />
         </datalist>
       </div>
