@@ -12,6 +12,7 @@ import {
 } from '../api/client';
 import {
   clearVisible,
+  defaultProjectRoot,
   groupFamilies,
   initialSelection,
   searchAgents,
@@ -23,7 +24,7 @@ import {
 import { usePickerMemory } from '../composables/usePickerMemory';
 import { useNotice } from '../composables/useNotice';
 
-const props = defineProps<{ skills: string[] }>();
+const props = defineProps<{ skills: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useI18n();
@@ -43,6 +44,13 @@ const defaultMode = (forScope: Scope): DistributeMode => (forScope === 'user' ? 
 
 async function loadAgents() {
   loadError.value = null;
+  // No project named yet: the list waits (the backend rejects a rootless project
+  // query) instead of guessing a directory the operator never chose.
+  if (projectPending.value) {
+    agents.value = [];
+    selection.value = [];
+    return;
+  }
   try {
     const result = await fetchCatalogAgents(scope.value, scope.value === 'project' ? projectRoot.value : undefined);
     agents.value = result.agents;
@@ -52,8 +60,11 @@ async function loadAgents() {
   }
 }
 
+const projectPending = computed(() => scope.value === 'project' && projectRoot.value.trim() === '');
+
 watch(scope, (next) => {
   mode.value = defaultMode(next);
+  if (next === 'project') projectRoot.value = defaultProjectRoot(props.knownProjects);
   void loadAgents();
 });
 
@@ -103,7 +114,16 @@ async function apply() {
     </div>
 
     <div v-if="scope === 'project'" class="field-line">
-      <input v-model="projectRoot" type="text" :placeholder="t('picker.projectRoot')" @change="loadAgents" />
+      <input
+        v-model="projectRoot"
+        type="text"
+        :placeholder="t('picker.projectRoot')"
+        list="picker-known-projects"
+        @change="loadAgents"
+      />
+      <datalist id="picker-known-projects">
+        <option v-for="project in knownProjects" :key="project" :value="project" />
+      </datalist>
     </div>
 
     <div class="field-line">
@@ -123,6 +143,10 @@ async function apply() {
     </div>
 
     <p v-if="loadError" class="picker-error">{{ t('error.loadFailed', { message: loadError }) }}</p>
+
+    <div v-else-if="projectPending" class="agent-list">
+      <p class="picker-hint">{{ t('picker.projectHint') }}</p>
+    </div>
 
     <div v-else class="agent-list">
       <section v-if="detected.length > 0">
@@ -187,7 +211,7 @@ async function apply() {
     <div class="sheet-foot">
       <span class="picker-count">{{ t('picker.selected', selection.length) }}</span>
       <button class="text-btn" @click="emit('close')">{{ t('picker.cancel') }}</button>
-      <button class="primary-btn" :disabled="selection.length === 0 || applying" @click="apply">
+      <button class="primary-btn" :disabled="selection.length === 0 || applying || projectPending" @click="apply">
         {{ applying ? t('picker.applying') : t('picker.apply') }}
       </button>
     </div>

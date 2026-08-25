@@ -56,12 +56,12 @@ function patchRegistry(patch: (entry: Record<string, unknown>) => void) {
 }
 
 describe('GET /api/state (single-page slim contract)', () => {
-  it('returns only skills, activity, and updateCount', async () => {
+  it('returns skills, activity, updateCount, and knownProjects', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/state' });
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.ok).toBe(true);
-    expect(Object.keys(body.data).sort()).toEqual(['activity', 'skills', 'updateCount']);
+    expect(Object.keys(body.data).sort()).toEqual(['activity', 'knownProjects', 'skills', 'updateCount']);
   });
 
   it('describes every skill in one row with the seven single-page fields', async () => {
@@ -136,6 +136,37 @@ describe('GET /api/state (single-page slim contract)', () => {
     appendFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), '\n# hub changed\n');
     const state = await getState();
     expect(state.skills[0].warning).toBe('outdated-copy');
+  });
+});
+
+describe('GET /api/state knownProjects (distribution history, read-only derivation)', () => {
+  it('is empty when no project distribution exists, user distributions notwithstanding', async () => {
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['warp'] } });
+    const state = await getState();
+    expect(state.knownProjects).toEqual([]);
+  });
+
+  it('lists project targetRoots from the index, most recently updated first', async () => {
+    const projA = path.join(root, 'proj-a');
+    const projB = path.join(root, 'proj-b');
+    const first = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: projA, skills: ['alpha'], agents: ['warp'] } });
+    expect(JSON.parse(first.body).ok, first.body).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: projB, skills: ['alpha'], agents: ['zed'] } });
+    const state = await getState();
+    expect(state.knownProjects).toEqual([projB, projA]);
+  });
+
+  it('keeps a single entry per project even after re-distribution', async () => {
+    const projA = path.join(root, 'proj-a');
+    const projB = path.join(root, 'proj-b');
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: projB, skills: ['alpha'], agents: ['warp'] } });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: projA, skills: ['alpha'], agents: ['zed'] } });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: projB, skills: ['alpha'], agents: ['zed'] } });
+    const state = await getState();
+    expect(state.knownProjects).toEqual([projB, projA]);
   });
 });
 

@@ -3,10 +3,10 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
 import { errorMessage, undistribute, type Scope } from '../api/client';
-import { toggleAgent } from '../domain/picker';
+import { defaultProjectRoot, toggleAgent } from '../domain/picker';
 import { useNotice } from '../composables/useNotice';
 
-const props = defineProps<{ skill: string; agents: string[] }>();
+const props = defineProps<{ skill: string; agents: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useI18n();
@@ -17,8 +17,10 @@ const projectRoot = ref('');
 const selection = ref<string[]>([...props.agents]);
 const applying = ref(false);
 
-watch(scope, () => {
+watch(scope, (next) => {
   selection.value = [...props.agents];
+  // Same prefill as the distribute picker: the most recent project, if any.
+  if (next === 'project') projectRoot.value = defaultProjectRoot(props.knownProjects);
 });
 
 function toggle(id: string) {
@@ -54,7 +56,10 @@ async function apply() {
       <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
     <div v-if="scope === 'project'" class="field-line">
-      <input v-model="projectRoot" type="text" :placeholder="t('picker.projectRoot')" />
+      <input v-model="projectRoot" type="text" :placeholder="t('picker.projectRoot')" list="undistribute-known-projects" />
+      <datalist id="undistribute-known-projects">
+        <option v-for="project in knownProjects" :key="project" :value="project" />
+      </datalist>
     </div>
 
     <p v-if="agents.length === 0" class="picker-hint">{{ t('undistribute.none') }}</p>

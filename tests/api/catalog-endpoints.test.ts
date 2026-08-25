@@ -60,12 +60,21 @@ describe('GET /api/catalog/agents (picker data)', () => {
 
   it('returns project-scope agents keyed by project runtime dirs with eve valid', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/catalog/agents?scope=project&projectRoot=' + encodeURIComponent(path.join(root, 'proj')) });
+    expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body).data;
     const eve = body.agents.find((agent: { id: string }) => agent.id === 'eve');
     expect(eve.invalidReason).toBeNull();
     expect(eve.familyKey).toContain('agent/skills');
     const codex = body.agents.find((agent: { id: string }) => agent.id === 'codex');
     expect(codex.familyKey).toContain('.agents/skills');
+  });
+
+  it('rejects a project-scope query without projectRoot — no silent server-cwd fallback', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/catalog/agents?scope=project' });
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe('catalog_project_root_required');
   });
 });
 

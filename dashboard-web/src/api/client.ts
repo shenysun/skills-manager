@@ -22,6 +22,8 @@ export type DashboardState = {
   skills: SkillRowState[];
   activity: ActivityRecord[];
   updateCount: number;
+  /** Project targets the operator has distributed to, most recent first (index-derived). */
+  knownProjects: string[];
 };
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string; details?: unknown } };

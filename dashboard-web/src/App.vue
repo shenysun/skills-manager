@@ -203,11 +203,17 @@ async function onRemoveConfirm() {
       />
     </template>
 
-    <AgentPickerSheet v-if="pickerSkills" :skills="pickerSkills" @close="onPickerClose" />
+    <AgentPickerSheet
+      v-if="pickerSkills"
+      :skills="pickerSkills"
+      :known-projects="state?.knownProjects ?? []"
+      @close="onPickerClose"
+    />
     <UndistributeSheet
       v-if="undistributeTarget"
       :skill="undistributeTarget.name"
       :agents="undistributeTarget.distributedAgents"
+      :known-projects="state?.knownProjects ?? []"
       @close="onUndistributeClose"
     />
     <ConfirmSheet

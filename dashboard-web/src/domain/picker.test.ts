@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clearVisible,
+  defaultProjectRoot,
   groupFamilies,
   initialSelection,
   rememberApply,
@@ -128,6 +129,16 @@ describe('quick actions (select-all / select-detected / clear act on the visible
 
   it('clear with a query unchecks only visible rows — off-screen ticks survive the clear', () => {
     expect(clearVisible(quickCatalog, 'zed', ['claude-code', 'zed', 'amp'])).toEqual(['amp', 'claude-code']);
+  });
+});
+
+describe('defaultProjectRoot (project scope pre-fill)', () => {
+  it('prefills the most recently distributed project', () => {
+    expect(defaultProjectRoot(['/p/recent', '/p/older'])).toBe('/p/recent');
+  });
+
+  it('stays empty with no distribution history — never a server cwd guess', () => {
+    expect(defaultProjectRoot([])).toBe('');
   });
 });
 

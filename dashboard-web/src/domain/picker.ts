@@ -85,6 +85,12 @@ export function clearVisible(agents: readonly PickerAgent[], query: string, sele
   return sorted(selected.filter((id) => !visibleIds.has(id)));
 }
 
+/** Project scope prefill: the most recently distributed project, or empty when
+ *  there is no history — never a server-cwd guess. */
+export function defaultProjectRoot(knownProjects: readonly string[]): string {
+  return knownProjects[0] ?? '';
+}
+
 /** A family header is rendered only where a real family (≥2 selectable members) exists;
  *  singletons — whether their familyKey is unique or absent — lie flat as plain rows. */
 export function groupFamilies(agents: readonly PickerAgent[]): {

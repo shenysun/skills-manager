@@ -45,6 +45,7 @@ export default {
     scopeUser: '用户',
     scopeProject: '项目',
     projectRoot: '项目根目录(如 ~/code/myproject)',
+    projectHint: '从分发历史选择项目路径,或输入新路径后回车。',
     searchPlaceholder: '搜索 agent…',
     quick: {
       selectAll: '全选',

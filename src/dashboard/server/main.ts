@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { errorCode, errorMessage } from '../../shared/errors.js';
+import { errorCode, errorMessage, SkillsManagerError } from '../../shared/errors.js';
 import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
@@ -233,6 +233,12 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
       skills,
       activity: services.activity.list({ limit: 25 }),
       updateCount: skills.filter((skill) => skill.hasUpdate).length,
+      // Read-only derivation of the hub index: the project targets the operator
+      // has actually distributed to, most recent first — the picker's datalist.
+      knownProjects: index
+        .filter((record) => record.kind === 'project')
+        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
+        .map((record) => record.targetRoot),
     };
   };
 
@@ -246,7 +252,15 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const services = getServices();
     const snapshot = services.catalog.load();
     const detected = new Set(services.catalog.detected());
-    const projectRoot = query.projectRoot ? path.resolve(query.projectRoot) : process.cwd();
+    // Project families depend on the named project — same project-required
+    // semantics as the distribute service; no silent server-cwd fallback.
+    if (scope === 'project' && !query.projectRoot) {
+      throw Object.assign(
+        new SkillsManagerError('catalog_project_root_required', 'Project scope requires an explicit projectRoot'),
+        { statusCode: 400 },
+      );
+    }
+    const projectRoot = path.resolve(query.projectRoot ?? '');
     const agents = snapshot.agents.map((agent) => {
       if (scope === 'user') {
         if (!agent.globalSkillsDir) {

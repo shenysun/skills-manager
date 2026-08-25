@@ -45,6 +45,7 @@ export default {
     scopeUser: 'User',
     scopeProject: 'Project',
     projectRoot: 'Project root (e.g. ~/code/myproject)',
+    projectHint: 'Pick a project from your distribution history, or type a new path and press Enter.',
     searchPlaceholder: 'Search agents…',
     quick: {
       selectAll: 'Select all',
