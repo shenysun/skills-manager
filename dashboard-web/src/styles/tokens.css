@@ -1,32 +1,56 @@
+/* Tokens — light/dark pair carried over from the ratified prototype (variant C). */
 :root {
-  color-scheme: light dark;
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --bg: #f5f7fb;
-  --panel: rgba(255, 255, 255, 0.82);
-  --brand: #2563eb;
-  --line: rgba(15, 23, 42, 0.08);
-  --muted-panel: rgba(37, 99, 235, 0.06);
+  --bg: #fafafa;
+  --fg: #18181b;
+  --fg2: #71717a;
+  --fg3: #a1a1aa;
+  --line: #e4e4e7;
+  --line2: #f4f4f5;
+  --accent: #2563eb;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --ok: #16a34a;
+  font-size: 15px;
 }
 
-[data-theme='dark'] {
-  --bg: #0b1020;
-  --panel: rgba(15, 23, 42, 0.84);
-  --brand: #38bdf8;
-  --line: rgba(226, 232, 240, 0.12);
-  --muted-panel: rgba(56, 189, 248, 0.08);
+:root[data-theme='dark'] {
+  --bg: #101013;
+  --fg: #ededef;
+  --fg2: #9d9da7;
+  --fg3: #63636e;
+  --line: #26262c;
+  --line2: #1d1d22;
+  --accent: #3b82f6;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --ok: #22c55e;
 }
 
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  margin: 0;
-  font: 14px/1.55 var(--font);
   background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, 'PingFang SC', 'Segoe UI', sans-serif;
 }
 
-a {
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
   color: inherit;
-  text-decoration: none;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+.mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
 }

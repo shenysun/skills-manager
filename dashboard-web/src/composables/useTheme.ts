@@ -1,18 +1,18 @@
-import { computed, ref, watchEffect } from 'vue';
+export type Theme = 'light' | 'dark';
 
-export type Theme = 'system' | 'light' | 'dark';
+const THEME_KEY = 'skills-manager.prefs.theme';
 
-const prefersDark = ref(window.matchMedia('(prefers-color-scheme: dark)').matches);
-const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-mediaQuery.addEventListener('change', (event) => { prefersDark.value = event.matches; });
+/** Default follows the system; a saved preference wins (spec §Implementation Decisions · Prefs). */
+export function detectTheme(): Theme {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
-export const theme = ref<Theme>((localStorage.getItem('skills-manager-theme') as Theme) || 'system');
-export const effectiveTheme = computed<'light' | 'dark'>(() => (theme.value === 'system' ? (prefersDark.value ? 'dark' : 'light') : theme.value));
+export function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme;
+}
 
-export function useTheme() {
-  watchEffect(() => {
-    localStorage.setItem('skills-manager-theme', theme.value);
-    document.documentElement.dataset.theme = effectiveTheme.value;
-  });
-  return { theme, effectiveTheme };
+export function persistTheme(theme: Theme) {
+  localStorage.setItem(THEME_KEY, theme);
 }
