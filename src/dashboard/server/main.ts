@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static';
 import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -243,6 +244,54 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   };
 
   app.get('/api/state', async () => data(await state()));
+
+  // Directory browsing for project path picker: list entries in a directory
+  // with parent-link semantics. Prevents traversal attacks by restricting to
+  // user home and cwd.
+  app.get('/api/fs/browse', async (request) => {
+    const query = request.query as { path?: string };
+    const userHome = options.userHome || process.env.HOME || os.homedir();
+    const cwd = process.cwd();
+    let targetPath = query.path ? path.resolve(query.path) : userHome;
+
+    // Security: restrict to user home or cwd to prevent traversal outside allowed bounds
+    const normalized = path.normalize(targetPath);
+    const normalizedHome = path.normalize(userHome);
+    const normalizedCwd = path.normalize(cwd);
+    const isInHome = normalized === normalizedHome || normalized.startsWith(normalizedHome + path.sep);
+    const isInCwd = normalized === normalizedCwd || normalized.startsWith(normalizedCwd + path.sep);
+    if (!isInHome && !isInCwd) {
+      throw Object.assign(
+        new SkillsManagerError('browse_forbidden', `Access denied to ${targetPath}`),
+        { statusCode: 403 },
+      );
+    }
+
+    const fs = new NodeFileSystem();
+    if (fs.kind(targetPath) !== 'directory') {
+      throw Object.assign(
+        new SkillsManagerError('browse_not_directory', `${targetPath} is not a directory`),
+        { statusCode: 400 },
+      );
+    }
+
+    const entries = fs.readDirectory(targetPath)
+      .filter((entry) => entry.kind === 'directory')
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const parent = targetPath !== userHome && targetPath !== '/'
+      ? path.dirname(targetPath)
+      : null;
+
+    return data({
+      path: targetPath,
+      parent,
+      entries: entries.map((entry) => ({
+        name: entry.name,
+        path: path.join(targetPath, entry.name),
+      })),
+    });
+  });
 
   // Picker data endpoint: the full catalog filtered for a scope, with detected
   // flags, family keys for shared-path grouping, and invalid reasons.

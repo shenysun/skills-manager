@@ -46,6 +46,7 @@ export default {
     scopeProject: 'Project',
     projectRoot: 'Project root (e.g. ~/code/myproject)',
     projectHint: 'Pick a project from your distribution history, or type a new path and press Enter.',
+    browsePath: 'Browse',
     searchPlaceholder: 'Search agents…',
     quick: {
       selectAll: 'Select all',
@@ -121,5 +122,13 @@ export default {
   },
   chrome: {
     themeHint: 'Toggle light/dark theme',
+  },
+  browser: {
+    title: 'Select project directory',
+    up: 'Go up',
+    empty: 'No subdirectories',
+    loading: 'Loading…',
+    cancel: 'Cancel',
+    select: 'Select this directory',
   },
 };

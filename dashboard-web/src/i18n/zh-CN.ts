@@ -46,6 +46,7 @@ export default {
     scopeProject: '项目',
     projectRoot: '项目根目录(如 ~/code/myproject)',
     projectHint: '从分发历史选择项目路径,或输入新路径后回车。',
+    browsePath: '浏览',
     searchPlaceholder: '搜索 agent…',
     quick: {
       selectAll: '全选',
@@ -121,5 +122,13 @@ export default {
   },
   chrome: {
     themeHint: '切换明暗主题',
+  },
+  browser: {
+    title: '选择项目目录',
+    up: '返回上级',
+    empty: '该目录无子目录',
+    loading: '加载中…',
+    cancel: '取消',
+    select: '选择此目录',
   },
 };

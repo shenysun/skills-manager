@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
+import DirectoryBrowser from './DirectoryBrowser.vue';
 import {
   distribute,
   errorMessage,
@@ -39,6 +40,7 @@ const loadError = ref<string | null>(null);
 const applying = ref(false);
 const mode = ref<DistributeMode>('symlink');
 const selection = ref<string[]>([]);
+const showBrowser = ref(false);
 
 const defaultMode = (forScope: Scope): DistributeMode => (forScope === 'user' ? 'symlink' : 'copy');
 
@@ -85,6 +87,12 @@ function reasonText(agent: CatalogAgent): string {
   return agent.invalidReason ?? '';
 }
 
+function onBrowsedPath(path: string) {
+  projectRoot.value = path;
+  showBrowser.value = false;
+  void loadAgents();
+}
+
 async function apply() {
   applying.value = true;
   try {
@@ -107,23 +115,28 @@ async function apply() {
 </script>
 
 <template>
-  <Sheet :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
+  <Sheet v-if="!showBrowser" :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
     <div class="scope-row">
       <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
       <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
 
-    <div v-if="scope === 'project'" class="field-line">
-      <input
-        v-model="projectRoot"
-        type="text"
-        :placeholder="t('picker.projectRoot')"
-        list="picker-known-projects"
-        @change="loadAgents"
-      />
-      <datalist id="picker-known-projects">
-        <option v-for="project in knownProjects" :key="project" :value="project" />
-      </datalist>
+    <div v-if="scope === 'project'" class="project-input-row">
+      <div class="field-line">
+        <input
+          v-model="projectRoot"
+          type="text"
+          :placeholder="t('picker.projectRoot')"
+          list="picker-known-projects"
+          @change="loadAgents"
+        />
+        <datalist id="picker-known-projects">
+          <option v-for="project in knownProjects" :key="project" :value="project" />
+        </datalist>
+      </div>
+      <button class="browse-btn" :disabled="!projectRoot.trim()" @click="showBrowser = true">
+        {{ t('picker.browsePath') }}
+      </button>
     </div>
 
     <div class="field-line">
@@ -216,4 +229,43 @@ async function apply() {
       </button>
     </div>
   </Sheet>
+
+  <DirectoryBrowser
+    v-else
+    :initial-path="projectRoot.trim() || undefined"
+    @select="onBrowsedPath"
+    @cancel="showBrowser = false"
+  />
 </template>
+
+<style scoped>
+.project-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  padding: 0 0 1rem 0;
+}
+
+.field-line {
+  flex: 1;
+}
+
+.browse-btn {
+  padding: 0.4rem 0.8rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.browse-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.browse-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>

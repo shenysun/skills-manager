@@ -105,3 +105,15 @@ export function discover(source: string) {
 export function installFromSource(body: { source: string; subpaths: string[]; overwrite?: boolean }) {
   return api<{ installed: string[] }>('/api/install', { method: 'POST', body: JSON.stringify(body) });
 }
+
+export type BrowseDirectory = {
+  path: string;
+  parent: string | null;
+  entries: Array<{ name: string; path: string }>;
+};
+
+export function browseDirectory(path?: string) {
+  const params = new URLSearchParams();
+  if (path) params.set('path', path);
+  return api<BrowseDirectory>(`/api/fs/browse?${params.toString()}`);
+}
