@@ -22,6 +22,7 @@ export default {
     viewRendered: 'Rendered view',
     loadFailed: 'Preview failed to load: {message}',
     truncated: 'Content exceeds 512KB; shown truncated.',
+    binary: 'Binary file, contents not rendered · {size}',
     loading: 'Loading…',
   },
   action: {

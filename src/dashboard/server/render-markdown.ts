@@ -71,3 +71,14 @@ export async function renderMarkdown(body: string): Promise<string> {
     activeHighlighter = null;
   }
 }
+
+/** Standalone source file highlight (preview `source` kind): same dual-theme
+ *  CSS-variable output, sanitized like everything entering an html field. */
+export async function highlightSource(code: string, lang: string): Promise<string> {
+  const highlighter = await getHighlighter();
+  return DOMPurify.sanitize(highlighter.codeToHtml(code, {
+    lang,
+    themes: { light: 'github-light', dark: 'github-dark' },
+    defaultColor: false,
+  }));
+}

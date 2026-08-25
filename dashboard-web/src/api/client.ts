@@ -154,14 +154,20 @@ export function browseDirectory(path?: string) {
 
 /** One file of a hub skill, server-rendered (skill preview Sheet). The html is
  *  sanitized server-side — the only server output the client innerHTMLs. */
-export type SkillFilePayload = {
-  kind: 'markdown';
-  html: string;
-  raw: string;
-  truncated: boolean;
-};
+export type SkillFilePayload =
+  | { kind: 'markdown'; html: string; raw: string; truncated: boolean }
+  | { kind: 'source'; html: string; truncated: boolean }
+  | { kind: 'text'; raw: string; truncated: boolean }
+  | { kind: 'binary'; size: number };
+
+export type SkillFileEntry = { path: string; size: number };
 
 export function fetchSkillFile(name: string, filePath: string) {
   const params = new URLSearchParams({ name, path: filePath });
   return api<SkillFilePayload>(`/api/skill/file?${params.toString()}`);
+}
+
+/** The skill's full file list for the preview tree, sorted server-side. */
+export function fetchSkillFiles(name: string) {
+  return api<{ files: SkillFileEntry[] }>(`/api/skill/files?name=${encodeURIComponent(name)}`);
 }

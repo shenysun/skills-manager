@@ -168,3 +168,88 @@ describe('GET /api/skill/file (path safety)', () => {
     expect(body.error.code).toBe('path_escape');
   });
 });
+
+describe('GET /api/skill/files (file tree enumeration)', () => {
+  it('lists every file as sorted relative paths with sizes', async () => {
+    seedSkill('tree', {
+      'SKILL.md': '# Tree\n',
+      'docs/guide.md': 'Guide\n',
+      'agents/vendor/lib/deep.mjs': 'export {}\n',
+      'run.sh': 'echo hi\n',
+    });
+    const response = await app.inject({ method: 'GET', url: '/api/skill/files?name=tree' });
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.ok).toBe(true);
+    expect(body.data.files.map((f: { path: string }) => f.path)).toEqual([
+      'SKILL.md',
+      'agents/vendor/lib/deep.mjs',
+      'docs/guide.md',
+      'run.sh',
+    ]);
+    expect(body.data.files.find((f: { path: string }) => f.path === 'run.sh').size).toBe('echo hi\n'.length);
+  });
+
+  it('404s when the skill does not exist', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/skill/files?name=ghost' });
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).error.code).toBe('skill_not_found');
+  });
+
+  it('403s on an invalid skill name', async () => {
+    const response = await app.inject({ method: 'GET', url: `/api/skill/files?name=${encodeURIComponent('../evil')}` });
+    expect(response.statusCode).toBe(403);
+    expect(JSON.parse(response.body).error.code).toBe('invalid_skill_name');
+  });
+});
+
+describe('GET /api/skill/file (source / text / binary kinds)', () => {
+  it('returns highlighted source for whitelisted language extensions', async () => {
+    seedSkill('src', { 'SKILL.md': '# S\n', 'app.mjs': 'export const x = 1;\n', 'run.sh': 'echo hi\n' });
+    const response = await app.inject({ method: 'GET', url: '/api/skill/file?name=src&path=app.mjs' });
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.ok).toBe(true);
+    expect(body.data.kind).toBe('source');
+    expect(body.data.html).toContain('shiki');
+    expect(body.data.html).toContain('--shiki-light');
+    expect(body.data.html).not.toContain('onerror'); // sanitized like markdown
+    expect(body.data.truncated).toBe(false);
+    expect('raw' in body.data).toBe(false);
+  });
+
+  it('returns plain text for non-whitelisted text extensions and extensionless files', async () => {
+    seedSkill('txt', { 'SKILL.md': '# T\n', 'pnpm.lock': 'lockfileVersion\n', 'Makefile': 'build:\n' });
+    const lock = JSON.parse((await app.inject({ method: 'GET', url: '/api/skill/file?name=txt&path=pnpm.lock' })).body);
+    expect(lock.data.kind).toBe('text');
+    expect(lock.data.raw).toBe('lockfileVersion\n');
+    expect(lock.data.truncated).toBe(false);
+
+    const make = JSON.parse((await app.inject({ method: 'GET', url: '/api/skill/file?name=txt&path=Makefile' })).body);
+    expect(make.data.kind).toBe('text');
+    expect(make.data.raw).toBe('build:\n');
+  });
+
+  it('classifies files with NUL bytes or invalid UTF-8 as binary with size only', async () => {
+    seedSkill('bin', { 'SKILL.md': '# B\n' });
+    const skillRoot = path.join(home, 'skills', 'bin');
+    writeFileSync(path.join(skillRoot, 'blob.bin'), Buffer.from([0x61, 0x00, 0x62, 0x63]));
+    writeFileSync(path.join(skillRoot, 'weird.txt'), Buffer.from([0xff, 0xfe, 0xfd]));
+
+    const blob = JSON.parse((await app.inject({ method: 'GET', url: '/api/skill/file?name=bin&path=blob.bin' })).body);
+    expect(blob.data.kind).toBe('binary');
+    expect(blob.data.size).toBe(4);
+    expect('raw' in blob.data).toBe(false);
+    expect('html' in blob.data).toBe(false);
+
+    const weird = JSON.parse((await app.inject({ method: 'GET', url: '/api/skill/file?name=bin&path=weird.txt' })).body);
+    expect(weird.data.kind).toBe('binary');
+  });
+
+  it('truncates source and text files over the 512KB cap', async () => {
+    seedSkill('big2', { 'SKILL.md': '# B\n', 'huge.js': '// ' + 'y'.repeat(600 * 1024) + '\n' });
+    const js = JSON.parse((await app.inject({ method: 'GET', url: '/api/skill/file?name=big2&path=huge.js' })).body);
+    expect(js.data.kind).toBe('source');
+    expect(js.data.truncated).toBe(true);
+  });
+});

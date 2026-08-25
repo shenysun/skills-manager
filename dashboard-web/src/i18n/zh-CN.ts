@@ -22,6 +22,7 @@ export default {
     viewRendered: '渲染视图',
     loadFailed: '预览加载失败:{message}',
     truncated: '内容超过 512KB,已截断显示。',
+    binary: '二进制文件,不渲染内容 · {size}',
     loading: '加载中…',
   },
   action: {

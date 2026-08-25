@@ -11,7 +11,7 @@ import { errorCode, errorMessage, SkillsManagerError } from '../../shared/errors
 import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
-import { readSkillFile } from './skill-file.js';
+import { previewFileEntries, previewSkillDir, readSkillFile } from './skill-file.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -259,6 +259,16 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const query = request.query as { name?: string; path?: string };
     const { resolution } = getServices();
     return data(await readSkillFile(resolution.root, query.name ?? '', query.path ?? ''));
+  });
+
+  // Skill preview (read-only): the skill's full file list for the tree.
+  // listSkillFiles' first consumer (spec §API 契约).
+  app.get('/api/skill/files', async (request) => {
+    const query = request.query as { name?: string };
+    const name = query.name ?? '';
+    const { resolution, registry } = getServices();
+    const skillDir = previewSkillDir(resolution.root, name);
+    return data({ files: previewFileEntries(skillDir, registry.listSkillFiles(name)) });
   });
 
   // Directory browsing for project path picker: list entries in a directory
