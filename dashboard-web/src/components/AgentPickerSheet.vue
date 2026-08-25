@@ -134,7 +134,7 @@ async function apply() {
           <option v-for="project in knownProjects" :key="project" :value="project" />
         </datalist>
       </div>
-      <button class="browse-btn" :disabled="!projectRoot.trim()" @click="showBrowser = true">
+      <button class="browse-btn" @click="showBrowser = true">
         {{ t('picker.browsePath') }}
       </button>
     </div>
@@ -232,7 +232,7 @@ async function apply() {
 
   <DirectoryBrowser
     v-else
-    :initial-path="projectRoot.trim() || undefined"
+    :initial-path="projectRoot.trim() ? projectRoot.trim() : undefined"
     @select="onBrowsedPath"
     @cancel="showBrowser = false"
   />
