@@ -132,4 +132,10 @@ export default {
     cancel: '取消',
     select: '选择此目录',
   },
+  dropdown: {
+    browse: '浏览目录',
+    noMatch: '没有匹配的项目',
+    recentLabel: '最近访问',
+    knownLabel: '已知项目',
+  },
 };

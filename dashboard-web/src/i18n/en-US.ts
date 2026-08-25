@@ -132,4 +132,10 @@ export default {
     cancel: 'Cancel',
     select: 'Select this directory',
   },
+  dropdown: {
+    browse: 'Browse directory',
+    noMatch: 'No matching projects',
+    recentLabel: 'Recent',
+    knownLabel: 'Known projects',
+  },
 };

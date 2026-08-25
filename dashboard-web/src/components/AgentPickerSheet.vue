@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
 import DirectoryBrowser from './DirectoryBrowser.vue';
+import ProjectDropdown from './ProjectDropdown.vue';
 import {
   distribute,
   errorMessage,
@@ -132,22 +133,14 @@ async function apply() {
     </div>
 
     <div v-if="scope === 'project'" class="project-input-row">
-      <div class="field-line">
-        <input
-          v-model="projectRoot"
-          type="text"
-          :placeholder="t('picker.projectRoot')"
-          list="picker-known-projects"
-          @change="loadAgents; rememberProjectPath()"
-        />
-        <datalist id="picker-known-projects">
-          <option v-for="project in recentPaths" :key="project" :value="project" />
-          <option v-for="project in knownProjects" :key="project" :value="project" />
-        </datalist>
-      </div>
-      <button class="browse-btn" @click="showBrowser = true">
-        {{ t('picker.browsePath') }}
-      </button>
+      <ProjectDropdown
+        v-model="projectRoot"
+        :recent-paths="recentPaths"
+        :known-projects="knownProjects"
+        :placeholder="t('picker.projectRoot')"
+        @update:model-value="loadAgents; rememberProjectPath()"
+        @browse="showBrowser = true"
+      />
     </div>
 
     <div class="field-line">
@@ -251,32 +244,6 @@ async function apply() {
 
 <style scoped>
 .project-input-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: flex-end;
   padding: 0 0 1rem 0;
-}
-
-.field-line {
-  flex: 1;
-}
-
-.browse-btn {
-  padding: 0.4rem 0.8rem;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  white-space: nowrap;
-}
-
-.browse-btn:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-}
-
-.browse-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>
