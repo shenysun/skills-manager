@@ -18,7 +18,13 @@ export default {
   action: {
     distribute: '接入',
     update: '更新',
+    updating: '更新中…',
     more: '更多',
+  },
+  strip: {
+    text: '{n} 个技能可更新',
+    updateAll: '全部更新',
+    updating: '更新中…',
   },
   empty: {
     filtered: {
@@ -69,6 +75,7 @@ export default {
     undistributed: '已从 {n} 个 agent 撤除接入:{skill}',
     removed: '已从库中移除:{skills}',
     removeFailed: '移除失败:{skill} —{message}',
+    updated: '已更新:{skills}',
   },
   remove: {
     title: '从库中移除',

@@ -5,7 +5,7 @@ import { deriveRowStatus, type RowStatus } from '../domain/rowStatus';
 import type { SkillRowState } from '../api/client';
 import RowMenu from './RowMenu.vue';
 
-const props = defineProps<{ skill: SkillRowState }>();
+const props = defineProps<{ skill: SkillRowState; updating?: boolean }>();
 const menuOpen = ref(false);
 
 defineEmits<{
@@ -43,7 +43,9 @@ const statusText = computed(() => {
       <div class="desc">{{ skill.description || t('row.noDescription') }}</div>
     </div>
     <div class="hover-acts">
-      <button v-if="skill.hasUpdate" class="upd" @click="$emit('update', skill.name)">{{ t('action.update') }}</button>
+      <button v-if="skill.hasUpdate" class="upd" :disabled="updating" @click="$emit('update', skill.name)">
+        {{ updating ? t('action.updating') : t('action.update') }}
+      </button>
       <button @click="$emit('distribute', skill.name)">{{ t('action.distribute') }}</button>
       <RowMenu v-model="menuOpen" @undistribute="$emit('undistribute', skill)" @remove="$emit('remove', skill)" />
     </div>

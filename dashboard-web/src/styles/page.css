@@ -55,6 +55,29 @@
   color: var(--fg3);
 }
 
+/* One text line with a text button — no colored strip (visual baseline). */
+.update-line {
+  padding: 10px 2px;
+  font-size: 14px;
+  color: var(--fg2);
+}
+
+.update-line b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.update-line button {
+  margin-left: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.update-line button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* Row: bold name + plain-text status on the right, grey description below;
    hover fades the status out and the actions in. */
 .item {

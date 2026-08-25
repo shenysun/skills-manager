@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { fetchState, removeSkills, type DashboardState, type SkillRowState } from './api/client';
+import { fetchState, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
 import { filterSkills } from './domain/filterSkills';
 import { removeConsequence } from './domain/remove';
 import { resolveHash } from './domain/resolveHash';
+import { showUpdateStrip, updatableNames } from './domain/updateStrip';
 import { useNotice } from './composables/useNotice';
 import SkillRow from './components/SkillRow.vue';
 import AgentPickerSheet from './components/AgentPickerSheet.vue';
@@ -39,6 +40,28 @@ onMounted(() => {
 
 const rows = computed(() => (state.value ? filterSkills(state.value.skills, query.value) : []));
 const isFiltering = computed(() => query.value.trim() !== '');
+
+const updating = ref(new Set<string>());
+const stripVisible = computed(() => state.value !== null && showUpdateStrip(state.value.updateCount));
+const updatingAll = computed(() => {
+  const names = state.value ? updatableNames(state.value.skills) : [];
+  return names.length > 0 && names.every((name) => updating.value.has(name));
+});
+
+async function runUpdate(names: string[]) {
+  if (names.length === 0) return;
+  updating.value = new Set(names);
+  try {
+    const { updated } = await updateSkills(names);
+    show('ok', t('notice.updated', { skills: updated.join(', ') }));
+  } catch (error) {
+    // The rows stay as they are — hasUpdate is unchanged, so retry is possible.
+    show('error', error instanceof Error ? error.message : String(error));
+  } finally {
+    updating.value = new Set();
+  }
+  await load();
+}
 
 function openPicker(name: string) {
   pickerSkills.value = [name];
@@ -83,6 +106,13 @@ async function onRemoveConfirm() {
       <input v-model="query" type="search" :placeholder="t('search.placeholder')" />
     </div>
 
+    <p v-if="stripVisible" class="update-line">
+      <b>{{ t('strip.text', state?.updateCount ?? 0) }}</b>
+      <button :disabled="updating.size > 0" @click="runUpdate(updatableNames(state?.skills ?? []))">
+        {{ updatingAll ? t('strip.updating') : t('strip.updateAll') }}
+      </button>
+    </p>
+
     <div v-if="loadError" class="error">
       <p class="title">{{ t('error.loadFailed', { message: loadError }) }}</p>
       <button class="retry" @click="load">{{ t('error.retry') }}</button>
@@ -99,7 +129,9 @@ async function onRemoveConfirm() {
         v-for="skill in rows"
         :key="skill.name"
         :skill="skill"
+        :updating="updating.has(skill.name)"
         @distribute="openPicker"
+        @update="(name) => runUpdate([name])"
         @undistribute="(skill) => (undistributeTarget = skill)"
         @remove="(skill) => (removeTargets = [skill])"
       />

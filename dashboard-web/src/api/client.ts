@@ -84,3 +84,7 @@ export type RemoveResult = { skill: string; ok: true; removed: number } | { skil
 export function removeSkills(skills: string[]) {
   return api<{ results: RemoveResult[] }>('/api/skills/remove', { method: 'POST', body: JSON.stringify({ skills }) });
 }
+
+export function updateSkills(skills: string[]) {
+  return api<{ updated: string[] }>('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills }) });
+}

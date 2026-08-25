@@ -18,7 +18,13 @@ export default {
   action: {
     distribute: 'Distribute',
     update: 'Update',
+    updating: 'Updating…',
     more: 'More',
+  },
+  strip: {
+    text: '{n} skills can be updated',
+    updateAll: 'Update all',
+    updating: 'Updating…',
   },
   empty: {
     filtered: {
@@ -69,6 +75,7 @@ export default {
     undistributed: 'Undistributed {skill} from {n} agent(s)',
     removed: 'Removed from library: {skills}',
     removeFailed: 'Remove failed: {skill} — {message}',
+    updated: 'Updated: {skills}',
   },
   remove: {
     title: 'Remove from library',
