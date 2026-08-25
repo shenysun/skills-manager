@@ -34,8 +34,13 @@ try {
   const distributed = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['api-smoke'], agents: ['zed'] } });
   assert.equal(JSON.parse(distributed.body).ok, true);
   const after = JSON.parse((await app.inject({ method: 'GET', url: '/api/state' })).body).data;
-  assert.equal(after.updateCount, 1);
+  assert.equal(after.updateCount, 0); // fresh install matches its source
   assert.deepEqual(after.skills[0].distributedAgents, ['zed']);
+  const { appendFileSync } = await import('node:fs');
+  appendFileSync(path.join(sourceRoot, 'skills', 'api-smoke', 'SKILL.md'), '\n# v2\n');
+  const drifted = JSON.parse((await app.inject({ method: 'GET', url: '/api/state' })).body).data;
+  assert.equal(drifted.skills[0].hasUpdate, true);
+  assert.equal(drifted.updateCount, 1);
   const removed = await app.inject({ method: 'POST', url: '/api/undistribute', payload: { to: 'user', skills: ['api-smoke'], agents: ['zed'] } });
   assert.equal(JSON.parse(removed.body).ok, true);
   await app.close();

@@ -1,12 +1,17 @@
 import fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { execFile, execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { errorCode, errorMessage } from '../../shared/errors.js';
 import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
+import { NodeFileSystem } from '../../infra/fs-skill-home.js';
+
+const execFileAsync = promisify(execFile);
 
 export type DashboardServerOptions = RuntimeOptions & {
   port: number;
@@ -116,17 +121,88 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   const getServices = () => createRuntimeServices(options, options.projectRoot || process.cwd());
   const data = <T>(value: T) => ({ ok: true as const, data: value });
 
+  // Update detection for the single page: hasUpdate is a real diff, not plan
+  // membership — local sources compare content trees, remote sources compare
+  // the registry's upstream commit against the tracked ref's remote head.
+  // Membership alone would mark every sourced skill updatable forever.
+  const contentFs = new NodeFileSystem();
+  const REMOTE_HEAD_TTL_MS = 5 * 60 * 1000;
+  const remoteHeads = new Map<string, { sha: string | null; fetchedAt: number }>();
+
+  async function remoteHeadSha(url: string, ref: string | null | undefined): Promise<string | null> {
+    const key = `${url}|${ref || ''}`;
+    const cached = remoteHeads.get(key);
+    if (cached && Date.now() - cached.fetchedAt < REMOTE_HEAD_TTL_MS) return cached.sha;
+    let sha: string | null = null;
+    try {
+      const args = ref ? ['ls-remote', url, ref] : ['ls-remote', url, 'HEAD'];
+      const { stdout } = await execFileAsync('git', args, { timeout: 15000 });
+      sha = stdout.trim().split('\t')[0] || null;
+    } catch {
+      sha = null; // offline or unreachable: stay quiet rather than crying wolf
+    }
+    remoteHeads.set(key, { sha, fetchedAt: Date.now() });
+    return sha;
+  }
+
+  /** Mirrors DistributeService.fingerprint's tree hashing so equal trees compare equal. */
+  function hashTree(root: string): string | null {
+    if (contentFs.kind(root) !== 'directory') return null;
+    const hash = createHash('sha256');
+    const walk = (prefix: string) => {
+      const dir = prefix ? path.join(root, prefix) : root;
+      for (const entry of contentFs.readDirectory(dir).sort((a, b) => a.name.localeCompare(b.name))) {
+        const relative = prefix ? path.join(prefix, entry.name) : entry.name;
+        const full = path.join(root, relative);
+        const kind = contentFs.kind(full);
+        hash.update(relative);
+        hash.update('\0');
+        hash.update(kind);
+        hash.update('\0');
+        if (kind === 'file') hash.update(contentFs.readText(full));
+        else if (kind === 'symlink') hash.update(contentFs.readlink(full));
+        if (entry.kind === 'directory') walk(relative);
+      }
+    };
+    walk('');
+    return `sha256:${hash.digest('hex')}`;
+  }
+
+  async function detectUpdates(
+    services: ReturnType<typeof getServices>,
+    skills: ReturnType<typeof services.registry.listSkills>,
+  ): Promise<Map<string, boolean>> {
+    const candidates = new Set(services.update.plan().candidates.map((candidate) => candidate.skill));
+    const updatable = new Map<string, boolean>();
+    await Promise.all(
+      skills.map(async (skill) => {
+        const source = skill.source;
+        if (!candidates.has(skill.name) || !source.url || !source.subpath) return;
+        if (source.type === 'local') {
+          const sourceHash = hashTree(path.resolve(source.url, source.subpath));
+          if (sourceHash === null) return;
+          updatable.set(skill.name, sourceHash !== services.distribute.fingerprint(skill.name));
+          return;
+        }
+        const remote = await remoteHeadSha(source.url, source.ref);
+        if (remote === null || !source.upstream_commit) return;
+        updatable.set(skill.name, remote !== source.upstream_commit);
+      }),
+    );
+    return updatable;
+  }
+
   // Single-page state (ADR-0005): one row per skill, recent operations, and the
   // update count. distributedAgents is the logical layer of the hub
   // distribution index — observed agent ids, never registry consumers tags
   // (desired defaults; see ADR-0004).
-  const state = () => {
+  const state = async () => {
     const services = getServices();
-    const candidates = services.update.plan().candidates;
-    const updatable = new Set(candidates.map((candidate) => candidate.skill));
+    const listed = services.registry.listSkills({ includeArchived: false });
+    const updatable = await detectUpdates(services, listed);
     const index = services.distribute.listIndex();
     const brokenPaths = new Set(services.doctor.check().brokenLinks);
-    const skills = services.registry.listSkills({ includeArchived: false }).map((skill) => {
+    const skills = listed.map((skill) => {
       const agents = new Set<string>();
       let warning: string | null = null;
       let hubFingerprint: string | null = null;
@@ -146,7 +222,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
         category: skill.category,
         description: skill.description,
         sourceType: skill.source.type || 'local',
-        hasUpdate: updatable.has(skill.name),
+        hasUpdate: updatable.get(skill.name) ?? false,
         warning,
         distributedAgents: [...agents].sort(),
       };
@@ -154,11 +230,11 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return {
       skills,
       activity: services.activity.list({ limit: 25 }),
-      updateCount: candidates.length,
+      updateCount: skills.filter((skill) => skill.hasUpdate).length,
     };
   };
 
-  app.get('/api/state', async () => data(state()));
+  app.get('/api/state', async () => data(await state()));
 
   // Picker data endpoint: the full catalog filtered for a scope, with detected
   // flags, family keys for shared-path grouping, and invalid reasons.

@@ -82,10 +82,26 @@ describe('GET /api/state (single-page slim contract)', () => {
     expect(state.activity.some((record: { action: string }) => record.action === 'install')).toBe(true);
   });
 
-  it('derives hasUpdate from the update plan and reports updateCount', async () => {
-    const state = await getState();
+  it('derives hasUpdate by diffing the hub tree against the local source', async () => {
+    // Fresh install: hub content equals source content — nothing to do.
+    let state = await getState();
+    expect(state.skills[0].hasUpdate).toBe(false);
+    expect(state.updateCount).toBe(0);
+    // Upstream drift: the source moves ahead of the hub.
+    appendFileSync(path.join(sourceRoot, 'skills', 'alpha', 'SKILL.md'), '\n# v2\n');
+    state = await getState();
     expect(state.skills[0].hasUpdate).toBe(true);
     expect(state.updateCount).toBe(1);
+  });
+
+  it('clears hasUpdate after the skill is updated from its source', async () => {
+    appendFileSync(path.join(sourceRoot, 'skills', 'alpha', 'SKILL.md'), '\n# v2\n');
+    expect((await getState()).skills[0].hasUpdate).toBe(true);
+    const response = await app.inject({ method: 'POST', url: '/api/update/skills', payload: { skills: ['alpha'] } });
+    expect(response.statusCode).toBe(200);
+    const state = await getState();
+    expect(state.skills[0].hasUpdate).toBe(false);
+    expect(state.updateCount).toBe(0);
   });
 
   it('derives distributedAgents from the hub index logical layer, not registry consumers tags', async () => {
@@ -158,6 +174,7 @@ describe('kept endpoints regression', () => {
   });
 
   it('updates skills via the update/skills endpoint', async () => {
+    appendFileSync(path.join(sourceRoot, 'skills', 'alpha', 'SKILL.md'), '\n# v2\n');
     const response = await app.inject({ method: 'POST', url: '/api/update/skills', payload: { skills: ['alpha'] } });
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body).data.updated).toEqual(['alpha']);
