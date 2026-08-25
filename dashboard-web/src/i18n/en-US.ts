@@ -69,6 +69,7 @@ export default {
   menu: {
     undistribute: 'Undistribute…',
     remove: 'Remove from library…',
+    removeTitle: 'Remove',
   },
   notice: {
     distributed: 'Distributed {skills} → {n} agent(s)',
@@ -82,5 +83,10 @@ export default {
     consequence: 'This undistributes {agents} agent entrie(s) and archives {skills} skill(s) from the library.',
     confirm: 'Remove',
     cancel: 'Cancel',
+  },
+  selection: {
+    count: '{n} selected',
+    cancel: 'Cancel',
+    esc: 'Esc to exit',
   },
 };

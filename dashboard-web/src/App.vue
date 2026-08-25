@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { fetchState, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
 import { filterSkills } from './domain/filterSkills';
 import { removeConsequence } from './domain/remove';
 import { resolveHash } from './domain/resolveHash';
+import { exitSelection, idleSelection, isSelected, selectionCount, toggleSelection } from './domain/selection';
 import { showUpdateStrip, updatableNames } from './domain/updateStrip';
 import { useNotice } from './composables/useNotice';
 import SkillRow from './components/SkillRow.vue';
 import AgentPickerSheet from './components/AgentPickerSheet.vue';
 import UndistributeSheet from './components/UndistributeSheet.vue';
 import ConfirmSheet from './components/ConfirmSheet.vue';
+import SelectionBar from './components/SelectionBar.vue';
 
 const { t } = useI18n();
 const { notice, show } = useNotice();
@@ -22,6 +24,29 @@ const query = ref('');
 const pickerSkills = ref<string[] | null>(null);
 const undistributeTarget = ref<SkillRowState | null>(null);
 const removeTargets = ref<SkillRowState[] | null>(null);
+
+const selection = ref(idleSelection);
+watchEffect(() => {
+  document.body.classList.toggle('selecting', selection.value.active);
+});
+
+function onRowToggle(name: string) {
+  selection.value = toggleSelection(selection.value, name);
+}
+
+const selectedSkillStates = computed(() => {
+  if (!state.value) return [];
+  return state.value.skills.filter((skill) => isSelected(selection.value, skill.name));
+});
+
+async function batchUpdate() {
+  await runUpdate([...selection.value.names]);
+  selection.value = exitSelection(selection.value);
+}
+
+function batchDistribute() {
+  pickerSkills.value = [...selection.value.names];
+}
 
 async function load() {
   loadError.value = null;
@@ -35,8 +60,18 @@ async function load() {
 onMounted(() => {
   const resolved = resolveHash(location.hash);
   if (resolved.redirect) history.replaceState(null, '', location.pathname + location.search);
+  window.addEventListener('keydown', onKeydown);
   void load();
 });
+
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return;
+  // A sheet open means the sheet owns Escape; selection exits only on a bare page.
+  if (!selection.value.active || pickerSkills.value || undistributeTarget.value || removeTargets.value) return;
+  selection.value = exitSelection(selection.value);
+}
 
 const rows = computed(() => (state.value ? filterSkills(state.value.skills, query.value) : []));
 const isFiltering = computed(() => query.value.trim() !== '');
@@ -67,8 +102,13 @@ function openPicker(name: string) {
   pickerSkills.value = [name];
 }
 
+function batchRemove() {
+  removeTargets.value = selectedSkillStates.value;
+}
+
 async function onPickerClose() {
   pickerSkills.value = null;
+  selection.value = exitSelection(selection.value);
   await load();
 }
 
@@ -82,6 +122,7 @@ const removeSummary = computed(() => (removeTargets.value ? removeConsequence(re
 async function onRemoveConfirm() {
   const targets = removeTargets.value ?? [];
   removeTargets.value = null;
+  selection.value = exitSelection(selection.value);
   try {
     const { results } = await removeSkills(targets.map((skill) => skill.name));
     const done = results.filter((result) => result.ok).map((result) => result.skill);
@@ -130,6 +171,8 @@ async function onRemoveConfirm() {
         :key="skill.name"
         :skill="skill"
         :updating="updating.has(skill.name)"
+        :selected="isSelected(selection, skill.name)"
+        @toggle="onRowToggle"
         @distribute="openPicker"
         @update="(name) => runUpdate([name])"
         @undistribute="(skill) => (undistributeTarget = skill)"
@@ -162,5 +205,15 @@ async function onRemoveConfirm() {
       </p>
       <p class="confirm-skills mono">{{ removeTargets.map((skill) => skill.name).join(' · ') }}</p>
     </ConfirmSheet>
+
+    <SelectionBar
+      v-if="selection.active"
+      :count="selectionCount(selection)"
+      :busy="updating.size > 0"
+      @update="batchUpdate"
+      @distribute="batchDistribute"
+      @remove="batchRemove"
+      @cancel="selection = exitSelection(selection)"
+    />
   </main>
 </template>

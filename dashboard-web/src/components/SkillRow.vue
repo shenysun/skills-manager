@@ -5,7 +5,7 @@ import { deriveRowStatus, type RowStatus } from '../domain/rowStatus';
 import type { SkillRowState } from '../api/client';
 import RowMenu from './RowMenu.vue';
 
-const props = defineProps<{ skill: SkillRowState; updating?: boolean }>();
+const props = defineProps<{ skill: SkillRowState; updating?: boolean; selected?: boolean }>();
 const menuOpen = ref(false);
 
 defineEmits<{
@@ -13,6 +13,7 @@ defineEmits<{
   update: [name: string];
   undistribute: [skill: SkillRowState];
   remove: [skill: SkillRowState];
+  toggle: [name: string];
 }>();
 
 const { t } = useI18n();
@@ -35,6 +36,9 @@ const statusText = computed(() => {
 
 <template>
   <div class="item" :class="{ 'menu-open': menuOpen }">
+    <label class="cb">
+      <input type="checkbox" :checked="selected" @change="$emit('toggle', skill.name)" />
+    </label>
     <div class="main">
       <div class="l1">
         <span class="name mono">{{ skill.name }}</span>

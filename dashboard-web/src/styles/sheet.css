@@ -291,3 +291,48 @@
 .notice.error {
   color: var(--danger);
 }
+
+/* Selection-mode floating bar (prototype variant C) */
+.selection-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--fg);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  z-index: 400;
+  font-size: 14px;
+}
+
+.selection-bar .count {
+  font-weight: 600;
+}
+
+.selection-bar .act {
+  padding: 5px 12px;
+  border-radius: 7px;
+}
+
+.selection-bar .act:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.25);
+}
+
+.selection-bar .act:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.selection-bar .act.remove {
+  color: #fca5a5;
+}
+
+.selection-bar .esc {
+  opacity: 0.6;
+  font-size: 12px;
+}

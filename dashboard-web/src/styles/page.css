@@ -88,6 +88,28 @@
   gap: 10px;
 }
 
+/* Zero selection chrome by default: the checkbox exists but is invisible
+   until the row is hovered or selection mode is active (body.selecting). */
+.item .cb {
+  align-self: center;
+  width: 22px;
+  flex: none;
+}
+
+.item .cb input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.item:hover .cb input,
+body.selecting .item .cb input {
+  opacity: 1;
+}
+
 .item .main {
   flex: 1;
   min-width: 0;

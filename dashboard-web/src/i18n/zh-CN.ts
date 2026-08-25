@@ -69,6 +69,7 @@ export default {
   menu: {
     undistribute: '撤除接入…',
     remove: '从库中移除…',
+    removeTitle: '移除',
   },
   notice: {
     distributed: '已接入 {skills} → {n} 个 agent',
@@ -82,5 +83,10 @@ export default {
     consequence: '将撤除 {agents} 处接入,并从库中归档 {skills} 个技能。',
     confirm: '移除',
     cancel: '取消',
+  },
+  selection: {
+    count: '已选 {n} 项',
+    cancel: '取消',
+    esc: 'Esc 退出',
   },
 };
