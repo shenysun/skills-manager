@@ -19,19 +19,23 @@ export function assertPathInside(child: string, parent: string) {
   }
 }
 
+/** Whether a value is one of the legacy consumer words (agents/claude) — the migration bridge's recognition test. */
+export function isLegacyConsumer(value: string): boolean {
+  return (LEGACY_CONSUMERS as readonly string[]).includes(value);
+}
+
 /**
  * Parse desired/default agent tags. Catalog membership is NOT checked here —
  * callers at the catalog boundary (API endpoints) validate ids against the
  * snapshot; legacy words always fail there, with migrate-consumers as the
  * only path for old values.
  */
-export function parseAgentTags(values: readonly string[] | undefined, fallback?: readonly string[], options: { allowEmpty?: boolean } = {}): string[] {
-  const raw = values !== undefined ? values : fallback;
+export function parseAgentTags(values: readonly string[] | undefined, fallback?: readonly string[], options: { allowEmpty?: boolean } = {}): string[] {  const raw = values !== undefined ? values : fallback;
   if (!raw || raw.length === 0) {
     if (options.allowEmpty) return [];
     throw new SkillsManagerError('missing_agents', 'At least one agent id is required.');
   }
-  const invalid = raw.map(String).filter((value) => !/^[a-z0-9][a-z0-9-]*$/.test(value) || (LEGACY_CONSUMERS as readonly string[]).includes(value));
+  const invalid = raw.map(String).filter((value) => !/^[a-z0-9][a-z0-9-]*$/.test(value) || isLegacyConsumer(value));
   if (invalid.length > 0) {
     throw new SkillsManagerError('invalid_agent', `Invalid agent id(s): ${invalid.join(', ')}. Agent ids come from the catalog (kebab-case, e.g. claude-code). Legacy values (agents/claude) must go through \`skills-manager migrate-consumers\`.`);
   }

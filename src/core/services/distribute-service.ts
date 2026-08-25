@@ -15,7 +15,7 @@ import {
 import type { CatalogService } from './catalog-service.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { assertPathInside, assertSafeSkillName } from '../../shared/validation.js';
+import { assertPathInside, assertSafeSkillName, isLegacyConsumer } from '../../shared/validation.js';
 import type { RegistryService } from './registry-service.js';
 
 export type DistributeRequest = {
@@ -396,7 +396,7 @@ export class DistributeService {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => JSON.parse(line) as DistributionIndexRecord);
-    const legacy = records.some((record) => record.entries.some((entry) => (LEGACY_CONSUMERS as readonly string[]).includes((entry as { consumer?: string }).consumer ?? '')));
+    const legacy = records.some((record) => record.entries.some((entry) => isLegacyConsumer((entry as { consumer?: string }).consumer ?? '')));
     if (legacy) {
       throw new SkillsManagerError('legacy_consumer_tags', 'The hub distribution index still uses legacy consumer entries. Run `skills-manager migrate-consumers` to migrate them to catalog agent ids.');
     }

@@ -1,9 +1,9 @@
 import path from 'node:path';
 import YAML from 'yaml';
-import { LEGACY_CONSUMERS, type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
+import { type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { assertPathInside, assertSafeSkillName, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
+import { assertPathInside, assertSafeSkillName, isLegacyConsumer, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
 
 export class RegistryService {
   constructor(private readonly fs: FileSystemPort, private readonly home: SkillHome) {}
@@ -13,7 +13,7 @@ export class RegistryService {
     const parsed = YAML.parse(this.fs.readText(this.home.registryFile)) as Registry | null;
     const registry = parsed && typeof parsed === 'object' && parsed.skills ? parsed : { skills: {} };
     const legacy = Object.entries(registry.skills || {})
-      .filter(([, entry]) => (entry.consumers || []).some((value) => (LEGACY_CONSUMERS as readonly string[]).includes(value)))
+      .filter(([, entry]) => (entry.consumers || []).some((value) => isLegacyConsumer(value)))
       .map(([name]) => name);
     if (legacy.length > 0) {
       throw new SkillsManagerError('legacy_consumer_tags', `registry.yaml still uses legacy consumer tags (agents/claude) on: ${legacy.join(', ')}. Run \`skills-manager migrate-consumers\` to migrate them to catalog agent ids.`);
