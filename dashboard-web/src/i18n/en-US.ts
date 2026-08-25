@@ -46,6 +46,11 @@ export default {
     scopeProject: 'Project',
     projectRoot: 'Project root (e.g. ~/code/myproject)',
     searchPlaceholder: 'Search agents…',
+    quick: {
+      selectAll: 'Select all',
+      selectDetected: 'Select detected',
+      clear: 'Clear',
+    },
     detected: 'Detected',
     allAgents: 'Full catalog',
     selectAll: 'select all',

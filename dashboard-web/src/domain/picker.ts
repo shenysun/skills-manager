@@ -55,3 +55,55 @@ export function searchAgents(agents: readonly PickerAgent[], query: string): Pic
   if (term === '') return [...agents];
   return agents.filter((agent) => agent.id.toLowerCase().includes(term) || agent.label.toLowerCase().includes(term));
 }
+
+/** Quick actions operate on the visible (search-filtered) selectable set; invisible rows keep their state. */
+const visibleSelectableIds = (agents: readonly PickerAgent[], query: string) =>
+  selectable(searchAgents(agents, query)).map((agent) => agent.id);
+
+const union = (a: readonly string[], b: readonly string[]) => [...new Set([...a, ...b])];
+
+/** 全选: check every visible selectable agent, merging into the existing selection. */
+export function selectAllVisible(agents: readonly PickerAgent[], query: string, selected: readonly string[]): string[] {
+  return sorted(union(selected, visibleSelectableIds(agents, query)));
+}
+
+/** 全选已检测: check the visible selectable ∩ detected slice, merging into the existing selection. */
+export function selectDetectedVisible(
+  agents: readonly PickerAgent[],
+  query: string,
+  selected: readonly string[],
+): string[] {
+  const detectedIds = selectable(searchAgents(agents, query))
+    .filter((agent) => agent.detected)
+    .map((agent) => agent.id);
+  return sorted(union(selected, detectedIds));
+}
+
+/** 清空: uncheck only the visible selectable agents — off-screen ticks survive. */
+export function clearVisible(agents: readonly PickerAgent[], query: string, selected: readonly string[]): string[] {
+  const visibleIds = new Set(visibleSelectableIds(agents, query));
+  return sorted(selected.filter((id) => !visibleIds.has(id)));
+}
+
+/** A family header is rendered only where a real family (≥2 selectable members) exists;
+ *  singletons — whether their familyKey is unique or absent — lie flat as plain rows. */
+export function groupFamilies(agents: readonly PickerAgent[]): {
+  families: Array<{ familyKey: string; members: PickerAgent[] }>;
+  singletons: PickerAgent[];
+} {
+  const byKey = new Map<string, PickerAgent[]>();
+  const singletons: PickerAgent[] = [];
+  for (const agent of selectable(agents)) {
+    if (agent.familyKey === null) {
+      singletons.push(agent);
+      continue;
+    }
+    byKey.set(agent.familyKey, [...(byKey.get(agent.familyKey) || []), agent]);
+  }
+  const families: Array<{ familyKey: string; members: PickerAgent[] }> = [];
+  for (const [familyKey, members] of byKey) {
+    if (members.length >= 2) families.push({ familyKey, members });
+    else singletons.push(members[0]);
+  }
+  return { families, singletons };
+}

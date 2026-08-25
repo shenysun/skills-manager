@@ -182,6 +182,23 @@
   font-style: italic;
 }
 
+/* Quick actions: one line of small text buttons under the picker search box. */
+.quick-row {
+  display: flex;
+  gap: 14px;
+  margin: -4px 0 6px;
+}
+
+.quick-row .text-btn {
+  color: var(--fg3);
+  font-size: 12.5px;
+  padding: 0;
+}
+
+.quick-row .text-btn:hover {
+  color: var(--accent);
+}
+
 .family {
   margin-bottom: 4px;
 }

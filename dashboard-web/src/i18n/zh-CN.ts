@@ -46,6 +46,11 @@ export default {
     scopeProject: '项目',
     projectRoot: '项目根目录(如 ~/code/myproject)',
     searchPlaceholder: '搜索 agent…',
+    quick: {
+      selectAll: '全选',
+      selectDetected: '全选已检测',
+      clear: '清空',
+    },
     detected: '已检测',
     allAgents: '全部目录',
     selectAll: '全选',

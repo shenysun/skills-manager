@@ -10,7 +10,16 @@ import {
   type DistributeMode,
   type Scope,
 } from '../api/client';
-import { initialSelection, searchAgents, toggleAgent, toggleFamily, selectableAgents } from '../domain/picker';
+import {
+  clearVisible,
+  groupFamilies,
+  initialSelection,
+  searchAgents,
+  selectAllVisible,
+  selectDetectedVisible,
+  toggleAgent,
+  toggleFamily,
+} from '../domain/picker';
 import { usePickerMemory } from '../composables/usePickerMemory';
 import { useNotice } from '../composables/useNotice';
 
@@ -54,14 +63,7 @@ const visible = computed(() => searchAgents(agents.value, query.value));
 const detected = computed(() => visible.value.filter((agent) => agent.detected && agent.invalidReason === null));
 const invalid = computed(() => visible.value.filter((agent) => agent.invalidReason !== null));
 
-const families = computed(() => {
-  const byKey = new Map<string, CatalogAgent[]>();
-  for (const agent of selectableAgents(visible.value)) {
-    if (agent.familyKey === null) continue;
-    byKey.set(agent.familyKey, [...(byKey.get(agent.familyKey) || []), agent]);
-  }
-  return [...byKey.entries()].map(([familyKey, members]) => ({ familyKey, members }));
-});
+const grouping = computed(() => groupFamilies(visible.value));
 
 const familyName = (familyKey: string) => familyKey.split('/').filter(Boolean).slice(-2).join('/') || familyKey;
 
@@ -108,6 +110,18 @@ async function apply() {
       <input v-model="query" type="search" :placeholder="t('picker.searchPlaceholder')" />
     </div>
 
+    <div v-if="!loadError" class="quick-row">
+      <button class="text-btn" @click="selection = selectAllVisible(agents, query, selection)">
+        {{ t('picker.quick.selectAll') }}
+      </button>
+      <button class="text-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
+        {{ t('picker.quick.selectDetected') }}
+      </button>
+      <button class="text-btn" @click="selection = clearVisible(agents, query, selection)">
+        {{ t('picker.quick.clear') }}
+      </button>
+    </div>
+
     <p v-if="loadError" class="picker-error">{{ t('error.loadFailed', { message: loadError }) }}</p>
 
     <div v-else class="agent-list">
@@ -126,7 +140,7 @@ async function apply() {
 
       <section>
         <h3>{{ t('picker.allAgents') }}</h3>
-        <div v-for="family in families" :key="family.familyKey" class="family">
+        <div v-for="family in grouping.families" :key="family.familyKey" class="family">
           <button class="family-all" @click="selection = toggleFamily(visible, selection, family.familyKey)">
             {{ familyName(family.familyKey) }} · {{ t('picker.selectAll') }}
           </button>
@@ -140,7 +154,18 @@ async function apply() {
             <span class="agent-label">{{ agent.label }}</span>
           </label>
         </div>
-        <p v-if="families.length === 0" class="picker-hint">{{ t('picker.noMatch') }}</p>
+        <label v-for="agent in grouping.singletons" :key="agent.id" class="agent-row">
+          <input
+            type="checkbox"
+            :checked="selection.includes(agent.id)"
+            @change="selection = toggleAgent(selection, agent.id)"
+          />
+          <span class="agent-id mono">{{ agent.id }}</span>
+          <span class="agent-label">{{ agent.label }}</span>
+        </label>
+        <p v-if="grouping.families.length === 0 && grouping.singletons.length === 0" class="picker-hint">
+          {{ t('picker.noMatch') }}
+        </p>
       </section>
 
       <section v-if="invalid.length > 0">
