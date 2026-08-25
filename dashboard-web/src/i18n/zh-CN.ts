@@ -125,6 +125,7 @@ export default {
   },
   browser: {
     title: '选择项目目录',
+    recent: '最近访问',
     up: '返回上级',
     empty: '该目录无子目录',
     loading: '加载中…',

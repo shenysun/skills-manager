@@ -125,6 +125,7 @@ export default {
   },
   browser: {
     title: 'Select project directory',
+    recent: 'Recent',
     up: 'Go up',
     empty: 'No subdirectories',
     loading: 'Loading…',

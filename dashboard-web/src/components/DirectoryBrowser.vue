@@ -3,11 +3,13 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
 import { browseDirectory, errorMessage, type BrowseDirectory } from '../api/client';
+import { useBrowserHistory } from '../composables/useBrowserHistory';
 
 const props = defineProps<{ initialPath?: string }>();
 const emit = defineEmits<{ select: [path: string]; cancel: [] }>();
 
 const { t } = useI18n();
+const { recentPaths, addPath } = useBrowserHistory();
 
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -46,6 +48,7 @@ function goParent() {
 
 function select() {
   if (browse.value) {
+    addPath(browse.value.path);
     emit('select', browse.value.path);
   }
 }
@@ -57,6 +60,22 @@ watch(() => props.initialPath, () => {
 
 <template>
   <Sheet :title="t('browser.title')" @cancel="emit('cancel')">
+    <!-- Recent paths quick access -->
+    <div v-if="recentPaths.length > 0" class="recent-paths">
+      <div class="recent-label">{{ t('browser.recent') }}</div>
+      <div class="recent-list">
+        <button
+          v-for="path in recentPaths"
+          :key="path"
+          class="recent-item"
+          :title="path"
+          @click="navigateTo(path)"
+        >
+          {{ path.split('/').pop() || path }}
+        </button>
+      </div>
+    </div>
+
     <div v-if="loading" class="browser-loading">{{ t('browser.loading') }}</div>
 
     <div v-else-if="error" class="browser-error">{{ error }}</div>
@@ -73,7 +92,7 @@ watch(() => props.initialPath, () => {
         </div>
       </div>
 
-      <!-- Directory list -->
+      <!-- Directory list with max-height constraint -->
       <div class="directory-list">
         <button v-if="browse.entries.length === 0" class="empty-hint" disabled>
           {{ t('browser.empty') }}
@@ -99,11 +118,54 @@ watch(() => props.initialPath, () => {
 </template>
 
 <style scoped>
+/* Recent paths section - fixed height to prevent layout collapse */
+.recent-paths {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line2);
+}
+
+.recent-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.recent-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.recent-item {
+  padding: 0.4rem 0.75rem;
+  background: var(--line2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--fg2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.recent-item:hover {
+  background: var(--line);
+}
+
 .browser-loading,
 .browser-error {
   padding: 1rem;
   text-align: center;
   color: var(--fg3);
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .browser-error {
@@ -116,6 +178,7 @@ watch(() => props.initialPath, () => {
   gap: 1rem;
   padding: 1rem;
   min-height: 300px;
+  max-height: 60vh;
 }
 
 .breadcrumb-row {
