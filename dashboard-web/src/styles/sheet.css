@@ -336,3 +336,27 @@
   opacity: 0.6;
   font-size: 12px;
 }
+
+/* Add-wizard specifics: existing-skill mark and the overwrite ask */
+.existing-mark {
+  font-style: normal;
+  color: var(--warn);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.overwrite-ask {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--fg2);
+}
+
+.overwrite-ask .overwrite-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}

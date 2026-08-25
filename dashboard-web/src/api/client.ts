@@ -88,3 +88,16 @@ export function removeSkills(skills: string[]) {
 export function updateSkills(skills: string[]) {
   return api<{ updated: string[] }>('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills }) });
 }
+
+export type DiscoveredSkill = { name: string; title: string; description: string; subpath: string };
+
+export function discover(source: string) {
+  return api<{ discovered: DiscoveredSkill[]; existing: string[] }>('/api/discover', {
+    method: 'POST',
+    body: JSON.stringify({ source }),
+  });
+}
+
+export function installFromSource(body: { source: string; subpaths: string[]; overwrite?: boolean }) {
+  return api<{ installed: string[] }>('/api/install', { method: 'POST', body: JSON.stringify(body) });
+}

@@ -13,6 +13,7 @@ import AgentPickerSheet from './components/AgentPickerSheet.vue';
 import UndistributeSheet from './components/UndistributeSheet.vue';
 import ConfirmSheet from './components/ConfirmSheet.vue';
 import SelectionBar from './components/SelectionBar.vue';
+import AddWizard from './components/AddWizard.vue';
 
 const { t } = useI18n();
 const { notice, show } = useNotice();
@@ -24,6 +25,7 @@ const query = ref('');
 const pickerSkills = ref<string[] | null>(null);
 const undistributeTarget = ref<SkillRowState | null>(null);
 const removeTargets = ref<SkillRowState[] | null>(null);
+const addOpen = ref(false);
 
 const selection = ref(idleSelection);
 watchEffect(() => {
@@ -106,6 +108,11 @@ function batchRemove() {
   removeTargets.value = selectedSkillStates.value;
 }
 
+async function onAddClose() {
+  addOpen.value = false;
+  await load();
+}
+
 async function onPickerClose() {
   pickerSkills.value = null;
   selection.value = exitSelection(selection.value);
@@ -140,6 +147,9 @@ async function onRemoveConfirm() {
   <main class="page">
     <header class="head">
       <h1>{{ t('library.title') }}</h1>
+      <div class="links">
+        <button @click="addOpen = true">{{ t('add.link') }}</button>
+      </div>
     </header>
     <p class="sub">{{ t('library.count', state?.skills.length ?? 0) }}</p>
     <p v-if="notice" class="notice" :class="notice.kind">{{ notice.text }}</p>
@@ -205,6 +215,8 @@ async function onRemoveConfirm() {
       </p>
       <p class="confirm-skills mono">{{ removeTargets.map((skill) => skill.name).join(' · ') }}</p>
     </ConfirmSheet>
+
+    <AddWizard v-if="addOpen" @close="onAddClose" />
 
     <SelectionBar
       v-if="selection.active"
