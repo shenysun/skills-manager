@@ -360,3 +360,55 @@
   justify-content: flex-end;
   margin-top: 10px;
 }
+
+/* Log drawer: slides in from the right, document-style lines */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  z-index: 450;
+}
+
+.log-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 92vw);
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  padding: 20px 22px;
+  z-index: 451;
+  overflow-y: auto;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.12);
+}
+
+.log-drawer .sheet-head {
+  margin-bottom: 10px;
+}
+
+.log-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line2);
+  font-size: 13px;
+}
+
+.log-time {
+  color: var(--fg3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-action {
+  color: var(--fg2);
+  white-space: nowrap;
+}
+
+.log-summary {
+  color: var(--fg2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

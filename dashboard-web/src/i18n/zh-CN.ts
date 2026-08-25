@@ -106,4 +106,12 @@ export default {
     overwriteBody: '目标已存在:{skills}。继续将覆盖库中的这些技能。',
     overwriteConfirm: '覆盖并安装',
   },
+  log: {
+    link: '日志',
+    title: '日志',
+    empty: '暂无操作记录。',
+  },
+  chrome: {
+    themeHint: '切换明暗主题',
+  },
 };

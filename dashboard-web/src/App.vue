@@ -14,9 +14,14 @@ import UndistributeSheet from './components/UndistributeSheet.vue';
 import ConfirmSheet from './components/ConfirmSheet.vue';
 import SelectionBar from './components/SelectionBar.vue';
 import AddWizard from './components/AddWizard.vue';
+import LogDrawer from './components/LogDrawer.vue';
+import { useTheme } from './composables/useTheme';
+import { useLocale } from './composables/useLocale';
 
 const { t } = useI18n();
 const { notice, show } = useNotice();
+const { theme, toggleTheme } = useTheme();
+const { locale, setLocale } = useLocale();
 
 const state = ref<DashboardState | null>(null);
 const loadError = ref<string | null>(null);
@@ -26,6 +31,7 @@ const pickerSkills = ref<string[] | null>(null);
 const undistributeTarget = ref<SkillRowState | null>(null);
 const removeTargets = ref<SkillRowState[] | null>(null);
 const addOpen = ref(false);
+const logOpen = ref(false);
 
 const selection = ref(idleSelection);
 watchEffect(() => {
@@ -148,7 +154,12 @@ async function onRemoveConfirm() {
     <header class="head">
       <h1>{{ t('library.title') }}</h1>
       <div class="links">
+        <button @click="logOpen = true">{{ t('log.link') }}</button>
         <button @click="addOpen = true">{{ t('add.link') }}</button>
+        <button :title="t('chrome.themeHint')" @click="toggleTheme">{{ theme === 'dark' ? '☀' : '◐' }}</button>
+        <button @click="setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')">
+          {{ locale === 'zh-CN' ? 'EN' : '中文' }}
+        </button>
       </div>
     </header>
     <p class="sub">{{ t('library.count', state?.skills.length ?? 0) }}</p>
@@ -217,6 +228,8 @@ async function onRemoveConfirm() {
     </ConfirmSheet>
 
     <AddWizard v-if="addOpen" @close="onAddClose" />
+
+    <LogDrawer v-if="logOpen" :records="state?.activity ?? []" @close="logOpen = false" />
 
     <SelectionBar
       v-if="selection.active"

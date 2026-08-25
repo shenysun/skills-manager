@@ -106,4 +106,12 @@ export default {
     overwriteBody: 'Already in the library: {skills}. Continuing overwrites these skills.',
     overwriteConfirm: 'Overwrite and install',
   },
+  log: {
+    link: 'Log',
+    title: 'Operation log',
+    empty: 'No operations recorded yet.',
+  },
+  chrome: {
+    themeHint: 'Toggle light/dark theme',
+  },
 };
