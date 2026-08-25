@@ -51,8 +51,11 @@ try {
   const port = 4899;
   dashboard = await waitForDashboard(cli, ['--home', dashboardHome, 'dashboard', '--no-open', '--port', String(port)], `http://127.0.0.1:${port}/api/state`);
   assert.equal(dashboard.body.ok, true);
-  assert.equal(dashboard.body.data.skillHome, dashboardHome);
-  assert.equal(dashboard.body.data.package.info.name, '@shenysun/skills-manager');
+  // API returns simplified state: skills, activity, updateCount, knownProjects (per ADR-0005)
+  assert.ok(Array.isArray(dashboard.body.data.skills));
+  assert.ok(Array.isArray(dashboard.body.data.activity));
+  assert.equal(typeof dashboard.body.data.updateCount, 'number');
+  assert.ok(Array.isArray(dashboard.body.data.knownProjects));
   console.log('package smoke test passed');
 } finally {
   if (dashboard?.child) dashboard.child.kill('SIGTERM');

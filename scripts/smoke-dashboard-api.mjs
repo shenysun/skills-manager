@@ -10,7 +10,7 @@ try {
   const state = await app.inject({ method: 'GET', url: '/api/state' });
   assert.equal(state.statusCode, 200);
   assert.equal(JSON.parse(state.body).ok, true);
-  assert.deepEqual(Object.keys(JSON.parse(state.body).data).sort(), ['activity', 'skills', 'updateCount']);
+  assert.deepEqual(Object.keys(JSON.parse(state.body).data).sort(), ['activity', 'knownProjects', 'skills', 'updateCount']);
   const bad = await app.inject({ method: 'POST', url: '/api/discover', payload: {} });
   assert.equal(bad.statusCode, 400);
   const dead = await app.inject({ method: 'GET', url: '/api/doctor' });
