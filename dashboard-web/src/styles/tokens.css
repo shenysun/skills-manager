@@ -32,6 +32,12 @@
   padding: 0;
 }
 
+/* Reserve the scrollbar gutter so locking body scroll for a sheet never
+   reflows the page sideways (Sheet.vue owns the lock itself). */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
