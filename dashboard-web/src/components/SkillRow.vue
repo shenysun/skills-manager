@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { deriveRowStatus, type RowStatus } from '../domain/rowStatus';
 import type { SkillRowState } from '../api/client';
+import RowMenu from './RowMenu.vue';
 
 const props = defineProps<{ skill: SkillRowState }>();
+const menuOpen = ref(false);
 
 defineEmits<{
   distribute: [name: string];
   update: [name: string];
-  more: [name: string];
+  undistribute: [skill: SkillRowState];
+  remove: [skill: SkillRowState];
 }>();
 
 const { t } = useI18n();
@@ -31,7 +34,7 @@ const statusText = computed(() => {
 </script>
 
 <template>
-  <div class="item">
+  <div class="item" :class="{ 'menu-open': menuOpen }">
     <div class="main">
       <div class="l1">
         <span class="name mono">{{ skill.name }}</span>
@@ -42,7 +45,7 @@ const statusText = computed(() => {
     <div class="hover-acts">
       <button v-if="skill.hasUpdate" class="upd" @click="$emit('update', skill.name)">{{ t('action.update') }}</button>
       <button @click="$emit('distribute', skill.name)">{{ t('action.distribute') }}</button>
-      <button @click="$emit('more', skill.name)">{{ t('action.more') }}</button>
+      <RowMenu v-model="menuOpen" @undistribute="$emit('undistribute', skill)" @remove="$emit('remove', skill)" />
     </div>
   </div>
 </template>

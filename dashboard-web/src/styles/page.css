@@ -114,7 +114,8 @@
   align-self: center;
 }
 
-.item:hover .hover-acts {
+.item:hover .hover-acts,
+.item.menu-open .hover-acts {
   display: flex;
 }
 

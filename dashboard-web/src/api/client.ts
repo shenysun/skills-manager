@@ -47,3 +47,34 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
 export function fetchState() {
   return api<DashboardState>('/api/state');
 }
+
+export type Scope = 'user' | 'project';
+export type DistributeMode = 'symlink' | 'copy';
+
+export type CatalogAgent = {
+  id: string;
+  label: string;
+  detected: boolean;
+  familyKey: string | null;
+  invalidReason: string | null;
+};
+
+export function fetchCatalogAgents(scope: Scope, projectRoot?: string) {
+  const params = new URLSearchParams({ scope });
+  if (projectRoot) params.set('projectRoot', projectRoot);
+  return api<{ scope: Scope; agents: CatalogAgent[] }>(`/api/catalog/agents?${params.toString()}`);
+}
+
+export function distribute(body: {
+  to: Scope;
+  projectRoot?: string;
+  skills: string[];
+  agents: string[];
+  mode: DistributeMode;
+}) {
+  return api<unknown>('/api/distribute', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function undistribute(body: { to: Scope; projectRoot?: string; skills: string[]; agents: string[] }) {
+  return api<{ removed: unknown[] }>('/api/undistribute', { method: 'POST', body: JSON.stringify(body) });
+}

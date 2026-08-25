@@ -1,0 +1,277 @@
+/* Hand-written sheet/menu/notice primitives — typographic, no chrome. */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8vh 24px 24px;
+  z-index: 500;
+  overflow-y: auto;
+}
+
+.sheet {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: 640px;
+  max-width: 100%;
+  padding: 20px 22px 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.sheet-head h2 {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.sheet-close {
+  margin-left: auto;
+  color: var(--fg3);
+  font-size: 13px;
+}
+
+.sheet-close:hover {
+  color: var(--fg);
+}
+
+.sheet-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line2);
+}
+
+.sheet-foot .picker-count {
+  color: var(--fg3);
+  font-size: 13px;
+  margin-right: auto;
+}
+
+.text-btn {
+  color: var(--fg2);
+  font-size: 13.5px;
+}
+
+.text-btn:hover {
+  color: var(--fg);
+}
+
+.primary-btn {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.primary-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Scope toggle: two text tabs, the active one underlined. */
+.scope-row {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.scope-row button {
+  color: var(--fg2);
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+}
+
+.scope-row button.on {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.field-line input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  outline: none;
+  padding: 7px 2px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.field-line input::placeholder {
+  color: var(--fg3);
+}
+
+.agent-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 6px 0 4px;
+}
+
+.agent-list h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 12px 0 6px;
+}
+
+.agent-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 2px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.agent-row input {
+  accent-color: var(--accent);
+  align-self: center;
+}
+
+.agent-row .agent-id {
+  min-width: 130px;
+}
+
+.agent-row .agent-label {
+  color: var(--fg2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-row.invalid {
+  color: var(--fg3);
+  cursor: default;
+}
+
+.agent-row.invalid .agent-label {
+  color: var(--fg3);
+  font-style: italic;
+}
+
+.family {
+  margin-bottom: 4px;
+}
+
+.family-all {
+  color: var(--fg3);
+  font-size: 12.5px;
+  padding: 2px 0;
+}
+
+.family-all:hover {
+  color: var(--accent);
+}
+
+.picker-hint,
+.picker-error {
+  color: var(--fg3);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.picker-error {
+  color: var(--danger);
+}
+
+.mode-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 13.5px;
+}
+
+.mode-row .mode-label {
+  color: var(--fg3);
+}
+
+.mode-row button {
+  color: var(--fg2);
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.mode-row button.on {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Row overflow menu */
+.row-menu {
+  position: relative;
+}
+
+.row-menu .more {
+  color: var(--fg3);
+  padding: 0 4px;
+}
+
+.row-menu .more:hover {
+  color: var(--fg);
+}
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 601;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  padding: 6px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu button {
+  text-align: left;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: var(--fg);
+}
+
+.menu button:hover {
+  background: var(--line2);
+}
+
+/* One-line operation feedback */
+.notice {
+  font-size: 13.5px;
+  margin: 0 0 6px;
+}
+
+.notice.ok {
+  color: var(--ok);
+}
+
+.notice.error {
+  color: var(--danger);
+}
