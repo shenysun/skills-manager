@@ -84,6 +84,14 @@ export class RegistryService {
     return registry.skills[skill];
   }
 
+  removeEntry(skill: SkillName) {
+    const registry = this.load();
+    if (!registry.skills?.[skill]) return;
+    const skills = { ...registry.skills };
+    delete skills[skill];
+    this.save({ skills });
+  }
+
   editSafeFields(skill: SkillName, patch: Partial<RegistrySafePatch>) {
     const safePatch = validateRegistrySafePatch(patch);
     const existing = this.getEntry(skill) || this.defaultEntry(skill);

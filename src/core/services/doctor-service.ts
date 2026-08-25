@@ -58,6 +58,13 @@ export class DoctorService {
     if (catalog.ageDays > CATALOG_STALE_DAYS) {
       warnings.push(`Agent catalog snapshot is ${catalog.ageDays} days old (upstream ${catalog.commit.slice(0, 10)}); run \`skills-manager catalog refresh\` to update`);
     }
+    const importedWithoutSource = Object.entries(this.registry.load().skills || {})
+      .filter(([, entry]) => entry.imported && !entry.source?.url)
+      .map(([skill, entry]) => ({ skill, importedAt: entry.imported_at ?? null }))
+      .sort((a, b) => a.skill.localeCompare(b.skill));
+    if (importedWithoutSource.length > 0) {
+      warnings.push(`${importedWithoutSource.length} imported skill(s) have no managed source and may be stale; supply one with \`skills-manager edit <skill> --source-url <url>\` to enable updates`);
+    }
     return {
       skillHome: this.home.root,
       skillCount: this.registry.listCanonicalSkills().length,
@@ -66,6 +73,7 @@ export class DoctorService {
       warnings,
       gitStatus,
       catalog,
+      importedWithoutSource,
     };
   }
 

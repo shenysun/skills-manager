@@ -12,6 +12,7 @@
     "dashboard": "tsx src/cli.ts dashboard",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "smoke:distribute": "npm run build:cli && node scripts/smoke-distribute.mjs",
+    "smoke:init": "npm run build:cli && node scripts/smoke-init.mjs",
     "smoke:core": "npm run build:cli && node scripts/smoke-core-services.mjs",
     "smoke:cli": "npm run build:cli && node scripts/smoke-cli-resolution.mjs",
     "smoke:api": "npm run build:cli && node scripts/smoke-dashboard-api.mjs",

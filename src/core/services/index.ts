@@ -13,6 +13,8 @@ import { SkillHomeResolver } from './skill-home-resolver.js';
 import { AdoptService } from './adopt-service.js';
 import { CatalogService } from './catalog-service.js';
 import { MigrationService } from './migration-service.js';
+import { InitService } from './init-service.js';
+import { BackupService } from './backup-service.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
@@ -47,8 +49,10 @@ export function createCoreServices(options: CoreServicesOptions) {
   const archive = new ArchiveService(options.fs, home, registry, views);
   const adopt = new AdoptService();
   const migration = new MigrationService(options.fs, home, distribute, catalog);
+  const backups = new BackupService(options.fs, home, registry, distribute);
+  const init = new InitService(options.fs, home, skillHome, registry, distribute, catalog, backups);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, package: packageService };
+  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
@@ -66,3 +70,7 @@ export { SkillHomeResolver } from './skill-home-resolver.js';
 export { AdoptService } from './adopt-service.js';
 export { CatalogService } from './catalog-service.js';
 export { MigrationService } from './migration-service.js';
+export { InitService } from './init-service.js';
+export type { InitRunRequest, InitRunResult, InitDiscoveredSkill, InitConflict, InitSkillLocation } from './init-service.js';
+export { BackupService } from './backup-service.js';
+export type { BackupInfo } from './backup-service.js';

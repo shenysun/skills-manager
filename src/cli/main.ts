@@ -49,6 +49,66 @@ program.command('doctor')
     print(s.doctor.check({ projectRoot: opts.project }));
   });
 
+program.command('init')
+  .description('Import skills already living in agent runtime dirs into the hub (reverse of distribute); origins become managed symlinks')
+  .option('-a, --agent <id...>', 'catalog agent ids to scan; defaults to the detected set')
+  .option('-r, --resolve <skill=choice...>', 'conflict decisions: <skill>=<agent-id|hub>')
+  .option('--all', 'import everything unambiguous; skip clashing skills (hub wins hub-vs-runtime)')
+  .option('--dry-run', 'print the full plan without touching disk')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.init.run({ agents: opts.agent, resolve: parseResolve(opts.resolve), dryRun: Boolean(opts.dryRun), all: Boolean(opts.all) });
+    if (!opts.dryRun) s.activity.record({ action: 'cli-init', summary: `Imported ${result.imported.join(', ') || 'nothing'} from runtime dirs`, details: { imported: result.imported, conflicts: result.conflicts, failed: result.failed } });
+    print(result);
+  });
+
+function parseResolve(values: string[] = []): Record<string, string> {
+  const resolve: Record<string, string> = {};
+  for (const value of values) {
+    const eq = value.indexOf('=');
+    if (eq <= 0) throw new Error(`--resolve expects <skill>=<agent-id|hub>, got "${value}"`);
+    resolve[value.slice(0, eq)] = value.slice(eq + 1);
+  }
+  return resolve;
+}
+
+program.command('edit')
+  .description('Edit safe registry fields for a skill (e.g. supply the upstream source of an imported skill)')
+  .argument('<skill>')
+  .option('--source-url <url>', 'upstream repository URL; enables update management for imported skills')
+  .option('--source-ref <ref>', 'branch or tag to track')
+  .option('--title <title>', 'display title')
+  .option('--description <description>', 'short description')
+  .option('--category <category>', 'category')
+  .option('--tags <tags...>', 'tags')
+  .action((skill, opts, cmd) => {
+    const s = services(cmd);
+    const patch: Record<string, unknown> = {};
+    if (opts.title !== undefined) patch.title = opts.title;
+    if (opts.description !== undefined) patch.description = opts.description;
+    if (opts.category !== undefined) patch.category = opts.category;
+    if (opts.tags !== undefined) patch.tags = opts.tags;
+    if (opts.sourceUrl !== undefined || opts.sourceRef !== undefined) {
+      patch.source = { ...(opts.sourceUrl !== undefined ? { type: 'git', url: opts.sourceUrl } : {}), ...(opts.sourceRef !== undefined ? { ref: opts.sourceRef } : {}) };
+    }
+    const result = s.registry.editSafeFields(skill, patch);
+    s.activity.record({ action: 'cli-edit', summary: `Edited ${skill}`, details: patch });
+    print(result);
+  });
+
+const backup = program.command('backup').description('Inspect and restore init backups (hub .backups/, 30-day retention)');backup.command('list')
+  .description('List saved backups')
+  .action((_opts, cmd) => print(services(cmd).backups.list()));
+backup.command('restore')
+  .description('Roll one skill fully back to its pre-init state')
+  .argument('<skill>')
+  .action((skill, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.backups.restore(skill);
+    s.activity.record({ action: 'cli-backup-restore', summary: `Restored ${skill} from backup`, details: result });
+    print(result);
+  });
+
 const catalog = program.command('catalog').description('Manage the bundled agent catalog snapshot');
 catalog.command('refresh')
   .description('Pull the upstream agent table and overwrite the local catalog snapshot')

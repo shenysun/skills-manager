@@ -29,11 +29,21 @@ skills-manager distribute --to user --skill my-skill --agent claude-code --agent
 skills-manager distribute --to project --project ./repo --skill my-skill --agent cursor --mode copy
 skills-manager undistribute --to user --skill my-skill --agent claude-code
 skills-manager redistribute --outdated
+skills-manager init --dry-run
+skills-manager init --agent claude-code --agent cursor
+skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
+skills-manager backup list
+skills-manager backup restore my-skill
+skills-manager edit my-skill --source-url https://github.com/owner/repo
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
 
 Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--agent` applies to the detected set on this machine. User scope defaults to `--mode symlink`, project scope to `--mode copy`; one mode per apply.
+
+### init (reverse import)
+
+`init` is the reverse of distribute: it scans the **global runtime directories of detected catalog agents** (`~/.claude/skills`, `~/.cursor/skills`, …), imports discovered skills into the hub, and turns each origin into a managed symlink back to `skills/<name>/` (the original is moved to `<home>/.backups/` first; backups expire after 30 days). Imported entries are stamped `imported: true` with no source — Skills Manager never guesses provenance. The CLI is non-interactive: clashing skills (same name in several runtimes, or in both hub and runtime) are skipped and reported with a suggested `--resolve <skill>=<agent-id|hub>` re-run; the winning copy enters the hub and **all** clashing origins symlink to it. `doctor` lists imported skills without a managed source; `edit <skill> --source-url <url>` supplies the upstream and enables normal update management. See [ADR-0006](adr/0006-init-reverse-import-symlinks.md).
 
 ## Agent catalog snapshot
 

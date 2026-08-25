@@ -12,6 +12,13 @@ npx @shenysun/skills-manager dashboard
 
 This automatically creates and initializes `~/.skills-manager/` on first run.
 
+**Already have skills in `~/.claude/skills` or other agent runtimes?** Fold them in with `skills-manager init` — content moves into the hub, originals become symlinks (backed up first):
+
+```sh
+skills-manager init --dry-run   # preview
+skills-manager init             # import
+```
+
 Or install globally:
 
 ```sh
@@ -65,8 +72,11 @@ skills-manager list --home ~/.skills-manager
 skills-manager add owner/repo --all --consumer agents --consumer claude --yes
 skills-manager update --plan
 skills-manager update --skill my-skill
-skills-manager expose agents my-skill
-skills-manager hide claude my-skill
+skills-manager init --dry-run                    # preview runtime-skill import
+skills-manager init --resolve my-skill=cursor    # import with a conflict decision
+skills-manager backup list                       # inspect init backups
+skills-manager backup restore my-skill           # roll one import back
+skills-manager edit my-skill --source-url https://github.com/owner/repo
 skills-manager archive old-skill
 ```
 
@@ -79,6 +89,8 @@ npm install
 npm run build
 npm run smoke:core
 npm run smoke:cli
+npm run smoke:distribute
+npm run smoke:init
 npm run smoke:api
 npm run smoke:package
 ```

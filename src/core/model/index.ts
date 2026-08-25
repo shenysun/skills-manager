@@ -29,6 +29,10 @@ export type RegistryEntry = {
   update_policy?: string;
   description?: string;
   archived?: boolean;
+  /** True when init folded this skill in from a runtime dir; provenance unknown, updates unmanaged (ADR-0006). */
+  imported?: boolean;
+  /** ISO timestamp of the init import (present only on imported entries). */
+  imported_at?: string;
   [key: string]: unknown;
 };
 
@@ -133,6 +137,8 @@ export type DoctorReport = {
   warnings: string[];
   gitStatus: string;
   catalog: { source: 'injected' | 'hub' | 'bundled'; commit: string; date: string; ageDays: number };
+  /** Imported entries with no managed source: snapshots that may silently lag their unknown upstream (ADR-0006). */
+  importedWithoutSource: Array<{ skill: string; importedAt: string | null }>;
 };
 
 /**

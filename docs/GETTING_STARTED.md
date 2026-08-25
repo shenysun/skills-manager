@@ -51,6 +51,53 @@ After initialization, your skill home will look like:
     └── activity.jsonl  # Operation log
 ```
 
+## Migrate Existing Skills (init)
+
+Already have skills in `~/.claude/skills`, `~/.cursor/skills`, or other agent runtime directories? `init` folds them into your skill home — the reverse of distribute:
+
+```bash
+# Preview what would be imported (no changes made)
+skills-manager init --dry-run
+
+# Import everything unambiguous
+skills-manager init
+```
+
+What happens to each imported skill:
+
+1. The skill **moves into** the skill home (`~/.skills-manager/skills/<name>/`) — the single canonical copy
+2. Its original runtime location is **preserved as a backup** (`~/.skills-manager/.backups/`), then becomes a **symlink back to the hub** — every tool keeps loading from its familiar path
+3. The registry marks it `imported: true` — provenance is unknown, so Skills Manager will not try to update it
+
+### Handling conflicts
+
+If the same skill name exists in multiple runtime directories (or already in the hub), `init` is non-interactive: it **skips the clash and reports it** with a suggested resolution:
+
+```bash
+# Pick which copy wins (agent id from the report, or 'hub' to keep the hub copy)
+skills-manager init --resolve my-skill=cursor
+skills-manager init --resolve my-skill=hub
+```
+
+The winning copy enters the hub and **all** clashing locations symlink to it.
+
+### Rollback
+
+Every import creates a timestamped backup (kept for 30 days, then pruned automatically):
+
+```bash
+skills-manager backup list            # see what's saved
+skills-manager backup restore my-skill   # roll one skill fully back
+```
+
+### Imported skills and updates
+
+Imported skills are snapshots — Skills Manager doesn't know their upstream. `doctor` lists imported skills without a managed source so staleness stays visible. When you know the origin, supply it and the skill joins the normal update flow:
+
+```bash
+skills-manager edit my-skill --source-url https://github.com/owner/repo
+```
+
 ## Common Tasks
 
 ### Check your installation

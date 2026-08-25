@@ -28,6 +28,10 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Project distribution**: Publishing a subset of hub skills into a given project’s **runtime skill directories**; one hub skill can be distributed to many projects.
 - **Distribution receipt**: Manifest/state recording what was distributed where — a **physical layer** (path, mode, fingerprint, managed marker) plus a **logical layer** (the catalog agent ids that motivated the write) — project-side and/or hub-side index; **not** a second canonical skill library.
   _Avoid_: Managing the same logical skill as separate full trees in every project home as the primary model.
+- **Import (init)**: `skills-manager init` — the **reverse of distribute**: discover skills already living in detected agents' global runtime directories and fold them into the hub. Content moves into hub `skills/<name>/`; each originating runtime path becomes a symlink back to it (original moved to a Backup first). Imported entries carry `imported: true` with no source — skills-manager does not guess provenance or manage their updates. Ratified 2026-08-25 in [ADR-0006](docs/adr/0006-init-reverse-import-symlinks.md).
+  _Avoid_: Copying runtime trees while leaving originals live (two canonical copies); scanning directories outside the catalog; guessing upstream repos.
+- **Backup**: Hub `.backups/<skill>-<timestamp>/` — the displaced original recorded before init replaces a runtime path with a symlink. Auto-expires after 30 days; listed and restored via `backup list` / `backup restore <skill>`.
+  _Avoid_: Treating backups as a second skill store; requiring manual cleanup.
 - **View (removed)**: Formerly a generated symlink tree under `views/<consumer>/`. **Superseded by distribute-to-runtime.** Do not reintroduce hub `views/` as a required layout.
 
 ## Product decisions (in progress — hub + distribute)
