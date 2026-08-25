@@ -10,8 +10,11 @@ try {
   const state = await app.inject({ method: 'GET', url: '/api/state' });
   assert.equal(state.statusCode, 200);
   assert.equal(JSON.parse(state.body).ok, true);
+  assert.deepEqual(Object.keys(JSON.parse(state.body).data).sort(), ['activity', 'skills', 'updateCount']);
   const bad = await app.inject({ method: 'POST', url: '/api/discover', payload: {} });
   assert.equal(bad.statusCode, 400);
+  const dead = await app.inject({ method: 'GET', url: '/api/doctor' });
+  assert.equal(dead.statusCode, 404);
 
   const sourceRoot = path.join(temp, 'source');
   await import('node:fs').then(({ mkdirSync, writeFileSync }) => {
@@ -25,19 +28,16 @@ try {
   const overwriteBlocked = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['api-smoke'] } });
   assert.equal(overwriteBlocked.statusCode, 500);
   assert.equal(JSON.parse(overwriteBlocked.body).ok, false);
-  const updates = await app.inject({ method: 'GET', url: '/api/updates' });
-  const sourceKey = JSON.parse(updates.body).data.groups[0].key;
-  const selectedSourceUpdate = await app.inject({ method: 'POST', url: '/api/update/source', payload: { key: sourceKey, skills: ['api-smoke'] } });
-  assert.equal(JSON.parse(selectedSourceUpdate.body).ok, true);
-  assert.deepEqual(JSON.parse(selectedSourceUpdate.body).data.updated, ['api-smoke']);
-  const doctor = await app.inject({ method: 'GET', url: '/api/doctor' });
-  assert.equal(JSON.parse(doctor.body).ok, true);
-  assert.equal(JSON.parse(doctor.body).data.distribution.managedEntries, 0);
+  const updated = await app.inject({ method: 'POST', url: '/api/update/skills', payload: { skills: ['api-smoke'] } });
+  assert.equal(JSON.parse(updated.body).ok, true);
+  assert.deepEqual(JSON.parse(updated.body).data.updated, ['api-smoke']);
   const distributed = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['api-smoke'], agents: ['zed'] } });
   assert.equal(JSON.parse(distributed.body).ok, true);
-  const after = await app.inject({ method: 'GET', url: '/api/state' });
-  assert.equal(JSON.parse(after.body).data.doctor.distribution.managedEntries, 1);
-  assert.ok(JSON.parse(after.body).data.distributions.user);
+  const after = JSON.parse((await app.inject({ method: 'GET', url: '/api/state' })).body).data;
+  assert.equal(after.updateCount, 1);
+  assert.deepEqual(after.skills[0].distributedAgents, ['zed']);
+  const removed = await app.inject({ method: 'POST', url: '/api/undistribute', payload: { to: 'user', skills: ['api-smoke'], agents: ['zed'] } });
+  assert.equal(JSON.parse(removed.body).ok, true);
   await app.close();
   console.log('dashboard api smoke test passed');
 } finally {

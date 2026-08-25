@@ -80,32 +80,6 @@ describe('distribute endpoints over agent sets', () => {
     const removed = await app.inject({ method: 'POST', url: '/api/undistribute', payload: { to: 'user', skills: ['alpha'], agents: ['warp'] } });
     expect(JSON.parse(removed.body).ok).toBe(true);
     const state = JSON.parse((await app.inject({ method: 'GET', url: '/api/state' })).body).data;
-    expect(state.distributions.user.entries[0].agents).toEqual(['zed']);
-  });
-});
-
-describe('overview statistics', () => {
-  it('reports managed entries and unique agent coverage with no legacy count fields', async () => {
-    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['zed', 'warp', 'claude-code'] } });
-    const state = JSON.parse((await app.inject({ method: 'GET', url: '/api/state' })).body).data;
-    expect(state.counts).toEqual({ skills: 1, sources: 1, managedEntries: 2, agentCoverage: 3, outdated: 0 });
-    expect('agents' in state.counts).toBe(false);
-    expect('claude' in state.counts).toBe(false);
-  });
-});
-
-describe('registry structured edit accepts catalog ids only', () => {
-  it('rejects legacy and unknown ids with migrate-consumers guidance', async () => {
-    const legacy = await app.inject({ method: 'POST', url: '/api/registry/edit', payload: { skill: 'alpha', patch: { consumers: ['agents'] } } });
-    expect(legacy.statusCode).toBe(400);
-    expect(JSON.parse(legacy.body).error.message).toMatch(/migrate-consumers/);
-    const unknown = await app.inject({ method: 'POST', url: '/api/registry/edit', payload: { skill: 'alpha', patch: { consumers: ['not-an-agent'] } } });
-    expect(unknown.statusCode).toBe(400);
-  });
-
-  it('accepts catalog ids as desired default agents', async () => {
-    const ok = await app.inject({ method: 'POST', url: '/api/registry/edit', payload: { skill: 'alpha', patch: { consumers: ['claude-code', 'zed'] } } });
-    expect(ok.statusCode).toBe(200);
-    expect(JSON.parse(ok.body).data.consumers.sort()).toEqual(['claude-code', 'zed']);
+    expect(state.skills[0].distributedAgents).toEqual(['zed']);
   });
 });

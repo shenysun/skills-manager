@@ -45,12 +45,6 @@ function staticRoot(projectRoot?: string) {
   return found;
 }
 
-const jsonBody = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {},
-} as const;
-
 const sourceBody = {
   type: 'object',
   required: ['source'],
@@ -103,26 +97,6 @@ const undistributeBody = {
   },
 } as const;
 
-const sourceUpdateBody = {
-  type: 'object',
-  required: ['key'],
-  additionalProperties: false,
-  properties: {
-    key: { type: 'string' },
-    skills: { type: 'array', items: { type: 'string' } },
-  },
-} as const;
-
-const registryEditBody = {
-  type: 'object',
-  required: ['skill', 'patch'],
-  additionalProperties: false,
-  properties: {
-    skill: { type: 'string' },
-    patch: { type: 'object', additionalProperties: true },
-  },
-} as const;
-
 export function createDashboardApp(options: DashboardServerOptions): FastifyInstance {
   const app = fastify({ logger: false });
 
@@ -142,41 +116,49 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   const getServices = () => createRuntimeServices(options, options.projectRoot || process.cwd());
   const data = <T>(value: T) => ({ ok: true as const, data: value });
 
+  // Single-page state (ADR-0005): one row per skill, recent operations, and the
+  // update count. distributedAgents is the logical layer of the hub
+  // distribution index — observed agent ids, never registry consumers tags
+  // (desired defaults; see ADR-0004).
   const state = () => {
     const services = getServices();
-    const skills = services.registry.listSkills({ includeArchived: false }).map((skill) => ({ ...skill, files: services.registry.listSkillFiles(skill.name) }));
-    const updatePlan = services.update.plan();
-    const doctor = services.doctor.check();
-    const registry = services.registry.load();
-    const sources = updatePlan.groups.map((group) => ({ ...group, installedSkills: group.skills.map((skill) => skill.skill) }));
+    const candidates = services.update.plan().candidates;
+    const updatable = new Set(candidates.map((candidate) => candidate.skill));
     const index = services.distribute.listIndex();
+    const brokenPaths = new Set(services.doctor.check().brokenLinks);
+    const skills = services.registry.listSkills({ includeArchived: false }).map((skill) => {
+      const agents = new Set<string>();
+      let warning: string | null = null;
+      let hubFingerprint: string | null = null;
+      for (const record of index) {
+        for (const entry of record.entries) {
+          if (entry.skill !== skill.name) continue;
+          entry.agents.forEach((id) => agents.add(id));
+          if (!warning && brokenPaths.has(entry.runtimePath)) warning = `Broken runtime link: ${entry.runtimePath}`;
+          if (!warning && entry.mode === 'copy') {
+            hubFingerprint ??= services.distribute.fingerprint(skill.name);
+            if (entry.fingerprint !== hubFingerprint) warning = `Outdated copy: ${entry.runtimePath}`;
+          }
+        }
+      }
+      return {
+        name: skill.name,
+        category: skill.category,
+        description: skill.description,
+        sourceType: skill.source.type || 'local',
+        hasUpdate: updatable.has(skill.name),
+        warning,
+        distributedAgents: [...agents].sort(),
+      };
+    });
     return {
-      skillHome: services.home.root,
-      resolution: services.resolution,
       skills,
-      candidates: updatePlan.candidates,
-      sources,
-      doctor,
-      registry,
       activity: services.activity.list({ limit: 25 }),
-      gitHistory: services.activity.gitHistory({ limit: 25 }),
-      package: services.package.check(),
-      counts: {
-        skills: skills.length,
-        sources: sources.length,
-        managedEntries: doctor.distribution.managedEntries,
-        agentCoverage: doctor.distribution.agentCoverage,
-        outdated: doctor.distribution.outdated,
-      },
-      distributions: {
-        user: index.find((record) => record.kind === 'user') || null,
-        projects: index.filter((record) => record.kind === 'project'),
-      },
+      updateCount: candidates.length,
     };
   };
 
   app.get('/api/state', async () => data(state()));
-  app.get('/api/skills', async () => data(state().skills));
 
   // Picker data endpoint: the full catalog filtered for a scope, with detected
   // flags, family keys for shared-path grouping, and invalid reasons.
@@ -199,12 +181,6 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     });
     return data({ scope, agents });
   });
-  app.get('/api/sources', async () => data(state().sources));
-  app.get('/api/updates', async () => data(getServices().update.plan()));
-  app.get('/api/registry', async () => data(getServices().registry.load()));
-  app.get('/api/activity', async () => { const services = getServices(); return data({ records: services.activity.list({ limit: 100 }), git: services.activity.gitHistory({ limit: 100 }) }); });
-  app.get('/api/doctor', async () => data(getServices().doctor.check()));
-  app.get('/api/package', async () => data(getServices().package.check()));
 
   app.post('/api/discover', { schema: { body: sourceBody } }, async (request) => {
     const body = request.body as { source: string };
@@ -229,14 +205,6 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return data(result);
   });
 
-  app.post('/api/update/source', { schema: { body: sourceUpdateBody } }, async (request) => {
-    const body = request.body as { key: string; skills?: string[] };
-    const services = getServices();
-    const result = services.update.updateSource(body.key, body.skills);
-    services.activity.record({ action: 'update-source', summary: `Updated source ${body.key}`, details: { ...result, selected: body.skills || null } });
-    return data(result);
-  });
-
   app.post('/api/distribute', { schema: { body: distributeBody } }, async (request) => {
     const body = request.body as { to: 'user' | 'project'; projectRoot?: string; skills: string[]; agents?: string[]; mode?: 'symlink' | 'copy'; force?: boolean };
     const services = getServices();
@@ -252,68 +220,6 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     services.activity.record({ action: 'undistribute', summary: `Undistributed ${body.skills.length} skill(s) from ${body.to}`, details: body });
     return data(result);
   });
-
-  app.post('/api/redistribute', { schema: { body: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      outdated: { type: 'boolean' },
-      to: { type: 'string', enum: ['user', 'project'] },
-      projectRoot: { type: 'string' },
-      force: { type: 'boolean' },
-    },
-  } } }, async (request) => {
-    const body = request.body as { outdated?: boolean; to?: 'user' | 'project'; projectRoot?: string; force?: boolean };
-    const services = getServices();
-    const result = services.distribute.redistributeOutdated(body);
-    services.activity.record({ action: 'redistribute', summary: 'Redistributed outdated targets', details: body });
-    return data(result);
-  });
-
-  app.post('/api/distribute/rollback', { schema: { body: {
-    type: 'object',
-    required: ['to'],
-    additionalProperties: false,
-    properties: { to: { type: 'string', enum: ['user', 'project'] }, projectRoot: { type: 'string' } },
-  } } }, async (request) => {
-    const body = request.body as { to: 'user' | 'project'; projectRoot?: string };
-    const services = getServices();
-    const result = services.distribute.rollback(body.to, body.projectRoot);
-    services.activity.record({ action: 'distribute-rollback', summary: `Rolled back ${body.to} distribution`, details: body });
-    return data(result);
-  });
-
-  app.post('/api/migrate-views', { schema: { body: {
-    type: 'object',
-    additionalProperties: false,
-    properties: { deleteViews: { type: 'boolean' }, force: { type: 'boolean' } },
-  } } }, async (request) => {
-    const body = (request.body || {}) as { deleteViews?: boolean; force?: boolean };
-    const services = getServices();
-    const result = services.distribute.migrateViews(body);
-    services.activity.record({ action: 'migrate-views', summary: 'Migrated leftover hub views to user distribute', details: result });
-    return data(result);
-  });
-
-  app.post('/api/registry/edit', { schema: { body: registryEditBody } }, async (request, reply) => {
-    const body = request.body as { skill: string; patch: Record<string, unknown> };
-    const services = getServices();
-    // Desired default agents are catalog ids only; legacy values have exactly
-    // one path back in: `skills-manager migrate-consumers`.
-    if (Array.isArray(body.patch.consumers)) {
-      const catalogIds = new Set(services.catalog.load().agents.map((agent) => agent.id));
-      const invalid = (body.patch.consumers as unknown[]).map(String).filter((id) => !catalogIds.has(id));
-      if (invalid.length > 0) {
-        return reply.status(400).send({ ok: false, error: { code: 'invalid_agent', message: `Unknown agent id(s): ${invalid.join(', ')}. Desired default agents must be catalog ids; legacy values (agents/claude) must go through \`skills-manager migrate-consumers\`.` } });
-      }
-    }
-    const entry = services.registry.editSafeFields(body.skill, body.patch);
-    services.views.rebuildCollections();
-    services.activity.record({ action: 'registry-edit', summary: `Edited registry metadata for ${body.skill}`, details: { skill: body.skill, patch: body.patch } });
-    return data(entry);
-  });
-
-  app.post('/api/package/dry-run', { schema: { body: jsonBody } }, async () => data(getServices().package.packDryRun()));
 
   app.post('/api/skills/archive', { schema: { body: skillsBody } }, async (request) => {
     const body = request.body as { skills: string[] };
