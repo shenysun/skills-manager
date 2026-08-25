@@ -13,6 +13,7 @@ defineEmits<{
   update: [name: string];
   undistribute: [skill: SkillRowState];
   remove: [skill: SkillRowState];
+  preview: [skill: SkillRowState];
   toggle: [name: string];
 }>();
 
@@ -41,7 +42,10 @@ const statusText = computed(() => {
     </label>
     <div class="main">
       <div class="l1">
-        <span class="name mono">{{ skill.name }}</span>
+        <!-- The row name is the preview entry (CONTEXT.md · Skill preview): link-styled, no whole-row click. -->
+        <button class="name mono preview-link" :title="t('preview.openHint')" @click="$emit('preview', skill)">
+          {{ skill.name }}
+        </button>
         <span class="meta" :class="status.kind">{{ statusText }}</span>
       </div>
       <div class="desc">{{ skill.description || t('row.noDescription') }}</div>

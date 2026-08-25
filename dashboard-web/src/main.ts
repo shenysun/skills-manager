@@ -5,6 +5,7 @@ import { bindLocaleToI18n } from './composables/useLocale';
 import './styles/tokens.css';
 import './styles/page.css';
 import './styles/sheet.css';
+import './styles/preview.css';
 
 const i18n = createDashboardI18n();
 bindLocaleToI18n(i18n.global);

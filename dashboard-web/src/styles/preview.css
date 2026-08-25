@@ -1,0 +1,170 @@
+/* Skill preview Sheet (CONTEXT.md · Skill preview): a wide, read-only viewer.
+   The sheet body owns scrolling; 02 will add the file-tree column beside it. */
+.sheet.wide {
+  width: min(92vw, 1080px);
+  height: calc(92vh - 24px);
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet.wide .sheet-head {
+  flex: none;
+}
+
+.sheet-head .preview-desc {
+  margin-left: 12px;
+  margin-right: auto;
+  color: var(--fg3);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Row-name preview entry: link-styled per the ratified IA. */
+.item .name.preview-link:hover {
+  text-decoration: underline;
+}
+
+/* Rendered markdown, server-sanitized HTML. */
+.preview-md {
+  max-width: 78ch;
+  padding: 6px 2px 28px;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--fg);
+}
+
+.preview-md h1,
+.preview-md h2,
+.preview-md h3,
+.preview-md h4 {
+  margin: 1.5em 0 0.5em;
+  line-height: 1.3;
+}
+
+.preview-md h1 { font-size: 1.5em; }
+.preview-md h2 { font-size: 1.28em; }
+.preview-md h3 { font-size: 1.12em; }
+.preview-md h4 { font-size: 1em; }
+
+.preview-md h1:first-child,
+.preview-md h2:first-child,
+.preview-md h3:first-child {
+  margin-top: 0.2em;
+}
+
+.preview-md p { margin: 0.6em 0; }
+
+.preview-md a {
+  color: var(--accent);
+}
+
+.preview-md code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--line2);
+  border-radius: 5px;
+  padding: 1.5px 5px;
+}
+
+.preview-md pre {
+  margin: 0.9em 0;
+  overflow-x: auto;
+}
+
+.preview-md pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.preview-md ul,
+.preview-md ol {
+  padding-left: 1.5em;
+  margin: 0.6em 0;
+}
+
+.preview-md li { margin: 0.25em 0; }
+
+.preview-md blockquote {
+  margin: 0.9em 0;
+  padding: 0.1em 0 0.1em 14px;
+  border-left: 3px solid var(--line);
+  color: var(--fg2);
+}
+
+.preview-md hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 1.6em 0;
+}
+
+.preview-md table {
+  border-collapse: collapse;
+  margin: 0.9em 0;
+  font-size: 0.95em;
+}
+
+.preview-md th,
+.preview-md td {
+  border: 1px solid var(--line);
+  padding: 5px 10px;
+  text-align: left;
+}
+
+.preview-md img {
+  max-width: 100%;
+}
+
+/* Shiki dual-theme output: one DOM carrying both palettes as CSS variables
+   (server renders with defaultColor: false); switching themes is pure CSS. */
+.preview-md .shiki,
+.preview-md .shiki span,
+.preview-source-wrap .shiki {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+[data-theme='dark'] .preview-md .shiki,
+[data-theme='dark'] .preview-md .shiki span,
+[data-theme='dark'] .preview-source-wrap .shiki {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+.preview-md .shiki {
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+
+/* Source view: the raw text from the same response, no extra request. */
+.preview-source {
+  padding: 6px 2px 28px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--fg2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-hint {
+  color: var(--fg3);
+  font-size: 13px;
+}
+
+.preview-truncated {
+  color: var(--warn);
+}
+
+.preview-error {
+  color: var(--danger);
+  font-size: 13.5px;
+}

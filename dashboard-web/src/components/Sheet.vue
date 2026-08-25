@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 
-defineProps<{ title: string }>();
+defineProps<{ title: string; wide?: boolean }>();
 const emit = defineEmits<{ cancel: [] }>();
 
 function onKey(event: KeyboardEvent) {
@@ -9,7 +9,7 @@ function onKey(event: KeyboardEvent) {
 }
 
 // Body scroll lock lives in the Sheet base so every layer (picker, undistribute,
-// wizard, confirm) inherits it. A module-level counter — not a boolean — keeps
+// wizard, confirm, preview) inherits it. A module-level counter — not a boolean — keeps
 // nested sheets locked until the last one closes; `scrollbar-gutter: stable`
 // (tokens.css) stops the hidden scrollbar from shifting the page sideways.
 let openSheets = 0;
@@ -41,9 +41,10 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div class="sheet-overlay" @click.self="emit('cancel')">
-      <div class="sheet" role="dialog" :aria-label="title">
+      <div class="sheet" :class="{ wide }" role="dialog" :aria-label="title">
         <div class="sheet-head">
           <h2>{{ title }}</h2>
+          <slot name="head" />
           <button class="sheet-close" @click="emit('cancel')">✕</button>
         </div>
         <slot />

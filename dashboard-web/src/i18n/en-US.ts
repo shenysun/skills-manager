@@ -16,6 +16,14 @@ export default {
   row: {
     noDescription: 'No description',
   },
+  preview: {
+    openHint: 'Preview skill contents',
+    viewSource: 'View source',
+    viewRendered: 'Rendered view',
+    loadFailed: 'Preview failed to load: {message}',
+    truncated: 'Content exceeds 512KB; shown truncated.',
+    loading: 'Loading…',
+  },
   action: {
     distribute: 'Distribute',
     update: 'Update',

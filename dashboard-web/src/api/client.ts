@@ -102,7 +102,7 @@ export function discover(source: string) {
   });
 }
 
-export type InitSkillLocation = { agentId: string; runtimeDir: string; path: string };
+export type InitSkillLocation = { agentIds: string[]; runtimeDir: string; path: string };
 
 export type InitDiscoveredSkill = {
   name: string;
@@ -150,4 +150,18 @@ export function browseDirectory(path?: string) {
   const params = new URLSearchParams();
   if (path) params.set('path', path);
   return api<BrowseDirectory>(`/api/fs/browse?${params.toString()}`);
+}
+
+/** One file of a hub skill, server-rendered (skill preview Sheet). The html is
+ *  sanitized server-side — the only server output the client innerHTMLs. */
+export type SkillFilePayload = {
+  kind: 'markdown';
+  html: string;
+  raw: string;
+  truncated: boolean;
+};
+
+export function fetchSkillFile(name: string, filePath: string) {
+  const params = new URLSearchParams({ name, path: filePath });
+  return api<SkillFilePayload>(`/api/skill/file?${params.toString()}`);
 }

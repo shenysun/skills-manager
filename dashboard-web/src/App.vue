@@ -9,6 +9,7 @@ import { exitSelection, idleSelection, isSelected, selectionCount, toggleSelecti
 import { showUpdateStrip, updatableNames } from './domain/updateStrip';
 import { useNotice } from './composables/useNotice';
 import SkillRow from './components/SkillRow.vue';
+import SkillPreviewSheet from './components/SkillPreviewSheet.vue';
 import AgentPickerSheet from './components/AgentPickerSheet.vue';
 import UndistributeSheet from './components/UndistributeSheet.vue';
 import ConfirmSheet from './components/ConfirmSheet.vue';
@@ -29,6 +30,7 @@ const loadError = ref<string | null>(null);
 const query = ref('');
 
 const pickerSkills = ref<string[] | null>(null);
+const previewTarget = ref<SkillRowState | null>(null);
 const undistributeTarget = ref<SkillRowState | null>(null);
 const removeTargets = ref<SkillRowState[] | null>(null);
 const addOpen = ref(false);
@@ -91,7 +93,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape') return;
   // A sheet open means the sheet owns Escape; selection exits only on a bare page.
-  if (!selection.value.active || pickerSkills.value || undistributeTarget.value || removeTargets.value) return;
+  if (!selection.value.active || pickerSkills.value || undistributeTarget.value || removeTargets.value || previewTarget.value) return;
   selection.value = exitSelection(selection.value);
 }
 
@@ -226,6 +228,7 @@ async function onRemoveConfirm() {
         @update="(name) => runUpdate([name])"
         @undistribute="(skill) => (undistributeTarget = skill)"
         @remove="(skill) => (removeTargets = [skill])"
+        @preview="(skill) => (previewTarget = skill)"
       />
     </template>
 
@@ -262,6 +265,8 @@ async function onRemoveConfirm() {
     </ConfirmSheet>
 
     <AddWizard v-if="addOpen" @close="onAddClose" />
+
+    <SkillPreviewSheet v-if="previewTarget" :skill="previewTarget" @close="previewTarget = null" />
 
     <InitSheet v-if="initOpen" @close="onInitClose" />
 

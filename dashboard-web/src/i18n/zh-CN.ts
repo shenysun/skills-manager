@@ -16,6 +16,14 @@ export default {
   row: {
     noDescription: '无描述',
   },
+  preview: {
+    openHint: '预览技能内容',
+    viewSource: '查看源码',
+    viewRendered: '渲染视图',
+    loadFailed: '预览加载失败:{message}',
+    truncated: '内容超过 512KB,已截断显示。',
+    loading: '加载中…',
+  },
   action: {
     distribute: '接入',
     update: '更新',

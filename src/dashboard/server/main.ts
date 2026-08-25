@@ -11,6 +11,7 @@ import { errorCode, errorMessage, SkillsManagerError } from '../../shared/errors
 import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
+import { readSkillFile } from './skill-file.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -252,6 +253,13 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   };
 
   app.get('/api/state', async () => data(await state()));
+
+  // Skill preview (read-only): one file of one skill, rendered server-side.
+  app.get('/api/skill/file', async (request) => {
+    const query = request.query as { name?: string; path?: string };
+    const { resolution } = getServices();
+    return data(await readSkillFile(resolution.root, query.name ?? '', query.path ?? ''));
+  });
 
   // Directory browsing for project path picker: list entries in a directory
   // with parent-link semantics. Prevents traversal attacks by restricting to
