@@ -2,20 +2,39 @@
 
 `@shenysun/skills-manager` is a local-first CLI and dashboard for managing agent, Claude, and Codex skills from a registry-driven skill home.
 
-## Install and run
+## Quick Start
+
+**No setup needed** — just run:
+
+```sh
+npx @shenysun/skills-manager dashboard
+```
+
+This automatically creates and initializes `~/.skills-manager/` on first run.
+
+Or install globally:
+
+```sh
+npm install -g @shenysun/skills-manager
+skills-manager dashboard
+```
+
+👉 **[See Getting Started guide](docs/GETTING_STARTED.md)** for detailed instructions and common tasks.
+
+## Install and Run
 
 Use without installing globally:
 
 ```sh
-npx @shenysun/skills-manager dashboard --home ~/.skills-manager
+npx @shenysun/skills-manager dashboard
 ```
 
 Or install globally from a published package or packed tarball:
 
 ```sh
 npm install -g @shenysun/skills-manager
-skills-manager dashboard --home ~/.skills-manager
-skills-manager doctor --home ~/.skills-manager
+skills-manager dashboard
+skills-manager doctor
 ```
 
 The dashboard opens a local Vue/Fastify control center by default. Use `--no-open` to keep the browser closed.
@@ -64,4 +83,8 @@ npm run smoke:api
 npm run smoke:package
 ```
 
-See [`docs/CLI.md`](docs/CLI.md) for the full command reference and publish smoke-test workflow.
+## Documentation
+
+- **[Getting Started](docs/GETTING_STARTED.md)** — Installation, first launch, common tasks
+- **[CLI Reference](docs/CLI.md)** — Full command reference and advanced usage
+- **[Architecture](CONTEXT.md)** — Project structure and design decisions
