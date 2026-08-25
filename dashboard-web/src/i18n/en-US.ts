@@ -67,5 +67,13 @@ export default {
   notice: {
     distributed: 'Distributed {skills} → {n} agent(s)',
     undistributed: 'Undistributed {skill} from {n} agent(s)',
+    removed: 'Removed from library: {skills}',
+    removeFailed: 'Remove failed: {skill} — {message}',
+  },
+  remove: {
+    title: 'Remove from library',
+    consequence: 'This undistributes {agents} agent entrie(s) and archives {skills} skill(s) from the library.',
+    confirm: 'Remove',
+    cancel: 'Cancel',
   },
 };

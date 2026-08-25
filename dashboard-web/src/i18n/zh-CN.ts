@@ -67,5 +67,13 @@ export default {
   notice: {
     distributed: '已接入 {skills} → {n} 个 agent',
     undistributed: '已从 {n} 个 agent 撤除接入:{skill}',
+    removed: '已从库中移除:{skills}',
+    removeFailed: '移除失败:{skill} —{message}',
+  },
+  remove: {
+    title: '从库中移除',
+    consequence: '将撤除 {agents} 处接入,并从库中归档 {skills} 个技能。',
+    confirm: '移除',
+    cancel: '取消',
   },
 };

@@ -305,6 +305,46 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return data(result);
   });
 
+  // One-step remove (ADR-0005): per skill, undistribute from every known
+  // target, then archive. Per-skill results; a failure is reported and never
+  // rolls back other skills' successes (same semantics as archive/undistribute).
+  app.post('/api/skills/remove', { schema: { body: skillsBody } }, async (request) => {
+    const body = request.body as { skills: string[] };
+    const services = getServices();
+    const results = [];
+    for (const skill of body.skills) {
+      try {
+        let removed = 0;
+        for (const record of services.distribute.listIndex()) {
+          const entries = record.entries.filter((entry) => entry.skill === skill);
+          if (entries.length === 0) continue;
+          const out = services.distribute.undistribute({
+            to: record.kind,
+            projectRoot: record.kind === 'project' ? record.targetRoot : undefined,
+            skills: [skill],
+            agents: [...new Set(entries.flatMap((entry) => entry.agents))],
+          });
+          removed += out.removed.length;
+        }
+        services.archive.archiveSkills([skill]);
+        results.push({ skill, ok: true as const, removed });
+      } catch (error) {
+        results.push({ skill, ok: false as const, error: { code: errorCode(error), message: errorMessage(error) } });
+      }
+    }
+    const done = results.filter((result) => result.ok);
+    const failed = results.filter((result) => !result.ok);
+    services.activity.record({
+      action: 'remove',
+      summary: [
+        done.length > 0 ? `Removed ${done.map((result) => result.skill).join(', ')}` : null,
+        failed.length > 0 ? `failed: ${failed.map((result) => `${result.skill} (${result.error.code})`).join(', ')}` : null,
+      ].filter(Boolean).join('; '),
+      details: { results },
+    });
+    return data({ results });
+  });
+
   return app;
 }
 

@@ -81,6 +81,22 @@
   cursor: default;
 }
 
+.primary-btn.danger {
+  background: var(--danger);
+}
+
+.confirm-body {
+  color: var(--fg2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.confirm-skills {
+  margin-top: 8px;
+  color: var(--fg3);
+  font-size: 13px;
+}
+
 /* Scope toggle: two text tabs, the active one underlined. */
 .scope-row {
   display: flex;

@@ -78,3 +78,9 @@ export function distribute(body: {
 export function undistribute(body: { to: Scope; projectRoot?: string; skills: string[]; agents: string[] }) {
   return api<{ removed: unknown[] }>('/api/undistribute', { method: 'POST', body: JSON.stringify(body) });
 }
+
+export type RemoveResult = { skill: string; ok: true; removed: number } | { skill: string; ok: false; error: { code: string; message: string } };
+
+export function removeSkills(skills: string[]) {
+  return api<{ results: RemoveResult[] }>('/api/skills/remove', { method: 'POST', body: JSON.stringify({ skills }) });
+}

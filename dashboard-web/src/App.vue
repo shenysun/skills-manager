@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { fetchState, type DashboardState, type SkillRowState } from './api/client';
+import { fetchState, removeSkills, type DashboardState, type SkillRowState } from './api/client';
 import { filterSkills } from './domain/filterSkills';
+import { removeConsequence } from './domain/remove';
 import { resolveHash } from './domain/resolveHash';
 import { useNotice } from './composables/useNotice';
 import SkillRow from './components/SkillRow.vue';
 import AgentPickerSheet from './components/AgentPickerSheet.vue';
 import UndistributeSheet from './components/UndistributeSheet.vue';
+import ConfirmSheet from './components/ConfirmSheet.vue';
 
 const { t } = useI18n();
 const { notice, show } = useNotice();
@@ -18,6 +20,7 @@ const query = ref('');
 
 const pickerSkills = ref<string[] | null>(null);
 const undistributeTarget = ref<SkillRowState | null>(null);
+const removeTargets = ref<SkillRowState[] | null>(null);
 
 async function load() {
   loadError.value = null;
@@ -48,6 +51,23 @@ async function onPickerClose() {
 
 async function onUndistributeClose() {
   undistributeTarget.value = null;
+  await load();
+}
+
+const removeSummary = computed(() => (removeTargets.value ? removeConsequence(removeTargets.value) : null));
+
+async function onRemoveConfirm() {
+  const targets = removeTargets.value ?? [];
+  removeTargets.value = null;
+  try {
+    const { results } = await removeSkills(targets.map((skill) => skill.name));
+    const done = results.filter((result) => result.ok).map((result) => result.skill);
+    const failed = results.filter((result) => !result.ok);
+    if (done.length > 0) show('ok', t('notice.removed', { skills: done.join(', ') }));
+    for (const failure of failed) show('error', t('notice.removeFailed', { skill: failure.skill, message: failure.error.message }));
+  } catch (error) {
+    show('error', error instanceof Error ? error.message : String(error));
+  }
   await load();
 }
 </script>
@@ -81,7 +101,7 @@ async function onUndistributeClose() {
         :skill="skill"
         @distribute="openPicker"
         @undistribute="(skill) => (undistributeTarget = skill)"
-        @remove="() => {}"
+        @remove="(skill) => (removeTargets = [skill])"
       />
     </template>
 
@@ -92,5 +112,23 @@ async function onUndistributeClose() {
       :agents="undistributeTarget.distributedAgents"
       @close="onUndistributeClose"
     />
+    <ConfirmSheet
+      v-if="removeTargets && removeSummary"
+      :title="t('remove.title')"
+      :confirm-label="t('remove.confirm')"
+      danger
+      @cancel="removeTargets = null"
+      @confirm="onRemoveConfirm"
+    >
+      <p>
+        {{
+          t('remove.consequence', {
+            agents: removeSummary.agentCount,
+            skills: removeSummary.skillCount,
+          })
+        }}
+      </p>
+      <p class="confirm-skills mono">{{ removeTargets.map((skill) => skill.name).join(' · ') }}</p>
+    </ConfirmSheet>
   </main>
 </template>
