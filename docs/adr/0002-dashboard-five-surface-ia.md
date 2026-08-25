@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0005 (2026-08-25): the dashboard collapsed further to a single-surface skill library.
 
 ## Context
 

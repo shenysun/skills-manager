@@ -2,7 +2,8 @@
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
-import { undistribute, type Scope } from '../api/client';
+import { errorMessage, undistribute, type Scope } from '../api/client';
+import { toggleAgent } from '../domain/picker';
 import { useNotice } from '../composables/useNotice';
 
 const props = defineProps<{ skill: string; agents: string[] }>();
@@ -21,24 +22,24 @@ watch(scope, () => {
 });
 
 function toggle(id: string) {
-  selection.value = selection.value.includes(id)
-    ? selection.value.filter((item) => item !== id)
-    : [...selection.value, id].sort();
+  selection.value = toggleAgent(selection.value, id);
 }
 
 async function apply() {
   applying.value = true;
   try {
-    await undistribute({
+    const { removed } = await undistribute({
       to: scope.value,
       projectRoot: scope.value === 'project' ? projectRoot.value.trim() || undefined : undefined,
       skills: [props.skill],
       agents: selection.value,
     });
-    show('ok', t('notice.undistributed', { skill: props.skill, n: selection.value.length }));
+    // Count what the endpoint actually removed — agents living only in the
+    // other scope are silently inert there, so selection.length would lie.
+    show('ok', t('notice.undistributed', { skill: props.skill, n: removed.length }));
     emit('close');
   } catch (error) {
-    show('error', error instanceof Error ? error.message : String(error));
+    show('error', errorMessage(error));
   } finally {
     applying.value = false;
   }

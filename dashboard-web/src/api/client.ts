@@ -1,10 +1,12 @@
+import type { PickerAgent, Scope } from '../domain/picker';
+
 export type SkillRowState = {
   name: string;
   category: string;
   description: string;
   sourceType: string;
   hasUpdate: boolean;
-  warning: string | null;
+  warning: 'broken-link' | 'outdated-copy' | null;
   distributedAgents: string[];
 };
 
@@ -35,6 +37,12 @@ export class ApiError extends Error {
   }
 }
 
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export type { Scope, PickerAgent } from '../domain/picker';
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { headers: { 'content-type': 'application/json' }, ...init });
   const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
@@ -48,16 +56,10 @@ export function fetchState() {
   return api<DashboardState>('/api/state');
 }
 
-export type Scope = 'user' | 'project';
 export type DistributeMode = 'symlink' | 'copy';
 
-export type CatalogAgent = {
-  id: string;
-  label: string;
-  detected: boolean;
-  familyKey: string | null;
-  invalidReason: string | null;
-};
+/** Wire shape of GET /api/catalog/agents rows — same type the picker domain reasons about. */
+export type CatalogAgent = PickerAgent;
 
 export function fetchCatalogAgents(scope: Scope, projectRoot?: string) {
   const params = new URLSearchParams({ scope });

@@ -121,22 +121,21 @@ describe('GET /api/state (single-page slim contract)', () => {
     expect((await getState()).skills[0].distributedAgents).toEqual(['zed']);
   });
 
-  it('marks a warning on a row whose distributed runtime link is broken', async () => {
+  it('marks a warning kind on a row whose distributed runtime link is broken', async () => {
     await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['claude-code'] } });
     const runtimePath = path.join(userHome, '.claude', 'skills', 'alpha');
     expect(lstatSync(runtimePath).isSymbolicLink()).toBe(true);
     rmSync(runtimePath);
     symlinkSync(path.join(root, 'gone'), runtimePath);
     const state = await getState();
-    expect(typeof state.skills[0].warning).toBe('string');
-    expect(state.skills[0].warning).toMatch(/alpha/);
+    expect(state.skills[0].warning).toBe('broken-link');
   });
 
-  it('marks a warning on a row whose copy is outdated versus the hub', async () => {
+  it('marks a warning kind on a row whose copy is outdated versus the hub', async () => {
     await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['claude-code'], mode: 'copy' } });
     appendFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), '\n# hub changed\n');
     const state = await getState();
-    expect(state.skills[0].warning).toMatch(/outdated/i);
+    expect(state.skills[0].warning).toBe('outdated-copy');
   });
 });
 

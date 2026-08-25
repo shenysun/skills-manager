@@ -1,25 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import {
-  checkboxVisible,
-  exitSelection,
-  idleSelection,
-  isSelected,
-  selectionCount,
-  toggleSelection,
-} from './selection';
+import { exitSelection, idleSelection, isSelected, selectionCount, toggleSelection } from './selection';
 
 describe('selection state machine (enter / count / exit / no trace)', () => {
-  it('is idle by default: not active, nobody selected, nothing visible', () => {
+  it('is idle by default: not active, nobody selected', () => {
     expect(idleSelection).toEqual({ active: false, names: [] });
     expect(selectionCount(idleSelection)).toBe(0);
-    expect(checkboxVisible(idleSelection, false)).toBe(false);
   });
 
   it('enters selection mode on the first check', () => {
     const state = toggleSelection(idleSelection, 'tdd');
     expect(state).toEqual({ active: true, names: ['tdd'] });
     expect(selectionCount(state)).toBe(1);
-    expect(checkboxVisible(state, false)).toBe(true);
   });
 
   it('counts a multi-skill selection and stays sorted', () => {
@@ -45,10 +36,6 @@ describe('selection state machine (enter / count / exit / no trace)', () => {
     let state = toggleSelection(idleSelection, 'tdd');
     state = toggleSelection(state, 'grilling');
     expect(exitSelection(state)).toEqual(idleSelection);
-  });
-
-  it('checkboxes fade in on row hover even while idle', () => {
-    expect(checkboxVisible(idleSelection, true)).toBe(true);
   });
 
   it('toggles are immutable — the previous state object is untouched', () => {

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
 import {
   distribute,
+  errorMessage,
   fetchCatalogAgents,
   type CatalogAgent,
   type DistributeMode,
@@ -38,7 +39,7 @@ async function loadAgents() {
     agents.value = result.agents;
     selection.value = initialSelection(result.agents, memory.value[scope.value] ?? null);
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : String(error);
+    loadError.value = errorMessage(error);
   }
 }
 
@@ -64,6 +65,13 @@ const families = computed(() => {
 
 const familyName = (familyKey: string) => familyKey.split('/').filter(Boolean).slice(-2).join('/') || familyKey;
 
+/** The kept catalog endpoint returns English reasons; localize the known ones, pass the rest through. */
+function reasonText(agent: CatalogAgent): string {
+  if (/project-only/i.test(agent.invalidReason ?? '')) return t('picker.reasonProjectOnly');
+  if (/cannot be resolved/i.test(agent.invalidReason ?? '')) return t('picker.reasonUnresolvable');
+  return agent.invalidReason ?? '';
+}
+
 async function apply() {
   applying.value = true;
   try {
@@ -78,7 +86,7 @@ async function apply() {
     show('ok', t('notice.distributed', { skills: props.skills.join(', '), n: selection.value.length }));
     emit('close');
   } catch (error) {
-    show('error', error instanceof Error ? error.message : String(error));
+    show('error', errorMessage(error));
   } finally {
     applying.value = false;
   }
@@ -140,7 +148,7 @@ async function apply() {
         <label v-for="agent in invalid" :key="agent.id" class="agent-row invalid">
           <input type="checkbox" disabled />
           <span class="agent-id mono">{{ agent.id }}</span>
-          <span class="agent-label">{{ agent.invalidReason }}</span>
+          <span class="agent-label">{{ reasonText(agent) }}</span>
         </label>
       </section>
     </div>

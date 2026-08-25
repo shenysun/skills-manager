@@ -23,7 +23,7 @@ const status = computed<RowStatus>(() => deriveRowStatus(props.skill));
 const statusText = computed(() => {
   switch (status.value.kind) {
     case 'warning':
-      return t('status.warning');
+      return props.skill.warning === 'outdated-copy' ? t('status.warningOutdated') : t('status.warningBroken');
     case 'updatable':
       return t('status.updatable');
     case 'distributed':

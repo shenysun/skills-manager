@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { fetchState, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
+import { errorMessage, fetchState, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
 import { filterSkills } from './domain/filterSkills';
 import { removeConsequence } from './domain/remove';
 import { resolveHash } from './domain/resolveHash';
@@ -48,7 +48,9 @@ const selectedSkillStates = computed(() => {
 });
 
 async function batchUpdate() {
-  await runUpdate([...selection.value.names]);
+  // Only the updatable subset goes to the endpoint — a source-less skill in
+  // the selection would fail the whole batch (update_source_missing).
+  await runUpdate(updatableNames(selectedSkillStates.value));
   selection.value = exitSelection(selection.value);
 }
 
@@ -61,7 +63,7 @@ async function load() {
   try {
     state.value = await fetchState();
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : String(error);
+    loadError.value = errorMessage(error);
   }
 }
 
@@ -99,7 +101,7 @@ async function runUpdate(names: string[]) {
     show('ok', t('notice.updated', { skills: updated.join(', ') }));
   } catch (error) {
     // The rows stay as they are — hasUpdate is unchanged, so retry is possible.
-    show('error', error instanceof Error ? error.message : String(error));
+    show('error', errorMessage(error));
   } finally {
     updating.value = new Set();
   }
@@ -143,7 +145,7 @@ async function onRemoveConfirm() {
     if (done.length > 0) show('ok', t('notice.removed', { skills: done.join(', ') }));
     for (const failure of failed) show('error', t('notice.removeFailed', { skill: failure.skill, message: failure.error.message }));
   } catch (error) {
-    show('error', error instanceof Error ? error.message : String(error));
+    show('error', errorMessage(error));
   }
   await load();
 }

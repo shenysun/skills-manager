@@ -3,9 +3,8 @@
  * any bookmarked hash (five legacy surfaces, older discover/updates/settings
  * hashes, or anything else) lands on the canonical no-hash location.
  */
-export type ResolvedHash = { hash: '' ; redirect: boolean };
+export type ResolvedHash = { redirect: boolean };
 
 export function resolveHash(rawHash: string): ResolvedHash {
-  const stripped = rawHash.trim().replace(/^#\/?/, '');
-  return { hash: '', redirect: stripped !== '' };
+  return { redirect: rawHash.trim().replace(/^#\/?/, '') !== '' };
 }

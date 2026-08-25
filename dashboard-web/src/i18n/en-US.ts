@@ -8,7 +8,8 @@ export default {
   },
   status: {
     updatable: 'Update available',
-    warning: '⚠ warning',
+    warningBroken: '⚠ broken link',
+    warningOutdated: '⚠ outdated copy',
     agents: '{n} agents',
     unlinked: 'not distributed',
   },
@@ -19,7 +20,6 @@ export default {
     distribute: 'Distribute',
     update: 'Update',
     updating: 'Updating…',
-    more: 'More',
   },
   strip: {
     text: '{n} skills can be updated',
@@ -50,6 +50,8 @@ export default {
     allAgents: 'Full catalog',
     selectAll: 'select all',
     invalid: 'Unavailable in this scope',
+    reasonProjectOnly: 'Project scope only (no global runtime path in the catalog)',
+    reasonUnresolvable: 'Global runtime dir cannot be resolved on this machine',
     noMatch: 'No matching agents.',
     mode: 'Mode',
     symlink: 'symlink (link)',

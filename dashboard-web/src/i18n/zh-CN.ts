@@ -8,7 +8,8 @@ export default {
   },
   status: {
     updatable: '可更新',
-    warning: '⚠ 警告',
+    warningBroken: '⚠ 接入已断开',
+    warningOutdated: '⚠ 副本过期',
     agents: '{n} agents',
     unlinked: '未接入',
   },
@@ -19,7 +20,6 @@ export default {
     distribute: '接入',
     update: '更新',
     updating: '更新中…',
-    more: '更多',
   },
   strip: {
     text: '{n} 个技能可更新',
@@ -50,6 +50,8 @@ export default {
     allAgents: '全部目录',
     selectAll: '全选',
     invalid: '此范围不可用',
+    reasonProjectOnly: '仅项目 scope 可用(目录无全局运行时路径)',
+    reasonUnresolvable: '全局运行时目录在本机无法解析',
     noMatch: '没有匹配的 agent。',
     mode: '模式',
     symlink: 'symlink(链接)',

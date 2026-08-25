@@ -25,8 +25,3 @@ export function selectionCount(state: SelectionState): number {
 export function isSelected(state: SelectionState, name: string): boolean {
   return state.names.includes(name);
 }
-
-/** Checkboxes are invisible until the row is hovered or the mode is active. */
-export function checkboxVisible(state: SelectionState, hovered: boolean): boolean {
-  return state.active || hovered;
-}

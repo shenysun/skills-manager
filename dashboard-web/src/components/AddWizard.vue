@@ -2,7 +2,8 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
-import { ApiError, discover, installFromSource, type DiscoveredSkill } from '../api/client';
+import { ApiError, discover, errorMessage, installFromSource, type DiscoveredSkill } from '../api/client';
+import { toggleAgent } from '../domain/picker';
 import { useNotice } from '../composables/useNotice';
 
 const emit = defineEmits<{ close: [] }>();
@@ -31,16 +32,14 @@ async function runDiscover() {
     step.value = 'pick';
   } catch (cause) {
     // Bad source or an illegal skill name in the tree — explain, stay on step 1.
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    error.value = errorMessage(cause);
   } finally {
     busy.value = null;
   }
 }
 
 function toggle(subpath: string) {
-  selected.value = selected.value.includes(subpath)
-    ? selected.value.filter((item) => item !== subpath)
-    : [...selected.value, subpath];
+  selected.value = toggleAgent(selected.value, subpath);
 }
 
 async function runInstall(overwrite: boolean) {
@@ -57,7 +56,7 @@ async function runInstall(overwrite: boolean) {
       overwriteAsk.value = details?.existing ?? [];
       return;
     }
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    error.value = errorMessage(cause);
   } finally {
     busy.value = null;
   }

@@ -19,8 +19,8 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
 - **Source-first install**: The preferred install flow: provide a source first, discover available `SKILL.md` files, then choose skills to install or update.
 - **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager dashboard` for browsing, installing, updating, and distributing skills.
-- **Dashboard primary navigation**: The five first-class surfaces of the Dashboard UI, organized by domain object rather than by verb: **Overview**, **Installed**, **Sources**, **Registry**, **Activity**.
-  _Avoid_: Discover, Updates, and Settings as top-level nav labels; those are capabilities hosted inside the five surfaces, not separate destinations.
+- **Skill library (dashboard surface)**: The Dashboard UI's single page — hub skills as rows with in-place actions (接入 / 更新 / 删除). Ratified 2026-08-25 in [ADR-0005](docs/adr/0005-dashboard-single-surface-skill-library.md).
+  _Avoid_: Overview / Sources / Registry / Activity as dashboard destinations; "primary navigation" as a dashboard concept (superseded five-surface IA of ADR-0002).
 - **Skill home / hub**: The **canonical** managed root where skill *content* lives: `skills/`, `collections/` (optional), `registry.yaml`, and distribution index under `.skills/`. Default hub: **`~/.skills-manager`**. Install/update/archive happen only here (unless operator explicitly points `--home` at another hub).
   _Avoid_: A hub-local `views/` tree as an expose layer — **removed from the product model**.
 - **Distribution target**: A user- or project-side place that **receives a selected subset** of hub skills for *use*, not a second independent source of truth for the same skill identity.
@@ -151,6 +151,8 @@ Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agen
 
 **Any-agent distribute: shared understanding confirmed** (grill 2026-08-24). Recorded in ADR-0004; ready for `/to-spec`.
 
+**Single-surface minimal dashboard: shipped** (2026-08-25). ADR-0005 implemented as specced in `.scratch/dashboard-single-surface/spec.md`: `dashboard-web` rewritten from scratch as the single-page skill library (typographic flow), the dashboard HTTP API trimmed to the single-page contract (`GET /api/state` slimmed with per-skill `distributedAgents` from the hub index; dead endpoints deleted; `POST /api/skills/remove` added as the one-step remove), core services and CLI untouched.
+
 ## Current product direction
 
 The project is evolving from a local skill repository into a publishable npm package that provides:
@@ -191,40 +193,31 @@ Use **dashboard** consistently for the local web UI. Code and package paths shou
 
 ### Dashboard information architecture
 
-Primary navigation is **five surfaces** (object-centric), not eight verb pages. Placement is **as implemented in the current dashboard WIP** (ratified in grill):
+**Single-surface skill library (ratified 2026-08-25 — supersedes the five-surface IA of ADR-0002; see [ADR-0005](docs/adr/0005-dashboard-single-surface-skill-library.md)).**
 
-| Surface | Domain object / purpose | Hosted capabilities |
-|---------|-------------------------|---------------------|
-| Overview | Health and status at a glance | Counts (skills/sources, managed runtime entries + unique agent coverage), doctor warnings & broken links, Run Doctor, recent activity preview (link to Activity). **No** dedicated git-status card. |
-| Installed | Canonical skills already in the skill home | Search/filter, category workbench, multi-select, **by-skill update** (selected / all candidates / per drawer), distribute/undistribute via the 接入 picker, archive, skill detail drawer. |
-| Sources | Provenance groups and source-first install | **Library** tab: group by source, search, per-source select, **by-source update** (all/selected), discover-more-from-source. **Discover** tab: compact embedded source-first install wizard (not a standalone multi-step page; safety checks required, step chrome optional). |
-| Registry | Structured registry metadata | Structured edit of safe fields only (unchanged intent). |
-| Activity | Operation history + workspace snapshot | Operations timeline, git history list, skill home path, package name, npm pack dry-run. |
+The dashboard is **one page** — the skill library — plus two entries:
 
-**Not first-class nav** (capabilities relocated):
+- **Skill library** (the only page): every hub skill is a row with in-place actions — 接入 (opens the any-agent picker), update, remove. **Remove is one-step**: undistribute all + archive, behind a confirm that states the consequence. A standalone **撤除接入** (agent-side only, skill stays in the library) also exists in row overflow. Search/filter stay; category tooling collapses into row overflow. **Batch is one unified pattern — selection mode**: checkboxes are invisible until hover; checking the first one enters selection mode with a floating bottom bar (已选 N · 更新 / 接入 / 移除 · 取消); Esc or 取消 exits. No persistent multi-select toolbar, no per-source group selector. A top inline strip `N 个可更新 · 全部更新` appears only when updates exist and executes directly. Doctor signal (broken links, outdated copies) becomes per-row status marks.
+- **+ 添加技能** (top-right): opens the source-first install wizard. The Sources surface disappears; the wizard survives.
+- **日志** drawer (top-right): the operation log survives as a drawer. The Activity surface disappears.
 
-- **Discover** → Sources · Discover tab; Topbar **Install Skill** uses the Discover deep-link (`#/sources?tab=discover` or equivalent).
-- **Updates** → split: by-skill on Installed; by-source on Sources · Library. No standalone Updates surface.
-- **Settings** → split: language & theme on Topbar; home / package / pack dry-run on Activity. No Settings item in primary nav.
+Explicit cuts: **Overview** (per-row status marks instead), **Registry editor** (no dashboard surface; `registry.yaml` remains the metadata backbone, edited by hand or CLI), **Activity page** (log drawer only), **update center** (in-place row actions only), **Settings** (language/theme survive as small topbar toggles). No primary navigation.
 
-**Global chrome (Topbar):** skill home path, Install Skill, operation log drawer, language, theme, refresh.
+Rationale: the measured daily line is distribute / remove / install / update — all one object (the skill). Three of five surfaces saw no real use.
 
-**Known implementation defects to fix (ratified in grill — not product intent):**
+All legacy hashes redirect to the single page.
 
-- `#/updates` must not land on Sources; either map to Installed (by-skill update surface) or drop the hash entirely after migration.
-- `#/settings` and a standalone Settings page must not remain as a parallel settings surface; keep Topbar (language/theme) + Activity (home/package/pack) only.
-- Dead Discover / Updates pages and unused update-center components must be removed so each capability has one home.
-- Do not use `localStorage` to pass Sources tab selection across navigations; express Discover deep-link in the hash itself.
+**Implementation posture (ratified 2026-08-25):** `dashboard-web` is **rewritten from scratch** — new code and components, no migration of old component code; behaviour follows ADR-0004 (picker, receipts) and ADR-0005 (IA). The HTTP API layer is trimmed: dead dashboard endpoints deleted, single-page endpoints kept or adjusted. Core services and CLI are untouched. Vue 3 stays; i18n (zh/en) and light/dark theme remain as small topbar toggles.
 
-**Dashboard hash contract (ratified):**
+**Visual baseline (ratified via prototype 2026-08-25; implemented by the 2026-08-25 rewrite):** the **typographic flow** variant won (prototype variant C; the three-variant file is preserved on the throwaway branch `prototype/single-surface-skill-library`). The question settled: what the single-page skill library looks like. Baseline traits, as implemented by the rewrite:
 
-- First-class hashes (only): `#/overview`, `#/installed`, `#/sources`, `#/registry`, `#/activity`.
-- Discover deep-link (not primary nav): `#/sources?tab=discover` or equivalent `#/sources/discover` — opens Sources on the Discover tab. Topbar Install Skill uses this.
-- Legacy hashes are not product surfaces; one-time redirects for bookmarks:
-  - `#/discover` → Discover deep-link on Sources
-  - `#/updates` → `#/installed` (by-skill update surface)
-  - `#/settings` → `#/activity` (workspace prefs + history)
-  After redirect, the legacy form is not a first-class destination.
+- Narrow single column (~720px), interface-as-document: no cards, no table lines, no sidebar, no toolbar chrome.
+- Skill entry: bold name + status as plain text on the right (`7 agents` / `可更新` / `⚠ 副本过期`) — text, not chips; grey description on a second line.
+- Actions fade in on row hover as text buttons (更新 · 接入 · 更多), replacing the status text while hovered.
+- Header is one line: title + text links (日志, ＋添加) + underline-only search box.
+- Update notice is one text line with a text button — no colored strip.
+
+Losing variants (A compact table rows, B airy cards) were rejected for chrome/visual-block weight; the prototype file keeps all three for reference.
 
 ### Default skill home (hub)
 

@@ -145,7 +145,9 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return sha;
   }
 
-  /** Mirrors DistributeService.fingerprint's tree hashing so equal trees compare equal. */
+  /** Mirrors DistributeService.fingerprint's tree hashing so equal trees compare equal.
+   *  Drift is caught behaviourally: dashboard-state tests require hasUpdate=false
+   *  on a fresh install, which only holds while both algorithms agree. */
   function hashTree(root: string): string | null {
     if (contentFs.kind(root) !== 'directory') return null;
     const hash = createHash('sha256');
@@ -204,16 +206,16 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const brokenPaths = new Set(services.doctor.check().brokenLinks);
     const skills = listed.map((skill) => {
       const agents = new Set<string>();
-      let warning: string | null = null;
+      let warning: 'broken-link' | 'outdated-copy' | null = null;
       let hubFingerprint: string | null = null;
       for (const record of index) {
         for (const entry of record.entries) {
           if (entry.skill !== skill.name) continue;
           entry.agents.forEach((id) => agents.add(id));
-          if (!warning && brokenPaths.has(entry.runtimePath)) warning = `Broken runtime link: ${entry.runtimePath}`;
+          if (!warning && brokenPaths.has(entry.runtimePath)) warning = 'broken-link';
           if (!warning && entry.mode === 'copy') {
             hubFingerprint ??= services.distribute.fingerprint(skill.name);
-            if (entry.fingerprint !== hubFingerprint) warning = `Outdated copy: ${entry.runtimePath}`;
+            if (entry.fingerprint !== hubFingerprint) warning = 'outdated-copy';
           }
         }
       }
