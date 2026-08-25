@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { errorMessage, fetchState, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
+import { errorMessage, fetchState, initPreview, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
 import { filterSkills } from './domain/filterSkills';
 import { removeConsequence } from './domain/remove';
 import { resolveHash } from './domain/resolveHash';
@@ -14,6 +14,7 @@ import UndistributeSheet from './components/UndistributeSheet.vue';
 import ConfirmSheet from './components/ConfirmSheet.vue';
 import SelectionBar from './components/SelectionBar.vue';
 import AddWizard from './components/AddWizard.vue';
+import InitSheet from './components/InitSheet.vue';
 import LogDrawer from './components/LogDrawer.vue';
 import { useTheme } from './composables/useTheme';
 import { useLocale } from './composables/useLocale';
@@ -32,6 +33,9 @@ const undistributeTarget = ref<SkillRowState | null>(null);
 const removeTargets = ref<SkillRowState[] | null>(null);
 const addOpen = ref(false);
 const logOpen = ref(false);
+const initOpen = ref(false);
+/** Empty-state onboarding: runtime skills init could fold in; null = not probed yet. */
+const importableCount = ref<number | null>(null);
 
 const selection = ref(idleSelection);
 watchEffect(() => {
@@ -62,6 +66,14 @@ async function load() {
   loadError.value = null;
   try {
     state.value = await fetchState();
+    if (state.value.skills.length === 0 && importableCount.value === null) {
+      // Empty library: probe once whether init has anything to offer (ADR-0006).
+      try {
+        importableCount.value = (await initPreview()).discovered.length;
+      } catch {
+        importableCount.value = 0;
+      }
+    }
   } catch (error) {
     loadError.value = errorMessage(error);
   }
@@ -121,6 +133,12 @@ async function onAddClose() {
   await load();
 }
 
+async function onInitClose() {
+  initOpen.value = false;
+  importableCount.value = null; // the next empty-state load re-probes
+  await load();
+}
+
 async function onPickerClose() {
   pickerSkills.value = null;
   selection.value = exitSelection(selection.value);
@@ -158,6 +176,7 @@ async function onRemoveConfirm() {
       <div class="links">
         <button @click="logOpen = true">{{ t('log.link') }}</button>
         <button @click="addOpen = true">{{ t('add.link') }}</button>
+        <button @click="initOpen = true">{{ t('init.link') }}</button>
         <button :title="t('chrome.themeHint')" @click="toggleTheme">{{ theme === 'dark' ? '☀' : '◐' }}</button>
         <button @click="setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')">
           {{ locale === 'zh-CN' ? 'EN' : '中文' }}
@@ -184,10 +203,17 @@ async function onRemoveConfirm() {
 
     <template v-else-if="state">
       <div v-if="rows.length === 0" class="empty">
-        <p class="title">
-          {{ isFiltering ? t('empty.filtered.title', { query: query.trim() }) : t('empty.library.title') }}
-        </p>
-        <p class="hint">{{ isFiltering ? t('empty.filtered.hint') : t('empty.library.hint') }}</p>
+        <template v-if="!isFiltering && (importableCount ?? 0) > 0">
+          <p class="title">{{ t('empty.guided.title', importableCount ?? 0) }}</p>
+          <p class="hint">{{ t('empty.guided.hint') }}</p>
+          <button class="primary-btn guided-import" @click="initOpen = true">{{ t('empty.guided.action') }}</button>
+        </template>
+        <template v-else>
+          <p class="title">
+            {{ isFiltering ? t('empty.filtered.title', { query: query.trim() }) : t('empty.library.title') }}
+          </p>
+          <p class="hint">{{ isFiltering ? t('empty.filtered.hint') : t('empty.library.hint') }}</p>
+        </template>
       </div>
       <SkillRow
         v-for="skill in rows"
@@ -236,6 +262,8 @@ async function onRemoveConfirm() {
     </ConfirmSheet>
 
     <AddWizard v-if="addOpen" @close="onAddClose" />
+
+    <InitSheet v-if="initOpen" @close="onInitClose" />
 
     <LogDrawer v-if="logOpen" :records="state?.activity ?? []" @close="logOpen = false" />
 

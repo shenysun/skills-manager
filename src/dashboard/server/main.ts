@@ -58,6 +58,14 @@ const sourceBody = {
   properties: { source: { type: 'string', minLength: 1 } },
 } as const;
 
+const initBody = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    resolve: { type: 'object', additionalProperties: { type: 'string' } },
+  },
+} as const;
+
 const installBody = {
   type: 'object',
   required: ['source', 'subpaths'],
@@ -328,6 +336,21 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const services = getServices();
     const source = services.source.checkout(body.source);
     return data({ sourceInfo: source, discovered: services.source.discover(source), existing: services.registry.listCanonicalSkills() });
+  });
+
+  // Reverse import (ADR-0006): the dashboard's conflict decisions arrive as the
+  // same resolve map the CLI's --resolve flags produce.
+  app.post('/api/init/preview', async () => {
+    const services = getServices();
+    return data(services.init.run({ dryRun: true }));
+  });
+
+  app.post('/api/init/apply', { schema: { body: initBody } }, async (request) => {
+    const body = request.body as { resolve?: Record<string, string> };
+    const services = getServices();
+    const result = services.init.run({ resolve: body.resolve });
+    services.activity.record({ action: 'init', summary: `Imported ${result.imported.join(', ') || 'nothing'} from runtime dirs`, details: { imported: result.imported, conflicts: result.conflicts.map((conflict) => conflict.skill), failed: result.failed } });
+    return data(result);
   });
 
   app.post('/api/install', { schema: { body: installBody } }, async (request) => {

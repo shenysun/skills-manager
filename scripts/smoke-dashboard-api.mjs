@@ -43,6 +43,22 @@ try {
   assert.equal(drifted.updateCount, 1);
   const removed = await app.inject({ method: 'POST', url: '/api/undistribute', payload: { to: 'user', skills: ['api-smoke'], agents: ['zed'] } });
   assert.equal(JSON.parse(removed.body).ok, true);
+
+  // Reverse import via the dashboard: preview is a dry-run; apply resolves clashes.
+  const { mkdirSync: mk, writeFileSync: wf } = await import('node:fs');
+  const userHome = path.join(temp, 'user-home');
+  mk(path.join(userHome, '.claude', 'skills', 'runtime-skill'), { recursive: true });
+  wf(path.join(userHome, '.claude', 'skills', 'runtime-skill', 'SKILL.md'), `---\nname: runtime-skill\ntitle: Runtime Skill\n---\n# Runtime\n`);
+  const previewed = JSON.parse((await app.inject({ method: 'POST', url: '/api/init/preview', payload: {} })).body);
+  assert.equal(previewed.ok, true);
+  assert.equal(previewed.data.dryRun, true);
+  assert.deepEqual(previewed.data.discovered.map((skill) => skill.name), ['runtime-skill']);
+  const imported = JSON.parse((await app.inject({ method: 'POST', url: '/api/init/apply', payload: { resolve: {} } })).body);
+  assert.equal(imported.ok, true);
+  assert.deepEqual(imported.data.imported, ['runtime-skill']);
+  const afterImport = JSON.parse((await app.inject({ method: 'GET', url: '/api/state' })).body).data;
+  assert.ok(afterImport.skills.some((skill) => skill.name === 'runtime-skill'));
+
   await app.close();
   console.log('dashboard api smoke test passed');
 } finally {

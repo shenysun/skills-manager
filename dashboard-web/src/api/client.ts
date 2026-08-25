@@ -102,6 +102,40 @@ export function discover(source: string) {
   });
 }
 
+export type InitSkillLocation = { agentId: string; runtimeDir: string; path: string };
+
+export type InitDiscoveredSkill = {
+  name: string;
+  title: string;
+  description: string;
+  locations: InitSkillLocation[];
+};
+
+export type InitConflict = {
+  skill: string;
+  kind: 'multi-runtime' | 'hub-vs-runtime';
+  locations: InitSkillLocation[];
+};
+
+export type InitRunResult = {
+  dryRun: boolean;
+  scanned: Array<{ agentId: string; runtimeDir: string }>;
+  discovered: InitDiscoveredSkill[];
+  imported: string[];
+  skippedManaged: string[];
+  conflicts: InitConflict[];
+  failed: Array<{ skill: string; reason: string }>;
+};
+
+/** Reverse import (ADR-0006): preview is a dry-run of the same operation. */
+export function initPreview() {
+  return api<InitRunResult>('/api/init/preview', { method: 'POST', body: JSON.stringify({}) });
+}
+
+export function initApply(body: { resolve?: Record<string, string> }) {
+  return api<InitRunResult>('/api/init/apply', { method: 'POST', body: JSON.stringify(body) });
+}
+
 export function installFromSource(body: { source: string; subpaths: string[]; overwrite?: boolean }) {
   return api<{ installed: string[] }>('/api/install', { method: 'POST', body: JSON.stringify(body) });
 }
