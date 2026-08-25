@@ -104,6 +104,7 @@ export default {
     cancel: 'Cancel',
   },
   menu: {
+    preview: 'Preview…',
     undistribute: 'Undistribute…',
     remove: 'Remove from library…',
     removeTitle: 'Remove',

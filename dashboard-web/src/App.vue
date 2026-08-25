@@ -223,6 +223,7 @@ async function onRemoveConfirm() {
         :skill="skill"
         :updating="updating.has(skill.name)"
         :selected="isSelected(selection, skill.name)"
+        :selecting="selection.active"
         @toggle="onRowToggle"
         @distribute="openPicker"
         @update="(name) => runUpdate([name])"

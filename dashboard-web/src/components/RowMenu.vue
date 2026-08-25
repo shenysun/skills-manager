@@ -2,8 +2,9 @@
 import { useI18n } from 'vue-i18n';
 
 defineEmits<{
+  preview: [];
   undistribute: [];
-  remove: [];
+  remove: []
 }>();
 
 const open = defineModel<boolean>({ default: false });
@@ -18,6 +19,14 @@ const { t } = useI18n();
       <div v-if="open" class="menu-backdrop" @click="open = false"></div>
     </Teleport>
     <div v-if="open" class="menu">
+      <button
+        @click="
+          open = false;
+          $emit('preview');
+        "
+      >
+        {{ t('menu.preview') }}
+      </button>
       <button
         @click="
           open = false;

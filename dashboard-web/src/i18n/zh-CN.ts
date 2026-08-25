@@ -104,6 +104,7 @@ export default {
     cancel: '取消',
   },
   menu: {
+    preview: '预览…',
     undistribute: '撤除接入…',
     remove: '从库中移除…',
     removeTitle: '移除',
