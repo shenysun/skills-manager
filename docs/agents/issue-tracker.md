@@ -1,6 +1,6 @@
 # Issue tracker: Local Markdown
 
-Issues and specs for this repo live as markdown files in `.scratch/`.
+Issues and specs for this repo live as markdown files in `.scratch/` — local working notes, not tracked by git (`.scratch/` is in `.gitignore`).
 
 ## Conventions
 

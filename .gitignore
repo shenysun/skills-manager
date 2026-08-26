@@ -8,4 +8,5 @@ dist/
 .env
 .playwright-mcp/
 .skills/
+.scratch/
 *.tgz
