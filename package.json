@@ -3,6 +3,14 @@
   "version": "2026.8.26",
   "packageManager": "pnpm@10.33.0",
   "description": "Local-first CLI and dashboard for managing agent, Claude, and Codex skills",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shenysun/skills-manager.git"
+  },
+  "homepage": "https://github.com/shenysun/skills-manager#readme",
+  "bugs": {
+    "url": "https://github.com/shenysun/skills-manager/issues"
+  },
   "scripts": {
     "skills-manager": "tsx src/cli.ts",
     "build": "pnpm run clean && tsc -p tsconfig.json && node scripts/copy-catalog-snapshot.mjs && vite build --config dashboard-web/vite.config.ts",
@@ -15,9 +23,19 @@
     "catalog:extract": "tsx scripts/extract-agent-catalog.ts",
     "release": "node scripts/release.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "skills",
+    "agent",
+    "agents",
+    "claude",
+    "claude-code",
+    "codex",
+    "cursor",
+    "cli",
+    "dashboard"
+  ],
+  "author": "shenysun",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@fastify/static": "^10.1.2",
