@@ -7,7 +7,7 @@ Welcome! This guide will help you get started with `@shenysun/skills-manager` in
 ### Option 1: Use without installing (Recommended)
 
 ```bash
-npx @shenysun/skills-manager dashboard
+npx @shenysun/skills-manager web
 ```
 
 ### Option 2: Install globally
@@ -16,7 +16,7 @@ npx @shenysun/skills-manager dashboard
 npm install -g @shenysun/skills-manager
 # or
 pnpm add -g @shenysun/skills-manager
-skills-manager dashboard
+skills-manager web
 ```
 
 ## Your First Launch
@@ -25,7 +25,7 @@ When you run any command for the first time, Skills Manager automatically initia
 
 ```bash
 # This automatically creates and initializes ~/.skills-manager/
-skills-manager dashboard
+skills-manager web
 ```
 
 Your browser will open to `http://localhost:4777` where you can start managing skills.
@@ -133,13 +133,13 @@ skills-manager add /local/path/to/skills --all
 ### Open the Dashboard
 
 ```bash
-skills-manager dashboard
+skills-manager web
 
 # Optionally run on a different port
-skills-manager dashboard --port 5000
+skills-manager web --port 5000
 
 # Don't auto-open browser
-skills-manager dashboard --no-open
+skills-manager web --no-open
 ```
 
 The Dashboard provides a visual interface to:
@@ -153,10 +153,10 @@ The Dashboard provides a visual interface to:
 ```bash
 # With environment variable
 export SKILL_HOME=~/my-skills
-skills-manager dashboard
+skills-manager web
 
 # Or with --home flag (takes precedence)
-skills-manager dashboard --home ~/my-skills
+skills-manager web --home ~/my-skills
 
 # All commands respect --home
 skills-manager list --home ~/my-skills
@@ -167,7 +167,7 @@ skills-manager doctor --home ~/my-skills
 
 ### Add your first skill
 
-1. Open Dashboard: `skills-manager dashboard`
+1. Open Dashboard: `skills-manager web`
 2. Click "＋ Add" in the top right
 3. Enter a GitHub repo (e.g., `owner/repo`) or local path
 4. Click "Discover" to see available skills
@@ -211,7 +211,7 @@ skills-manager doctor --migrate-views
 
 ```bash
 skills-manager --help
-skills-manager dashboard --help
+skills-manager web --help
 skills-manager doctor --help
 skills-manager add --help
 ```
@@ -229,10 +229,10 @@ Check [docs/CLI.md](CLI.md) for complete command documentation.
 skills-manager doctor
 
 # Try a different port
-skills-manager dashboard --port 5000
+skills-manager web --port 5000
 
 # Run without auto-opening browser
-skills-manager dashboard --no-open
+skills-manager web --no-open
 ```
 
 ### Skills not showing up
@@ -263,13 +263,13 @@ skills-manager catalog refresh
 # Project-specific skill home
 cd ~/my-project
 mkdir .skills-manager
-skills-manager dashboard --home ./.skills-manager
+skills-manager web --home ./.skills-manager
 
 # User-level skill home (default)
-skills-manager dashboard --home ~/.skills-manager
+skills-manager web --home ~/.skills-manager
 
 # Custom location
-skills-manager dashboard --home ~/important-skills
+skills-manager web --home ~/important-skills
 ```
 
 ### Automate with environment variables
@@ -281,7 +281,7 @@ export SKILL_HOME=~/my-skills
 # All commands now use this skill home
 skills-manager list
 skills-manager add owner/repo --all
-skills-manager dashboard
+skills-manager web
 ```
 
 ### Scripting

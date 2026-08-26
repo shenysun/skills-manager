@@ -18,7 +18,7 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Registry**: `registry.yaml`, the metadata source for skill paths, categories, consumers (desired/default consumer tags), source repositories, refs, and upstream commits.
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
 - **Source-first install**: The preferred install flow: provide a source first, discover available `SKILL.md` files, then choose skills to install or update.
-- **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager dashboard` for browsing, installing, updating, and distributing skills.
+- **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager web` for browsing, installing, updating, and distributing skills.
 - **Skill library (dashboard surface)**: The Dashboard UI's single page — hub skills as rows with in-place actions (接入 / 更新 / 删除). Ratified 2026-08-25 in [ADR-0005](docs/adr/0005-dashboard-single-surface-skill-library.md).
   _Avoid_: Overview / Sources / Registry / Activity as dashboard destinations; "primary navigation" as a dashboard concept (superseded five-surface IA of ADR-0002).
 - **Skill preview**: The Dashboard UI's **read-only** viewer for one hub skill, opened from a skill row as a wide Sheet: file tree on the left, selected file's content on the right (`.md` rendered as HTML, source files syntax-highlighted, other files a placeholder). No mutation from the preview.

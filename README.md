@@ -7,7 +7,7 @@
 **No setup needed** — just run:
 
 ```sh
-npx @shenysun/skills-manager dashboard
+npx @shenysun/skills-manager web
 ```
 
 This automatically creates and initializes `~/.skills-manager/` on first run.
@@ -25,7 +25,7 @@ Or install globally:
 npm install -g @shenysun/skills-manager
 # or
 pnpm add -g @shenysun/skills-manager
-skills-manager dashboard
+skills-manager web
 ```
 
 👉 **[See Getting Started guide](docs/GETTING_STARTED.md)** for detailed instructions and common tasks.
@@ -35,7 +35,7 @@ skills-manager dashboard
 Use without installing globally:
 
 ```sh
-npx @shenysun/skills-manager dashboard
+npx @shenysun/skills-manager web
 ```
 
 Or install globally from a published package or packed tarball:
@@ -44,11 +44,11 @@ Or install globally from a published package or packed tarball:
 npm install -g @shenysun/skills-manager
 # or
 pnpm add -g @shenysun/skills-manager
-skills-manager dashboard
+skills-manager web
 skills-manager doctor
 ```
 
-The dashboard opens a local Vue/Fastify control center by default. Use `--no-open` to keep the browser closed.
+`web` opens a local Vue/Fastify dashboard by default. Use `--no-open` to keep the browser closed.
 
 ## Skill home layout
 
@@ -70,7 +70,7 @@ Skill home resolution priority:
 ## Common commands
 
 ```sh
-skills-manager dashboard --home ~/.skills-manager
+skills-manager web --home ~/.skills-manager
 skills-manager doctor --home ~/.skills-manager
 skills-manager list --home ~/.skills-manager
 skills-manager add owner/repo --all --consumer agents --consumer claude --yes

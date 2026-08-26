@@ -23,15 +23,19 @@ program
   .option('--home <path>', 'skill home path; overrides SKILL_HOME and cwd detection')
   .showHelpAfterError();
 
-program.command('dashboard')
-  .description('Start the local dashboard')
-  .option('-p, --port <port>', 'port', '4777')
-  .option('--host <host>', 'host', '127.0.0.1')
-  .option('--no-open', 'do not open a browser')
-  .action((opts, cmd) => {
-    const globalOpts = (cmd.optsWithGlobals() as { home?: string });
-    return startDashboardServer({ home: globalOpts.home, port: Number(opts.port), host: opts.host, open: opts.open, projectRoot });
-  });
+const webCommand = (cmd: Command, description: string) =>
+  cmd
+    .description(description)
+    .option('-p, --port <port>', 'port', '4777')
+    .option('--host <host>', 'host', '127.0.0.1')
+    .option('--no-open', 'do not open a browser')
+    .action((opts, self) => {
+      const globalOpts = (self.optsWithGlobals() as { home?: string });
+      return startDashboardServer({ home: globalOpts.home, port: Number(opts.port), host: opts.host, open: opts.open, projectRoot });
+    });
+
+webCommand(program.command('web'), 'Start the local web dashboard');
+webCommand(program.command('dashboard', { hidden: true }), 'Deprecated alias for web');
 
 program.command('doctor')
   .description('Run health checks')

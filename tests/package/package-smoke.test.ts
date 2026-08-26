@@ -79,7 +79,7 @@ describe('package artifact (pack → install → bin → dashboard)', () => {
     expect(JSON.parse(run.stdout).skillHome).toBe(home);
 
     const port = 4899;
-    const started = await waitForDashboard(cli, ['--home', path.join(temp, 'dashboard-home'), 'dashboard', '--no-open', '--port', String(port)], `http://127.0.0.1:${port}/api/state`);
+    const started = await waitForDashboard(cli, ['--home', path.join(temp, 'dashboard-home'), 'web', '--no-open', '--port', String(port)], `http://127.0.0.1:${port}/api/state`);
     dashboard = started.child;
     expect(started.body.ok).toBe(true);
     expect(Array.isArray(started.body.data.skills)).toBe(true);

@@ -42,6 +42,9 @@ describe('compiled CLI bin (dist/cli.js)', () => {
 
   it('exposes doctor --migrate-views and distributes help without errors', () => {
     expect(spawnSync(process.execPath, [cli, 'doctor', '--help'], { encoding: 'utf8' }).stdout).toMatch(/migrate-views/);
+    const webHelp = spawnSync(process.execPath, [cli, 'web', '--help'], { encoding: 'utf8' });
+    expect(webHelp.status, webHelp.stderr || webHelp.stdout).toBe(0);
+    expect(webHelp.stdout).toMatch(/Start the local web dashboard/);
     const rollbackHelp = spawnSync(process.execPath, [cli, 'distribute', 'rollback', '--help'], { encoding: 'utf8' });
     expect(rollbackHelp.status, rollbackHelp.stderr || rollbackHelp.stdout).toBe(0);
     expect(rollbackHelp.stdout).toMatch(/Restore the last distribute snapshot/);

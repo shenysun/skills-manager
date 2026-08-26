@@ -16,7 +16,7 @@ Initialization creates `skills/`, `views/`, `collections/`, `registry.yaml`, and
 ## Commands
 
 ```sh
-skills-manager dashboard --home ./my-skill-home
+skills-manager web --home ./my-skill-home
 skills-manager doctor --home ./my-skill-home
 skills-manager catalog info --home ./my-skill-home
 skills-manager catalog refresh --home ./my-skill-home
@@ -56,8 +56,8 @@ To regenerate the checked-in snapshot during development: `pnpm run catalog:extr
 ## Dashboard
 
 ```sh
-skills-manager dashboard --home ~/.skills-manager
-skills-manager dashboard --no-open
+skills-manager web --home ~/.skills-manager
+skills-manager web --no-open
 ```
 
 The dashboard serves a local Vue/Vite UI backed by Fastify routes. Mutating dashboard operations write activity records to `.skills/activity.jsonl` and leave disk changes visible for `git diff`.
