@@ -20,6 +20,8 @@ export type DashboardServerOptions = RuntimeOptions & {
   host: string;
   open: boolean;
   projectRoot?: string;
+  /** Pre-built core services for tests; production wires `createRuntimeServices` instead. */
+  services?: ReturnType<typeof createRuntimeServices>;
 };
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -128,7 +130,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     });
   });
 
-  const getServices = () => createRuntimeServices(options, options.projectRoot || process.cwd());
+  const getServices = () => options.services ?? createRuntimeServices(options, options.projectRoot || process.cwd());
   const data = <T>(value: T) => ({ ok: true as const, data: value });
 
   // Update detection for the single page: hasUpdate is a real diff, not plan
@@ -217,15 +219,27 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const skills = listed.map((skill) => {
       const agents = new Set<string>();
       let warning: 'broken-link' | 'outdated-copy' | null = null;
+      let staleCount = 0;
       let hubFingerprint: string | null = null;
       for (const record of index) {
         for (const entry of record.entries) {
           if (entry.skill !== skill.name) continue;
           entry.agents.forEach((id) => agents.add(id));
-          if (!warning && brokenPaths.has(entry.runtimePath)) warning = 'broken-link';
-          if (!warning && entry.mode === 'copy') {
+          if (brokenPaths.has(entry.runtimePath)) {
+            warning ??= 'broken-link';
+            continue;
+          }
+          if (entry.error) {
+            staleCount += 1;
+            warning ??= 'outdated-copy';
+            continue;
+          }
+          if (entry.mode === 'copy') {
             hubFingerprint ??= services.distribute.fingerprint(skill.name);
-            if (entry.fingerprint !== hubFingerprint) warning = 'outdated-copy';
+            if (entry.fingerprint !== hubFingerprint) {
+              staleCount += 1;
+              warning ??= 'outdated-copy';
+            }
           }
         }
       }
@@ -236,6 +250,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
         sourceType: skill.source.type || 'local',
         hasUpdate: updatable.get(skill.name) ?? false,
         warning,
+        staleCount,
         distributedAgents: [...agents].sort(),
       };
     });
@@ -449,6 +464,31 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
       details: { results },
     });
     return data({ results });
+  });
+
+  // Refresh outdated copies (ADR-0008). Per-skill filters the cascade to one
+  // hub entry; the no-arg shape refreshes every record. Both never throw —
+  // per-entry failures land in `errors` with the runtimePath and message, so
+  // the dashboard can surface them without losing the rest of the batch.
+  app.post('/api/distribute/refresh', async (request) => {
+    const body = (request.body ?? {}) as { skill?: string; projectRoot?: string; to?: 'user' | 'project' };
+    const services = getServices();
+    const result = body.skill
+      ? services.distribute.redistributeOutdatedForSkill(body.skill)
+      : services.distribute.redistributeOutdated({ to: body.to, projectRoot: body.projectRoot });
+    return data({
+      refreshed: result.refreshed.length,
+      errored: result.errored.length,
+      errors: result.errored.map((entry) => ({ runtimePath: entry.runtimePath, message: entry.error?.message ?? '' })),
+    });
+  });
+
+  // Stale-count summary for the single-page badge (ADR-0008). Server-side
+  // because the fingerprint diff is hub-side; the client can't recompute it
+  // without re-reading each hub tree.
+  app.get('/api/distributions/stale', async () => {
+    const services = getServices();
+    return data(services.distribute.staleSummary());
   });
 
   return app;

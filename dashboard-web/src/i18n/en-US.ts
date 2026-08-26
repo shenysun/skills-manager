@@ -2,6 +2,7 @@ export default {
   library: {
     title: 'Skill library',
     count: '{n} skills',
+    loading: 'Loading…',
   },
   search: {
     placeholder: 'Search skills / categories / descriptions…',
@@ -12,6 +13,8 @@ export default {
     warningOutdated: '⚠ outdated copy',
     agents: '{n} agents',
     unlinked: 'not distributed',
+    staleBadge: 'stale: {count}',
+    staleHint: '{count} copy target(s) lag the hub',
   },
   row: {
     noDescription: 'No description',
@@ -29,6 +32,8 @@ export default {
     distribute: 'Distribute',
     update: 'Update',
     updating: 'Updating…',
+    refresh: 'Refresh copies',
+    refreshing: 'Refreshing…',
   },
   strip: {
     text: '{n} skills can be updated',
@@ -118,6 +123,7 @@ export default {
     installed: 'Installed: {skills}',
     imported: 'Imported: {skills}',
     importFailed: 'Import failed: {skill} — {message}',
+    refreshed: 'Refreshed copies of {skill}',
   },
   remove: {
     title: 'Remove from library',

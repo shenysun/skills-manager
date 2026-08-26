@@ -64,15 +64,16 @@ describe('GET /api/state (single-page slim contract)', () => {
     expect(Object.keys(body.data).sort()).toEqual(['activity', 'knownProjects', 'skills', 'updateCount']);
   });
 
-  it('describes every skill in one row with the seven single-page fields', async () => {
+  it('describes every skill in one row with the eight single-page fields', async () => {
     const state = await getState();
     expect(state.skills).toHaveLength(1);
     const alpha = state.skills[0];
-    expect(Object.keys(alpha).sort()).toEqual(['category', 'description', 'distributedAgents', 'hasUpdate', 'name', 'sourceType', 'warning']);
+    expect(Object.keys(alpha).sort()).toEqual(['category', 'description', 'distributedAgents', 'hasUpdate', 'name', 'sourceType', 'staleCount', 'warning']);
     expect(alpha.name).toBe('alpha');
     expect(alpha.description).toBe('api');
     expect(alpha.sourceType).toBe('local');
     expect(alpha.warning).toBeNull();
+    expect(alpha.staleCount).toBe(0);
     expect(alpha.distributedAgents).toEqual([]);
   });
 

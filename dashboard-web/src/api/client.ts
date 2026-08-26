@@ -7,6 +7,8 @@ export type SkillRowState = {
   sourceType: string;
   hasUpdate: boolean;
   warning: 'broken-link' | 'outdated-copy' | null;
+  /** Number of stale copy targets for this skill (ADR-0008). Always 0 for symlink-only skills. */
+  staleCount: number;
   distributedAgents: string[];
 };
 
@@ -91,6 +93,13 @@ export function removeSkills(skills: string[]) {
 
 export function updateSkills(skills: string[]) {
   return api<{ updated: string[] }>('/api/update/skills', { method: 'POST', body: JSON.stringify({ skills }) });
+}
+
+export type RefreshResult = { refreshed: number; errored: number; errors: Array<{ runtimePath: string; message: string }> };
+
+/** Refresh every stale copy target of `skill` (ADR-0008). Per-entry failures are surfaced via `errors`, never thrown. */
+export function refreshSkill(skill: string) {
+  return api<RefreshResult>('/api/distribute/refresh', { method: 'POST', body: JSON.stringify({ skill }) });
 }
 
 export type DiscoveredSkill = { name: string; title: string; description: string; subpath: string };

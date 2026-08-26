@@ -107,6 +107,18 @@ const updatingAll = computed(() => {
   return names.length > 0 && names.every((name) => updating.value.has(name));
 });
 
+// ADR-0008: refresh one skill's stale copy targets. Backend returns the
+// per-entry error list; we refetch state so the badge / warning / staleCount
+// update from the new hub fingerprint.
+async function onRefreshed(name: string) {
+  try {
+    state.value = await fetchState();
+    show('ok', t('notice.refreshed', { skill: name }));
+  } catch (error) {
+    show('error', errorMessage(error));
+  }
+}
+
 async function runUpdate(names: string[]) {
   if (names.length === 0) return;
   updating.value = new Set(names);
@@ -183,6 +195,7 @@ async function onRemoveConfirm() {
         <button @click="setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')">
           {{ locale === 'zh-CN' ? 'EN' : '中文' }}
         </button>
+        <a href="https://github.com/shenysun/skills-manager" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </header>
     <p class="sub">{{ t('library.count', state?.skills.length ?? 0) }}</p>
@@ -201,6 +214,11 @@ async function onRemoveConfirm() {
     <div v-if="loadError" class="error">
       <p class="title">{{ t('error.loadFailed', { message: loadError }) }}</p>
       <button class="retry" @click="load">{{ t('error.retry') }}</button>
+    </div>
+
+    <div v-else-if="!state" class="loading" role="status">
+      <span class="loading-mark" aria-hidden="true"></span>
+      {{ t('library.loading') }}
     </div>
 
     <template v-else-if="state">
@@ -230,6 +248,7 @@ async function onRemoveConfirm() {
         @undistribute="(skill) => (undistributeTarget = skill)"
         @remove="(skill) => (removeTargets = [skill])"
         @preview="(skill) => (previewTarget = skill)"
+        @refreshed="onRefreshed"
       />
     </template>
 

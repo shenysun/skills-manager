@@ -2,6 +2,7 @@ export default {
   library: {
     title: '技能库',
     count: '{n} 个技能',
+    loading: '加载中…',
   },
   search: {
     placeholder: '搜索技能 / 分类 / 描述…',
@@ -12,6 +13,8 @@ export default {
     warningOutdated: '⚠ 副本过期',
     agents: '{n} agents',
     unlinked: '未接入',
+    staleBadge: '落后 {count}',
+    staleHint: '{count} 个 copy 副本落后于 hub',
   },
   row: {
     noDescription: '无描述',
@@ -29,6 +32,8 @@ export default {
     distribute: '接入',
     update: '更新',
     updating: '更新中…',
+    refresh: '刷新副本',
+    refreshing: '刷新中…',
   },
   strip: {
     text: '{n} 个技能可更新',
@@ -118,6 +123,7 @@ export default {
     installed: '已安装:{skills}',
     imported: '已导入:{skills}',
     importFailed: '导入失败:{skill} —{message}',
+    refreshed: '已刷新 {skill} 的副本',
   },
   remove: {
     title: '从库中移除',

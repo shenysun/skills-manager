@@ -328,6 +328,23 @@ export class DistributeService {
     return this.loadIndex();
   }
 
+  /**
+   * Per-skill count of distribution entries that are stale or errored.
+   * `entryOutdated` short-circuits on symlink entries, so symlinks are
+   * never counted — same rule the cascade refresh uses.
+   */
+  staleSummary(): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const record of this.loadIndex()) {
+      for (const entry of record.entries) {
+        if (entry.error || this.entryOutdated(entry)) {
+          result[entry.skill] = (result[entry.skill] ?? 0) + 1;
+        }
+      }
+    }
+    return result;
+  }
+
   private applyOne(target: TargetRef, skill: SkillName, group: PhysicalGroup, mode: DistributeMode, fingerprint: string, appliedAt: string, force: boolean): DistributionIndexEntry {
     const runtimePath = path.join(group.runtimeDir, skill);
     this.fs.makeDirectory(group.runtimeDir);
