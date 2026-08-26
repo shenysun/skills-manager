@@ -49,7 +49,7 @@ Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--age
 
 The agent table (ids, runtime paths, detection rules) ships as a bundled snapshot extracted from [vercel-labs/skills](https://github.com/vercel-labs/skills) (MIT; attribution inside the file). `skills-manager catalog info` shows the snapshot stamp (upstream commit, date, age) and the detected agent set — the same determination `npx skills` makes with no `-a`. `skills-manager catalog refresh` re-downloads upstream, re-extracts, and stores the newer snapshot as a hub-local override at `<home>/.skills/agent-catalog.json`; doctor warns when the effective snapshot is older than 90 days.
 
-To regenerate the checked-in snapshot during development: `npm run catalog:extract` (downloads `src/agents.ts` + `src/detect-agent.ts`, extracts, writes `src/core/catalog/agent-catalog.json`).
+To regenerate the checked-in snapshot during development: `pnpm run catalog:extract` (downloads `src/agents.ts` + `src/detect-agent.ts`, extracts, writes `src/core/catalog/agent-catalog.json`).
 
 `<source>` can be a GitHub shorthand (`owner/repo`), Git URL, GitHub tree URL, or local path.
 
@@ -65,19 +65,9 @@ The dashboard serves a local Vue/Vite UI backed by Fastify routes. Mutating dash
 ## Development
 
 ```sh
-npm install
-npm run build
-npm run smoke:core
-npm run smoke:cli
-npm run smoke:api
-npm run smoke:package
+pnpm install
+pnpm run build
+pnpm test
 ```
 
-For publish checks:
-
-```sh
-npm pack --dry-run
-npm pack
-npm install -g ./shenysun-skills-manager-*.tgz
-skills-manager doctor --home /tmp/skills-home
-```
+The test suite includes compiled-artifact coverage: `tests/cli/cli-bin.test.ts` boots `dist/cli.js` as a real subprocess (home resolution, help, migrate-views), and `tests/package/package-smoke.test.ts` packs the tarball, installs it into a temp dir, and drives the installed bin plus the dashboard API.

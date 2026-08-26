@@ -14,6 +14,8 @@ npx @shenysun/skills-manager dashboard
 
 ```bash
 npm install -g @shenysun/skills-manager
+# or
+pnpm add -g @shenysun/skills-manager
 skills-manager dashboard
 ```
 

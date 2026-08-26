@@ -48,7 +48,7 @@ function staticRoot(projectRoot?: string) {
     buildDashboardWeb(projectRoot);
     found = candidates.find((candidate) => hasDashboardIndex(candidate));
   }
-  if (!found) throw new Error('Dashboard build output not found. Run npm run build first.');
+  if (!found) throw new Error('Dashboard build output not found. Run pnpm run build first.');
   return found;
 }
 

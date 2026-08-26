@@ -23,6 +23,8 @@ Or install globally:
 
 ```sh
 npm install -g @shenysun/skills-manager
+# or
+pnpm add -g @shenysun/skills-manager
 skills-manager dashboard
 ```
 
@@ -40,6 +42,8 @@ Or install globally from a published package or packed tarball:
 
 ```sh
 npm install -g @shenysun/skills-manager
+# or
+pnpm add -g @shenysun/skills-manager
 skills-manager dashboard
 skills-manager doctor
 ```
@@ -85,14 +89,9 @@ Sources can be GitHub shorthand (`owner/repo`), Git URLs, GitHub tree URLs, or l
 ## Development
 
 ```sh
-npm install
-npm run build
-npm run smoke:core
-npm run smoke:cli
-npm run smoke:distribute
-npm run smoke:init
-npm run smoke:api
-npm run smoke:package
+pnpm install
+pnpm run build
+pnpm test
 ```
 
 ## Documentation

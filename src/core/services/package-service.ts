@@ -22,7 +22,7 @@ export class PackageService {
   }
 
   packDryRun() {
-    const result = this.runner.run('npm', ['pack', '--dry-run', '--json'], { cwd: this.projectRoot });
+    const result = this.runner.run('pnpm', ['pack', '--dry-run', '--json'], { cwd: this.projectRoot });
     return { ok: result.status === 0, stdout: result.stdout, stderr: result.stderr };
   }
 }

@@ -2,7 +2,7 @@
  * One-shot catalog snapshot extractor (build-time action; see ADR-0004).
  * Downloads upstream vercel-labs/skills sources, extracts the agent table
  * as data, and writes src/core/catalog/agent-catalog.json. Repeatable:
- * `npm run catalog:extract`. This is the same extraction `catalog refresh`
+ * `pnpm run catalog:extract`. This is the same extraction `catalog refresh`
  * performs at runtime, minus the download target.
  */
 import { writeFileSync } from 'node:fs';
