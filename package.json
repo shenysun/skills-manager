@@ -34,7 +34,7 @@
     "cli",
     "dashboard"
   ],
-  "author": "shenysun",
+  "author": "shenysun <shenysun@163.com>",
   "license": "MIT",
   "type": "module",
   "dependencies": {
