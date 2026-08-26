@@ -52,16 +52,8 @@ beforeEach(() => {
       { skill: 'alpha', consumer: 'agents', mode: 'symlink', fingerprint: 'sha256:old', runtimePath: path.join(project, '.agents', 'skills', 'alpha') },
     ],
   })}\n`);
-  mkdirSync(path.join(project, '.skills-manager'), { recursive: true });
   mkdirSync(path.join(project, '.agents', 'skills'), { recursive: true });
   symlinkSync(path.join(home, 'skills', 'alpha'), path.join(project, '.agents', 'skills', 'alpha'));
-  mkdirSync(path.join(project, '.skills-manager'), { recursive: true });
-  writeFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), YAML.stringify({
-    version: 1,
-    hubRoot: home,
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    skills: { alpha: { agents: { mode: 'symlink', fingerprint: 'sha256:old', appliedAt: '2026-01-01T00:00:00.000Z' } } },
-  }));
 });
 
 afterEach(() => {
@@ -107,26 +99,22 @@ describe('migrate-consumers', () => {
     const before = {
       registry: readFileSync(path.join(home, 'registry.yaml'), 'utf8'),
       index: readFileSync(path.join(home, '.skills', 'distributions.jsonl'), 'utf8'),
-      receipt: readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8'),
     };
     const plan = s.migration.plan();
     expect(plan.agentMapping).toEqual({ claude: ['claude-code'], agents: SHARED_FAMILY });
     expect(plan.registryChanges).toEqual([{ skill: 'alpha', from: ['agents', 'claude'], to: ['claude-code', ...SHARED_FAMILY] }]);
     expect(plan.indexEntries).toBe(3);
-    expect(plan.receipts).toEqual([path.join(project, '.skills-manager', 'distribute.yaml')]);
     expect(readFileSync(path.join(home, 'registry.yaml'), 'utf8')).toBe(before.registry);
     expect(readFileSync(path.join(home, '.skills', 'distributions.jsonl'), 'utf8')).toBe(before.index);
-    expect(readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8')).toBe(before.receipt);
   });
 
-  it('migrates registry, index, and receipt to catalog ids with identical physical placement', () => {
+  it('migrates registry and index to catalog ids with identical physical placement', () => {
     const s = services();
     const agentsRuntime = path.join(userHome, '.agents', 'skills', 'alpha');
     const claudeRuntime = path.join(userHome, '.claude', 'skills', 'alpha');
     const result = s.migration.apply();
     expect(result.migrated.registrySkills).toEqual(['alpha']);
     expect(result.migrated.indexEntries).toBe(3);
-    expect(result.migrated.receipts).toEqual([path.join(project, '.skills-manager', 'distribute.yaml')]);
 
     const registry = s.registry.load();
     expect(registry.skills.alpha.consumers?.sort()).toEqual([...SHARED_FAMILY, 'claude-code'].sort());
@@ -138,10 +126,6 @@ describe('migrate-consumers', () => {
     expect(shared?.managed).toBe(true);
     const claude = record?.entries.find((entry) => entry.runtimePath === claudeRuntime);
     expect(claude?.agents).toEqual(['claude-code']);
-
-    const receipt = YAML.parse(readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8')) as { version: number; skills: Record<string, { entries: Array<{ agents: string[] }> }> };
-    expect(receipt.version).toBe(2);
-    expect(receipt.skills.alpha.entries[0].agents.sort()).toEqual(SHARED_FAMILY);
 
     // Identity: physical placement unchanged, byte-for-byte the same link targets.
     expect(existsSync(agentsRuntime)).toBe(true);
@@ -162,14 +146,12 @@ describe('migrate-consumers', () => {
     const before = {
       registry: readFileSync(path.join(home, 'registry.yaml'), 'utf8'),
       index: readFileSync(path.join(home, '.skills', 'distributions.jsonl'), 'utf8'),
-      receipt: readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8'),
     };
     s.migration.apply();
     expect(() => s.registry.load()).not.toThrow();
     s.migration.rollback();
     expect(readFileSync(path.join(home, 'registry.yaml'), 'utf8')).toBe(before.registry);
     expect(readFileSync(path.join(home, '.skills', 'distributions.jsonl'), 'utf8')).toBe(before.index);
-    expect(readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8')).toBe(before.receipt);
     expect(() => s.registry.load()).toThrow(/migrate-consumers/);
   });
 });

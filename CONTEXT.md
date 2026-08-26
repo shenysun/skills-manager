@@ -21,12 +21,14 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager dashboard` for browsing, installing, updating, and distributing skills.
 - **Skill library (dashboard surface)**: The Dashboard UI's single page — hub skills as rows with in-place actions (接入 / 更新 / 删除). Ratified 2026-08-25 in [ADR-0005](docs/adr/0005-dashboard-single-surface-skill-library.md).
   _Avoid_: Overview / Sources / Registry / Activity as dashboard destinations; "primary navigation" as a dashboard concept (superseded five-surface IA of ADR-0002).
+- **Skill preview**: The Dashboard UI's **read-only** viewer for one hub skill, opened from a skill row as a wide Sheet: file tree on the left, selected file's content on the right (`.md` rendered as HTML, source files syntax-highlighted, other files a placeholder). No mutation from the preview.
+  _Avoid_: Editing from the preview; treating preview content as trusted HTML; a second detail surface outside this Sheet.
 - **Skill home / hub**: The **canonical** managed root where skill *content* lives: `skills/`, `collections/` (optional), `registry.yaml`, and distribution index under `.skills/`. Default hub: **`~/.skills-manager`**. Install/update/archive happen only here (unless operator explicitly points `--home` at another hub).
   _Avoid_: A hub-local `views/` tree as an expose layer — **removed from the product model**.
 - **Distribution target**: A user- or project-side place that **receives a selected subset** of hub skills for *use*, not a second independent source of truth for the same skill identity.
 - **User distribution**: Publishing hub skills into the operator’s user-level **runtime skill directories**.
 - **Project distribution**: Publishing a subset of hub skills into a given project’s **runtime skill directories**; one hub skill can be distributed to many projects.
-- **Distribution receipt**: Manifest/state recording what was distributed where — a **physical layer** (path, mode, fingerprint, managed marker) plus a **logical layer** (the catalog agent ids that motivated the write) — project-side and/or hub-side index; **not** a second canonical skill library.
+- **Distribution index**: The hub-side record of what was distributed where — `.skills/distributions.jsonl`, one record per target (user or project) whose entries carry a **physical layer** (path, mode, fingerprint, managed marker) plus a **logical layer** (the catalog agent ids that motivated the write); **not** a second canonical skill library. Projects carry no distribution metadata (see [ADR-0007](docs/adr/0007-project-no-in-repo-metadata.md)).
   _Avoid_: Managing the same logical skill as separate full trees in every project home as the primary model.
 - **Import (init)**: `skills-manager init` — the **reverse of distribute**: discover skills already living in detected agents' global runtime directories and fold them into the hub. Content moves into hub `skills/<name>/`; each originating runtime path becomes a symlink back to it (original moved to a Backup first). Imported entries carry `imported: true` with no source — skills-manager does not guess provenance or manage their updates. Ratified 2026-08-25 in [ADR-0006](docs/adr/0006-init-reverse-import-symlinks.md).
   _Avoid_: Copying runtime trees while leaving originals live (two canonical copies); scanning directories outside the catalog; guessing upstream repos.
@@ -49,7 +51,7 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 
 - Cross-project reuse: same skill stays **one** object in the hub; distribute (or re-distribute) to each project that needs it.
 - Dual full homes as *two sources of truth* is **rejected** for the same skill identity (forked updates, multi-copy disk, no single update).
-- Absolute project → hub symlinks alone are **insufficient** for teammates without that hub; distribution mechanism must still address portability (open).
+- Absolute project → hub symlinks alone are **insufficient** for teammates without that hub; portability is answered by **copy + git** (the project collaboration model, [ADR-0007](docs/adr/0007-project-no-in-repo-metadata.md)) — no in-repo manifest required.
 
 ### Distribution modes (ratified)
 
@@ -109,28 +111,32 @@ Paths come from the **vercel-labs/skills agent table** (global vs project column
 - Registry may still store agent *tags* as metadata defaults; they must be catalog ids (or migrate from legacy `agents`/`claude`), and they do not imply a views tree.
 - **Collections** (category symlink trees under hub `collections/`) **remain** for organization/browsing only — not a consumer load path. Distinct from removed `views/`.
 
-### Distribution receipts (ratified — L1)
+### Distribution records (ratified — L1; in-repo receipt removed 2026-08-26, ADR-0007)
 
-- **Project receipt:** `<project-root>/.skills-manager/distribute.yaml`  
-  Records which hub skills are distributed to this project, per-consumer, mode (`symlink`|`copy`), and hub content fingerprint / ref for outdated checks. Safe to commit for team visibility of “what this repo uses.”
-- **Hub distribution index:** under the hub (e.g. `.skills/distributions.jsonl` or equivalent)  
-  Records targets (user or project paths) and skill sets so the hub can list subscribers and drive `redistribute --outdated` without scanning the whole disk.
+- **Hub distribution index — the only distribution record:** `.skills/distributions.jsonl` under the hub.  
+  Records every target (user or project paths) and its entries (skill, runtime path, mode, fingerprint, managed marker, agents, appliedAt) so the hub can list subscribers and drive `redistribute --outdated` without scanning the whole disk.
+- **No in-repo metadata:** a distributed project contains only skill entries (copy contents or symlinks) — no `.skills-manager/` directory, no receipt, no backups.
 - Runtime dirs (`.agents/skills`, `.claude/skills`) stay skill entries only — no manifest clutter inside them.
+
+### Project collaboration model (ratified 2026-08-26, ADR-0007)
+
+- **git is the sync channel.** Project default `copy` materializes skill contents into the repo; committing them is how skills reach collaborators.
+- **Distribution authority stays with the first distributor.** Teammates are pure consumers: committed contents load directly, their machines keep no record, and the C1 foreign-refusal against re-distributing the same path is protection, not a bug (takeover requires explicit `--force`).
 
 ### Conflict policy (ratified — C1)
 
 When a runtime path `…/skills/<name>` already exists:
 
-- **Managed** (created/recorded by skills-manager via receipt/index/marker): may be updated in place by re-distribute (respecting mode).
+- **Managed** (created/recorded by skills-manager via the hub index): may be updated in place by re-distribute (respecting mode).
 - **Foreign** (not managed): **refuse by default**; overwrite only with explicit `--force` / UI confirm.
 - Never silently destroy unmanaged skill trees.
 
 ### Outdated, re-distribute, rollback (ratified — U1)
 
-- **Fingerprint:** each distribution receipt stores a hub skill fingerprint (content hash and/or hub/upstream commit identity).
-- **Outdated:** fingerprint mismatch between receipt and current hub skill ⇒ target is outdated (applies to **copy**; symlink still records fingerprint for audit, but content is live via link).
+- **Fingerprint:** each hub-index entry stores a hub skill fingerprint (content hash and/or hub/upstream commit identity).
+- **Outdated:** fingerprint mismatch between index entry and current hub skill ⇒ target is outdated (applies to **copy**; symlink still records fingerprint for audit, but content is live via link).
 - **Re-distribute:** idempotent apply for **managed** targets; hub index enables `redistribute --outdated` across known targets.
-- **Rollback:** each successful apply keeps a restore point (implementation may use `.skills-manager/backups/` on project targets and a hub-side stash for user targets) so `distribute rollback` can restore the previous managed state.
+- **Rollback (user targets only):** each successful user apply keeps a hub-side restore point (`.skills/distribute-backups/`) so `distribute rollback` can restore the previous managed state. Project takes no snapshots — git is its restore point; `distribute rollback` on a project target errors (`project rollback not supported`).
 
 ### Collections (ratified — K1)
 
@@ -142,12 +148,12 @@ Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agen
 
 1. **Catalog data** — bundled snapshot (extracted from upstream `src/agents.ts`; MIT, attribution kept; stamped with upstream commit + date) + explicit `catalog refresh` command. No runtime fetch, no shelling out to `npx skills`.
 2. **Detection** — detection rules ship **as data inside the snapshot**; the same rule runs locally against the same data. Detected is only: the CLI default target when no `--agent` is given, and first-open picker checks. Never a gate.
-3. **Receipts are dual-layer** — the physical entry (path, mode, fingerprint, managed marker) carries undistribute / outdated / foreign-refusal; the logical layer (agent id list) carries provenance and display. Shared-path undistribute uses **reference counting**: the physical entry is removed only when its last referencing agent is undistributed.
-4. **No-baggage migration** — the loader **hard-fails** on legacy `agents`/`claude` tags with an actionable error pointing at `migrate-consumers`, which rewrites `registry.yaml` **and** existing hub receipts/index in one shot (dry-run + rollback). Mapping is identity-preserving: `claude` → `claude-code`; `agents` → every catalog id whose global path is `~/.agents/skills` (6 ids in the current snapshot; the project-path family on `.agents/skills` is the ~30-agent group). Zero permanent translation layer. (Supersedes an earlier in-grill lean toward permanent read-time normalization.)
+3. **Distribution index entries are dual-layer** — the physical entry (path, mode, fingerprint, managed marker) carries undistribute / outdated / foreign-refusal; the logical layer (agent id list) carries provenance and display. Shared-path undistribute uses **reference counting**: the physical entry is removed only when its last referencing agent is undistributed.
+4. **No-baggage migration** — the loader **hard-fails** on legacy `agents`/`claude` tags with an actionable error pointing at `migrate-consumers`, which rewrites `registry.yaml` **and** the hub index in one shot (dry-run + rollback; its former project-receipt leg was removed with the receipt itself, ADR-0007). Mapping is identity-preserving: `claude` → `claude-code`; `agents` → every catalog id whose global path is `~/.agents/skills` (6 ids in the current snapshot; the project-path family on `.agents/skills` is the ~30-agent group). Zero permanent translation layer. (Supersedes an earlier in-grill lean toward permanent read-time normalization.)
 5. **Scope axis** — user/project stays orthogonal to agent selection and is chosen first; the picker filters validity per scope. Project-only agents (`eve`, `promptscript`) appear **grayed with a reason** on user scope, not hidden.
 6. **CLI surface** — `--agent <id...>` is the only selection flag; `--consumer`, `expose`, `hide`, `rebuild-views` are **deleted** (pre-publish break; the package has zero external users today). `--migrate-views` stays.
 7. **Picker shape** — search box + two sections (已检测 / 全部目录); family **select-all** on shared paths is pure UI sugar over an agent-id selection; one mode selector per apply (defaults user→symlink, project→copy); scope toggle at sheet top; memory is **per scope** and equals exactly the last confirmed apply. Amended 2026-08-25 (distribute-picker-ux): under the search box sits a quick-action line — **全选 / 全选已检测 / 清空** — acting on the visible (search-filtered) set: invisible rows keep their ticks, invalid agents never join; family headers (and their select-all) render only for families with ≥2 members — singletons lie flat as plain rows; project scope prefills `knownProjects[0]` — from `/api/state`, a read-only derivation of hub-index `kind=project` records ordered by `updatedAt` desc — into a native `<datalist>`, and an empty project path disables apply (the catalog endpoint 400s a rootless project query instead of falling back to the server cwd).
-8. **Physical-first display & doctor** — badges show one chip per physical target with agent drill-down; Overview reports managed-entry count + unique agent coverage (replacing the `agents`/`claude` count fields); doctor scans only paths known from the hub index (plus the active project receipt), never the whole catalog.
+8. **Physical-first display & doctor** — badges show one chip per physical target with agent drill-down; Overview reports managed-entry count + unique agent coverage (replacing the `agents`/`claude` count fields); doctor scans only paths known from the hub index, never the whole catalog.
 9. **Dialog scroll lock** (2026-08-25, distribute-picker-ux) — the Sheet base component locks body scroll while any dialog (接入 picker, 撤除, add wizard, confirm) is open and restores it on close; a module-level open-count makes nested dialogs keep the lock until the last one closes, and `scrollbar-gutter: stable` on `html` prevents the hidden scrollbar from shifting the page sideways.
 
 ### Design status
@@ -172,8 +178,8 @@ The project is evolving from a local skill repository into a publishable npm pac
 
 - Keep the canonical `skills/` tree flat: `skills/<skill-name>/SKILL.md`.
 - Do **not** reintroduce hub `views/<consumer>/` as the expose mechanism; consumer wiring is **distribute** to runtime paths only.
-- Prefer registry-driven operations and distribution receipts over ad-hoc filesystem edits.
-- Treat remote `SKILL.md` metadata as untrusted; validate skill names and path containment before copying.
+- Prefer registry-driven operations and the hub distribution index over ad-hoc filesystem edits.
+- Treat remote `SKILL.md` metadata as untrusted; validate skill names and path containment before copying. The same applies to **file content shown in the dashboard**: skill bodies come from third-party sources and must be sanitized before insertion into the DOM.
 - Live writes under user/project agent runtime skill directories are allowed **only** via the planned **distribute** feature (symlink|copy), with doctor/rollback semantics; ad-hoc undocumented mutation of those paths remains out of scope until distribute ships.
 
 ## Product decisions
@@ -202,7 +208,8 @@ Use **dashboard** consistently for the local web UI. Code and package paths shou
 
 The dashboard is **one page** — the skill library — plus two entries:
 
-- **Skill library** (the only page): every hub skill is a row with in-place actions — 接入 (opens the any-agent picker), update, remove. **Remove is one-step**: undistribute all + archive, behind a confirm that states the consequence. A standalone **撤除接入** (agent-side only, skill stays in the library) also exists in row overflow. Search/filter stay; category tooling collapses into row overflow. **Batch is one unified pattern — selection mode**: checkboxes are invisible until hover; checking the first one enters selection mode with a floating bottom bar (已选 N · 更新 / 接入 / 移除 · 取消); Esc or 取消 exits. No persistent multi-select toolbar, no per-source group selector. A top inline strip `N 个可更新 · 全部更新` appears only when updates exist and executes directly. Doctor signal (broken links, outdated copies) becomes per-row status marks.
+- **Skill library** (the only page): every hub skill is a row with in-place actions — 接入 (opens the any-agent picker), update, remove. **Remove is one-step**: undistribute all + archive, behind a confirm that states the consequence. A standalone **撤除接入** (agent-side only, skill stays in the library) also exists in row overflow. Search/filter stay; category tooling collapses into row overflow. **Batch is one unified pattern — selection mode**: checkboxes are invisible until hover; checking the first one enters selection mode with a floating bottom bar (已选 N · 更新 / 接入 / 移除 · 取消); Esc or 取消 exits. While selection mode is active, clicking anywhere on a row toggles its checkbox (the row-name preview entry is suspended); it resumes when selection mode exits. No persistent multi-select toolbar, no per-source group selector. A top inline strip `N 个可更新 · 全部更新` appears only when updates exist and executes directly. Doctor signal (broken links, outdated copies) becomes per-row status marks.
+- **Skill preview entry** (ratified 2026-08-25): clicking a skill row's **name** opens the **Skill preview** Sheet (also reachable from row overflow). Skill rows otherwise keep no whole-row click behavior.
 - **+ 添加技能** (top-right): opens the source-first install wizard. The Sources surface disappears; the wizard survives.
 - **日志** drawer (top-right): the operation log survives as a drawer. The Activity surface disappears.
 
@@ -212,7 +219,7 @@ Rationale: the measured daily line is distribute / remove / install / update —
 
 All legacy hashes redirect to the single page.
 
-**Implementation posture (ratified 2026-08-25):** `dashboard-web` is **rewritten from scratch** — new code and components, no migration of old component code; behaviour follows ADR-0004 (picker, receipts) and ADR-0005 (IA). The HTTP API layer is trimmed: dead dashboard endpoints deleted, single-page endpoints kept or adjusted. Core services and CLI are untouched. Vue 3 stays; i18n (zh/en) and light/dark theme remain as small topbar toggles.
+**Implementation posture (ratified 2026-08-25):** `dashboard-web` is **rewritten from scratch** — new code and components, no migration of old component code; behaviour follows ADR-0004 (picker, index entries) and ADR-0005 (IA). The HTTP API layer is trimmed: dead dashboard endpoints deleted, single-page endpoints kept or adjusted. Core services and CLI are untouched. Vue 3 stays; i18n (zh/en) and light/dark theme remain as small topbar toggles.
 
 **Visual baseline (ratified via prototype 2026-08-25; implemented by the 2026-08-25 rewrite):** the **typographic flow** variant won (prototype variant C; the three-variant file is preserved on the throwaway branch `prototype/single-surface-skill-library`). The question settled: what the single-page skill library looks like. Baseline traits, as implemented by the rewrite:
 
@@ -226,4 +233,4 @@ Losing variants (A compact table rows, B airy cards) were rejected for chrome/vi
 
 ### Default skill home (hub)
 
-When no `--home` and no `SKILL_HOME` are provided, and cwd is not already a full skill-home layout, use the **hub** at `~/.skills-manager` (create if missing). Project paths are **distribution targets**, not the default management home. (Auto-detecting “open dashboard against project receipt while editing that repo” remains open.)
+When no `--home` and no `SKILL_HOME` are provided, and cwd is not already a full skill-home layout, use the **hub** at `~/.skills-manager` (create if missing). Project paths are **distribution targets**, not the default management home.

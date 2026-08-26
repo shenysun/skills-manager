@@ -8,21 +8,19 @@ import { SkillsManagerError } from '../../shared/errors.js';
 import { isLegacyConsumer } from '../../shared/validation.js';
 import { type DistributionIndexEntry, type DistributionIndexRecord } from '../model/index.js';
 
-/** Legacy one-shot bridge (ADR-0004): rewrite registry tags and hub receipts/index onto catalog ids. No translation code survives it. */
+/** Legacy one-shot bridge (ADR-0004): rewrite registry tags and the hub index onto catalog ids. No translation code survives it. */
 
 type LegacyIndexEntry = { skill: string; consumer: string; mode: 'symlink' | 'copy'; fingerprint: string; runtimePath: string };
 type LegacyRecord = { id: string; kind: 'user' | 'project'; targetRoot: string; updatedAt: string; entries: LegacyIndexEntry[] };
-type LegacyReceipt = { version: 1; hubRoot: string; updatedAt: string; skills: Record<string, Record<string, { mode: 'symlink' | 'copy'; fingerprint: string; appliedAt: string }>> };
 
 export type MigrationPlan = {
   agentMapping: Record<string, string[]>;
   registryChanges: Array<{ skill: string; from: string[]; to: string[] }>;
   indexEntries: number;
-  receipts: string[];
 };
 
 export type MigrationResult = {
-  migrated: { registrySkills: string[]; indexEntries: number; receipts: string[] };
+  migrated: { registrySkills: string[]; indexEntries: number };
   backupDir: string;
 };
 
@@ -51,8 +49,7 @@ export class MigrationService {
       registryChanges.push({ skill, from: consumers, to });
     }
     const records = this.readRawIndex();
-    const receipts = records.filter((record) => record.kind === 'project').map((record) => this.receiptPath(record.targetRoot)).filter((file) => this.fs.kind(file) === 'file');
-    return { agentMapping: mapping, registryChanges, indexEntries: records.reduce((count, record) => count + record.entries.filter((entry) => isLegacyConsumer(entry.consumer)).length, 0), receipts };
+    return { agentMapping: mapping, registryChanges, indexEntries: records.reduce((count, record) => count + record.entries.filter((entry) => isLegacyConsumer(entry.consumer)).length, 0) };
   }
 
   apply(): MigrationResult {
@@ -96,38 +93,7 @@ export class MigrationService {
     this.fs.writeText(path.join(backupDir, 'distributions.jsonl'), this.fs.readText(this.distribute.indexPath()));
     this.fs.writeText(this.distribute.indexPath(), migratedRecords.map((record) => JSON.stringify(record)).join('\n') + (migratedRecords.length ? '\n' : ''));
 
-    // 3. Project receipts: version 1 per-consumer maps → version 2 dual-layer entries.
-    const receiptBackups: Record<string, string> = {};
-    for (const receiptFile of plan.receipts) {
-      const legacy = YAML.parse(this.fs.readText(receiptFile)) as LegacyReceipt;
-      const record = records.find((item) => this.receiptPath(item.targetRoot) === receiptFile);
-      const skills: Record<string, { entries: Array<{ path: string; mode: 'symlink' | 'copy'; fingerprint: string; managed: boolean; agents: string[]; appliedAt: string }> }> = {};
-      for (const [skill, perConsumer] of Object.entries(legacy.skills || {})) {
-        const entries = [];
-        for (const [consumer, info] of Object.entries(perConsumer || {})) {
-          if (!isLegacyConsumer(consumer)) continue;
-          const fromIndex = record?.entries.find((item) => item.skill === skill && item.consumer === consumer);
-          const projectRoot = path.dirname(path.dirname(receiptFile));
-          const derived = path.join(projectRoot, `.${consumer}`, 'skills', skill);
-          entries.push({
-            path: fromIndex?.runtimePath ?? derived,
-            mode: info.mode,
-            fingerprint: info.fingerprint,
-            managed: true,
-            agents: mapping[consumer],
-            appliedAt: info.appliedAt,
-          });
-        }
-        if (entries.length > 0) skills[skill] = { entries };
-      }
-      const backupName = this.safeName(receiptFile);
-      receiptBackups[backupName] = receiptFile;
-      this.fs.writeText(path.join(backupDir, backupName), this.fs.readText(receiptFile));
-      this.fs.writeText(receiptFile, YAML.stringify({ version: 2, hubRoot: legacy.hubRoot, updatedAt: legacy.updatedAt, skills }, { lineWidth: 0 }));
-    }
-    this.fs.writeText(path.join(backupDir, 'manifest.json'), JSON.stringify({ receipts: receiptBackups }, null, 2));
-
-    return { migrated: { registrySkills, indexEntries, receipts: plan.receipts }, backupDir };
+    return { migrated: { registrySkills, indexEntries }, backupDir };
   }
 
   rollback() {
@@ -138,18 +104,6 @@ export class MigrationService {
     const dir = path.join(root, latest);
     this.fs.writeText(this.home.registryFile, this.fs.readText(path.join(dir, 'registry.yaml')));
     this.fs.writeText(this.distribute.indexPath(), this.fs.readText(path.join(dir, 'distributions.jsonl')));
-    const manifest = JSON.parse(this.fs.readText(path.join(dir, 'manifest.json'))) as { receipts: Record<string, string> };
-    for (const [backupName, original] of Object.entries(manifest.receipts)) {
-      this.fs.writeText(original, this.fs.readText(path.join(dir, backupName)));
-    }
-  }
-
-  private receiptPath(projectRoot: string) {
-    return path.join(projectRoot, '.skills-manager', 'distribute.yaml');
-  }
-
-  private safeName(file: string) {
-    return `receipt-${file.replace(/[^A-Za-z0-9._-]+/g, '_')}`;
   }
 
   private readRawRegistry(): Record<string, { consumers?: string[]; [key: string]: unknown }> {

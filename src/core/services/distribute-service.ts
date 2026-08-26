@@ -39,27 +39,10 @@ type PhysicalGroup = {
   agents: string[];
 };
 
-type ReceiptEntry = {
-  path: string;
-  mode: DistributeMode;
-  fingerprint: string;
-  managed: boolean;
-  agents: string[];
-  appliedAt: string;
-};
-
-type ReceiptFile = {
-  version: 2;
-  hubRoot: string;
-  updatedAt: string;
-  skills: Record<string, { entries: ReceiptEntry[] }>;
-};
-
 type SnapshotManifest = {
   kind: DistributionTargetKind;
   targetRoot: string;
   record: DistributionIndexRecord | null;
-  receipt: ReceiptFile | null;
 };
 
 export class DistributeService {
@@ -77,7 +60,7 @@ export class DistributeService {
     const skills = this.requireCanonicalSkills(request.skills);
     const mode = request.mode ?? (request.to === 'user' ? 'symlink' : 'copy');
     this.assertMode(mode);
-    this.snapshot(target);
+    this.snapshotRestorePoint(target);
     const appliedAt = new Date().toISOString();
     const groups = this.physicalGroups(agents, target);
     const entries: DistributionIndexEntry[] = [];
@@ -95,7 +78,7 @@ export class DistributeService {
     const agents = this.resolveAgents(request.agents);
     const skills = [...request.skills];
     for (const skill of skills) assertSafeSkillName(skill);
-    this.snapshot(target);
+    this.snapshotRestorePoint(target);
     const record = this.loadRecord(target.id);
     const kept: DistributionIndexEntry[] = [];
     const removed: DistributionIndexEntry[] = [];
@@ -117,7 +100,6 @@ export class DistributeService {
       }
     }
     this.writeRecord(target, kept);
-    if (target.kind === 'project') this.syncReceiptFromRecord(target);
     return { target, removed };
   }
 
@@ -147,6 +129,9 @@ export class DistributeService {
 
   rollback(to: DistributionTargetKind, projectRoot?: string) {
     const target = this.resolveTarget(to, projectRoot);
+    if (target.kind === 'project') {
+      throw new SkillsManagerError('distribute_project_rollback_unsupported', 'project rollback not supported — git is the restore point for project targets');
+    }
     const latest = this.latestBackupDir(target);
     if (!latest) throw new SkillsManagerError('distribute_no_rollback', `No restore point for ${target.id}`);
     const manifest = YAML.parse(this.fs.readText(path.join(latest, 'manifest.yaml'))) as SnapshotManifest;
@@ -166,10 +151,6 @@ export class DistributeService {
     }
     if (manifest.record) this.replaceIndexRecord(manifest.record);
     else this.writeRecord(target, []);
-    if (target.kind === 'project') {
-      if (manifest.receipt) this.fs.writeText(this.receiptPath(target.targetRoot), YAML.stringify(manifest.receipt, { lineWidth: 0 }));
-      else if (this.fs.exists(this.receiptPath(target.targetRoot))) this.fs.removeFileOrSymlink(this.receiptPath(target.targetRoot));
-    }
     return { target, restoredFrom: latest };
   }
 
@@ -279,13 +260,6 @@ export class DistributeService {
     return this.loadIndex();
   }
 
-  /** Physical entries recorded in a project's receipt — the scan source for machines without the hub index. */
-  projectReceiptEntries(projectRoot: string) {
-    const receipt = this.safeLoadReceipt(path.resolve(projectRoot));
-    if (!receipt) return [];
-    return Object.entries(receipt.skills).flatMap(([skill, item]) => item.entries.map((entry) => ({ skill, ...entry })));
-  }
-
   private applyOne(target: TargetRef, skill: SkillName, group: PhysicalGroup, mode: DistributeMode, fingerprint: string, appliedAt: string, force: boolean): DistributionIndexEntry {
     const runtimePath = path.join(group.runtimeDir, skill);
     this.fs.makeDirectory(group.runtimeDir);
@@ -304,7 +278,6 @@ export class DistributeService {
     const entry: DistributionIndexEntry = { skill, runtimePath, mode, fingerprint, managed: true, agents, appliedAt };
     const next = [...(record?.entries || []).filter((item) => !(item.skill === skill && item.runtimePath === runtimePath)), entry];
     this.writeRecord(target, next);
-    if (target.kind === 'project') this.upsertReceipt(target, skill, entry);
     return entry;
   }
 
@@ -425,59 +398,17 @@ export class DistributeService {
     this.fs.writeText(this.indexPath(), next.map((item) => JSON.stringify(item)).join('\n') + (next.length ? '\n' : ''));
   }
 
-  private receiptPath(projectRoot: string) {
-    return path.join(projectRoot, '.skills-manager', 'distribute.yaml');
-  }
-
-  private loadReceipt(projectRoot: string): ReceiptFile | null {
-    const file = this.receiptPath(projectRoot);
-    if (this.fs.kind(file) !== 'file') return null;
-    const parsed = YAML.parse(this.fs.readText(file)) as ReceiptFile;
-    if (!parsed || parsed.version !== 2) throw new SkillsManagerError('distribute_unknown_receipt_version', `Unsupported receipt version in ${file} (expected 2). Run \`skills-manager migrate-consumers\` to migrate legacy data.`);
-    return parsed;
-  }
-
-  private upsertReceipt(target: TargetRef, skill: string, entry: DistributionIndexEntry) {
-    const current = this.safeLoadReceipt(target.targetRoot) || { version: 2 as const, hubRoot: this.home.root, updatedAt: entry.appliedAt, skills: {} };
-    const skillReceipt = current.skills[skill] || { entries: [] };
-    const entries = [...skillReceipt.entries.filter((item) => item.path !== entry.runtimePath), this.toReceiptEntry(entry)];
-    const receipt: ReceiptFile = {
-      ...current,
-      hubRoot: this.home.root,
-      updatedAt: entry.appliedAt,
-      skills: { ...current.skills, [skill]: { entries } },
-    };
-    this.fs.makeDirectory(path.dirname(this.receiptPath(target.targetRoot)));
-    this.fs.writeText(this.receiptPath(target.targetRoot), YAML.stringify(receipt, { lineWidth: 0 }));
-  }
-
-  private syncReceiptFromRecord(target: TargetRef) {
-    const record = this.loadRecord(target.id);
-    if (!record || record.entries.length === 0) {
-      if (this.fs.exists(this.receiptPath(target.targetRoot))) this.fs.removeFileOrSymlink(this.receiptPath(target.targetRoot));
-      return;
-    }
-    const skills: ReceiptFile['skills'] = {};
-    for (const entry of record.entries) {
-      const existing = skills[entry.skill] || { entries: [] };
-      skills[entry.skill] = { entries: [...existing.entries, this.toReceiptEntry(entry)] };
-    }
-    const receipt: ReceiptFile = { version: 2, hubRoot: this.home.root, updatedAt: record.updatedAt, skills };
-    this.fs.makeDirectory(path.dirname(this.receiptPath(target.targetRoot)));
-    this.fs.writeText(this.receiptPath(target.targetRoot), YAML.stringify(receipt, { lineWidth: 0 }));
-  }
-
-  private toReceiptEntry(entry: DistributionIndexEntry): ReceiptEntry {
-    return { path: entry.runtimePath, mode: entry.mode, fingerprint: entry.fingerprint, managed: entry.managed, agents: entry.agents, appliedAt: entry.appliedAt };
-  }
-
   private backupRoot(target: TargetRef) {
-    if (target.kind === 'user') return path.join(this.home.root, '.skills', 'distribute-backups', this.safeId(target.id));
-    return path.join(target.targetRoot, '.skills-manager', 'backups');
+    return path.join(this.home.root, '.skills', 'distribute-backups', this.safeId(target.id));
   }
 
   private safeId(id: string) {
     return id.replace(/[^A-Za-z0-9._-]+/g, '_');
+  }
+
+  /** Only user targets keep a hub-side restore point; project targets rely on git (ADR-0007). */
+  private snapshotRestorePoint(target: TargetRef) {
+    if (target.kind === 'user') this.snapshot(target);
   }
 
   private snapshot(target: TargetRef) {
@@ -485,8 +416,7 @@ export class DistributeService {
     const dir = path.join(this.backupRoot(target), timestamp);
     this.fs.makeDirectory(dir);
     const record = this.loadRecord(target.id);
-    const receipt = target.kind === 'project' ? this.safeLoadReceipt(target.targetRoot) : null;
-    this.fs.writeText(path.join(dir, 'manifest.yaml'), YAML.stringify({ kind: target.kind, targetRoot: target.targetRoot, record, receipt } satisfies SnapshotManifest, { lineWidth: 0 }));
+    this.fs.writeText(path.join(dir, 'manifest.yaml'), YAML.stringify({ kind: target.kind, targetRoot: target.targetRoot, record } satisfies SnapshotManifest, { lineWidth: 0 }));
     const trees = path.join(dir, 'trees');
     for (const entry of record?.entries || []) {
       if (this.fs.kind(entry.runtimePath) === 'missing') continue;
@@ -497,14 +427,6 @@ export class DistributeService {
       const kind = this.fs.kind(entry.runtimePath);
       if (kind === 'symlink') this.fs.symlink(this.fs.readlink(entry.runtimePath), dest);
       else if (kind === 'directory') this.fs.copyDirectoryContents(entry.runtimePath, dest);
-    }
-  }
-
-  private safeLoadReceipt(projectRoot: string) {
-    try {
-      return this.loadReceipt(projectRoot);
-    } catch {
-      return null;
     }
   }
 

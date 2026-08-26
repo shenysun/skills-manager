@@ -35,7 +35,6 @@ program.command('dashboard')
 
 program.command('doctor')
   .description('Run health checks')
-  .option('--project <path>', 'also scan this project\'s distribution receipt paths')
   .option('--migrate-views', 'distribute leftover hub views to user runtimes')
   .option('--delete-views', 'with --migrate-views, remove generated view symlinks')
   .option('--force', 'with --migrate-views, overwrite unmanaged runtime paths')
@@ -46,13 +45,13 @@ program.command('doctor')
       s.activity.record({ action: 'cli-migrate-views', summary: 'Migrated leftover hub views', details: migrated });
       return print({ migrated, doctor: s.doctor.check() });
     }
-    print(s.doctor.check({ projectRoot: opts.project }));
+    print(s.doctor.check());
   });
 
 program.command('init')
   .description('Import skills already living in agent runtime dirs into the hub (reverse of distribute); origins become managed symlinks')
   .option('-a, --agent <id...>', 'catalog agent ids to scan; defaults to the detected set')
-  .option('-r, --resolve <skill=choice...>', 'conflict decisions: <skill>=<agent-id|hub>')
+  .option('-r, --resolve <skill=choice...>', 'conflict decisions: <skill>=<runtime-dir|agent-id|hub>')
   .option('--all', 'import everything unambiguous; skip clashing skills (hub wins hub-vs-runtime)')
   .option('--dry-run', 'print the full plan without touching disk')
   .action((opts, cmd) => {
@@ -66,7 +65,7 @@ function parseResolve(values: string[] = []): Record<string, string> {
   const resolve: Record<string, string> = {};
   for (const value of values) {
     const eq = value.indexOf('=');
-    if (eq <= 0) throw new Error(`--resolve expects <skill>=<agent-id|hub>, got "${value}"`);
+    if (eq <= 0) throw new Error(`--resolve expects <skill>=<runtime-dir|agent-id|hub>, got "${value}"`);
     resolve[value.slice(0, eq)] = value.slice(eq + 1);
   }
   return resolve;
@@ -239,7 +238,7 @@ program.command('migrate-views')
   });
 
 program.command('migrate-consumers')
-  .description('One-shot migration of legacy agents/claude tags to catalog agent ids (registry, hub index, project receipts)')
+  .description('One-shot migration of legacy agents/claude tags to catalog agent ids (registry, hub index)')
   .option('--dry-run', 'print the migration plan without touching disk')
   .option('--rollback', 'restore the files backed up by the last migration')
   .action((opts, cmd) => {

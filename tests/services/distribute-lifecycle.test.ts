@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import YAML from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createCoreServices } from '../../src/core/services/index.js';
 import { createNodeFileSystem } from '../../src/infra/index.js';
+import { SkillsManagerError } from '../../src/shared/errors.js';
 import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
 
 const fakeGit = { statusShort: () => '', clone: () => ({ repoDir: '', commit: null }), pull: () => null, latestCommit: () => null } as never;
@@ -52,7 +52,16 @@ function userRecord(s: ReturnType<typeof services>) {
   return s.distribute.listIndex().find((record) => record.kind === 'user');
 }
 
-describe('reference counting across skills and receipts', () => {
+function codeOf(fn: () => unknown) {
+  try {
+    fn();
+  } catch (error) {
+    return (error as SkillsManagerError).code;
+  }
+  throw new Error('expected function to throw');
+}
+
+describe('reference counting across skills', () => {
   it('keeps the physical entry while any skill on the shared path still references an agent', () => {
     const s = services();
     s.distribute.apply({ to: 'user', skills: ['alpha', 'beta'], agents: ['zed', 'warp'] });
@@ -67,12 +76,13 @@ describe('reference counting across skills and receipts', () => {
     expect(userRecord(s)?.entries.map((entry) => entry.skill)).toEqual(['beta']);
   });
 
-  it('mirrors reference counts into the project receipt', () => {
+  it('reference-counts project targets in the hub index alone', () => {
     const s = services();
     s.distribute.apply({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['zed', 'warp'] });
     s.distribute.undistribute({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['warp'] });
-    const receipt = YAML.parse(readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8')) as { skills: Record<string, { entries: Array<{ agents: string[] }> }> };
-    expect(receipt.skills.alpha.entries[0].agents).toEqual(['zed']);
+    const record = s.distribute.listIndex().find((item) => item.kind === 'project');
+    expect(record?.entries.find((entry) => entry.skill === 'alpha')?.agents).toEqual(['zed']);
+    expect(existsSync(path.join(project, '.skills-manager'))).toBe(false);
   });
 });
 
@@ -115,15 +125,12 @@ describe('rollback', () => {
     expect(userRecord(s)?.entries.map((entry) => entry.agents)).toEqual([['zed']]);
   });
 
-  it('restores the pre-apply managed state for project targets including the receipt', () => {
+  it('refuses project rollback: git is the restore point for project targets', () => {
     const s = services();
     s.distribute.apply({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['zed'] });
-    s.distribute.apply({ to: 'project', projectRoot: project, skills: ['beta'], agents: ['cursor'] });
-    s.distribute.rollback('project', project);
-    expect(existsSync(path.join(project, '.agents', 'skills', 'beta'))).toBe(false);
+    expect(codeOf(() => s.distribute.rollback('project', project))).toBe('distribute_project_rollback_unsupported');
+    expect(() => s.distribute.rollback('project', project)).toThrow(/git is the restore point/);
     expect(existsSync(path.join(project, '.agents', 'skills', 'alpha'))).toBe(true);
-    const receipt = YAML.parse(readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8')) as { skills: Record<string, unknown> };
-    expect(Object.keys(receipt.skills)).toEqual(['alpha']);
   });
 });
 
@@ -147,19 +154,5 @@ describe('doctor boundary', () => {
     const report = s.doctor.check();
     expect(report.brokenLinks).toContain(path.join(userHome, '.claude', 'skills', 'alpha'));
     expect(report.warnings.join('\n')).toMatch(/missing from the hub: alpha/);
-  });
-
-  it('scans paths from the active project receipt even when the hub index has no record', () => {
-    const s = services();
-    s.distribute.apply({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['zed'], mode: 'symlink' });
-    // Teammate scenario: the project receipt exists, the hub index does not know this project.
-    rmSync(path.join(home, '.skills', 'distributions.jsonl'), { force: true });
-    expect(s.doctor.check().brokenLinks).toHaveLength(0);
-    const runtimePath = path.join(project, '.agents', 'skills', 'alpha');
-    rmSync(path.join(home, 'skills', 'alpha'), { recursive: true, force: true });
-    mkdirSync(path.join(project, '.agents', 'skills', 'stray'), { recursive: true });
-    const withProject = s.doctor.check({ projectRoot: project });
-    expect(withProject.brokenLinks).toContain(runtimePath);
-    expect(withProject.distribution.foreign).toBe(1);
   });
 });

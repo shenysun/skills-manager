@@ -57,10 +57,7 @@ try {
   const copied = path.join(project, '.agents', 'skills', 'alpha', 'SKILL.md');
   assert.equal(existsSync(copied), true);
   assert.equal(lstatSync(path.join(project, '.agents', 'skills', 'alpha')).isSymbolicLink(), false);
-  const receipt = readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8');
-  assert.match(receipt, /version: 2/);
-  assert.match(receipt, /mode: copy/);
-  assert.match(receipt, /agents:\n\s+- zed/);
+  assert.equal(existsSync(path.join(project, '.skills-manager')), false);
   assert.equal(projectApply.mode, 'copy');
 
   const foreign = path.join(userHome, '.claude', 'skills', 'alpha');
@@ -76,7 +73,7 @@ try {
   assert.match(readFileSync(copied, 'utf8'), /Changed/);
 
   services.distribute.apply({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['zed'] });
-  services.distribute.rollback('project', project);
+  assert.throws(() => services.distribute.rollback('project', project), (error) => error instanceof SkillsManagerError && error.code === 'distribute_project_rollback_unsupported');
   assert.equal(existsSync(path.join(project, '.agents', 'skills', 'alpha')), true);
 
   services.distribute.apply({ to: 'user', skills: ['alpha'], agents: ['zed', 'warp'] });

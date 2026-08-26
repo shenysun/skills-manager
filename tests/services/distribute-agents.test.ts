@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import YAML from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createCoreServices } from '../../src/core/services/index.js';
 import { createNodeFileSystem } from '../../src/infra/index.js';
@@ -88,19 +87,16 @@ describe('distribute apply with catalog agents', () => {
     expect(existsSync(path.join(userHome, '.claude', 'skills', 'alpha', 'SKILL.md'))).toBe(true);
   });
 
-  it('writes a dual-layer project receipt at .skills-manager/distribute.yaml', () => {
+  it('writes no in-repo metadata for project targets — the hub index is the only record', () => {
     const s = services();
     s.distribute.apply({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['zed', 'warp'] });
-    const receipt = YAML.parse(readFileSync(path.join(project, '.skills-manager', 'distribute.yaml'), 'utf8')) as {
-      version: number;
-      skills: Record<string, { entries: Array<{ path: string; mode: string; fingerprint: string; managed: boolean; agents: string[] }> }>;
-    };
-    expect(receipt.version).toBe(2);
-    const entries = receipt.skills.alpha.entries;
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ path: path.join(project, '.agents', 'skills', 'alpha'), mode: 'copy', managed: true });
-    expect(entries[0].agents.sort()).toEqual(['warp', 'zed']);
-    expect(entries[0].fingerprint).toMatch(/^sha256:/);
+    expect(existsSync(path.join(project, '.skills-manager'))).toBe(false);
+    expect(existsSync(path.join(project, '.agents', 'skills', 'alpha', 'SKILL.md'))).toBe(true);
+    const record = s.distribute.listIndex().find((item) => item.kind === 'project');
+    expect(record?.entries).toHaveLength(1);
+    expect(record?.entries[0]).toMatchObject({ runtimePath: path.join(project, '.agents', 'skills', 'alpha'), mode: 'copy', managed: true });
+    expect(record?.entries[0].agents.sort()).toEqual(['warp', 'zed']);
+    expect(record?.entries[0].fingerprint).toMatch(/^sha256:/);
   });
 
   it('refuses foreign targets by default and overwrites with force', () => {
