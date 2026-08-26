@@ -2,22 +2,22 @@
 
 [English](GETTING_STARTED.md) | **简体中文**
 
-欢迎！本指南帮你几分钟内上手 `@shenysun/skills-manager`。
+欢迎！本指南帮你几分钟内上手 `agent-skills-manager`。
 
 ## 安装
 
 ### 方式一：免安装直接使用（推荐）
 
 ```bash
-npx @shenysun/skills-manager web
+npx agent-skills-manager web
 ```
 
 ### 方式二：全局安装
 
 ```bash
-npm install -g @shenysun/skills-manager
+npm install -g agent-skills-manager
 # 或
-pnpm add -g @shenysun/skills-manager
+pnpm add -g agent-skills-manager
 skills-manager web
 ```
 

@@ -2,14 +2,14 @@
 
 [English](README.md) | **简体中文**
 
-`@shenysun/skills-manager` 是一个本地优先的 CLI 与网页控制台，基于注册表驱动的技能库（skill home）管理 agent、Claude、Codex 的技能。
+`agent-skills-manager` 是一个本地优先的 CLI 与网页控制台，基于注册表驱动的技能库（skill home）管理 agent、Claude、Codex 的技能。
 
 ## 快速开始
 
 **无需任何安装** —— 直接运行：
 
 ```sh
-npx @shenysun/skills-manager web
+npx agent-skills-manager web
 ```
 
 首次运行时会自动创建并初始化 `~/.skills-manager/`。
@@ -24,9 +24,9 @@ skills-manager init             # 导入
 或者全局安装：
 
 ```sh
-npm install -g @shenysun/skills-manager
+npm install -g agent-skills-manager
 # 或
-pnpm add -g @shenysun/skills-manager
+pnpm add -g agent-skills-manager
 skills-manager web
 ```
 
@@ -37,15 +37,15 @@ skills-manager web
 免安装直接使用：
 
 ```sh
-npx @shenysun/skills-manager web
+npx agent-skills-manager web
 ```
 
 或从已发布的包/本地打包的 tarball 全局安装：
 
 ```sh
-npm install -g @shenysun/skills-manager
+npm install -g agent-skills-manager
 # 或
-pnpm add -g @shenysun/skills-manager
+pnpm add -g agent-skills-manager
 skills-manager web
 skills-manager doctor
 ```

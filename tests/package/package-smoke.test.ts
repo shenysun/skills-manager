@@ -53,7 +53,7 @@ async function waitForDashboard(cli: string, args: string[], url: string) {
 describe('package artifact (pack → install → bin → dashboard)', () => {
   it('declares the expected package name and bin', () => {
     const pkg = JSON.parse(readFileSync(path.resolve('package.json'), 'utf8')) as { name: string; bin?: Record<string, string> };
-    expect(pkg.name).toBe('@shenysun/skills-manager');
+    expect(pkg.name).toBe('agent-skills-manager');
     expect(pkg.bin?.['skills-manager']).toBe('./dist/cli.js');
   });
 

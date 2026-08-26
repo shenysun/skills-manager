@@ -2,7 +2,7 @@
 
 [English](CLI.md) | **简体中文**
 
-`@shenysun/skills-manager` 提供 `skills-manager` 可执行命令，管理本地优先的技能库。
+`agent-skills-manager` 提供 `skills-manager` 可执行命令，管理本地优先的技能库。
 
 ## 技能库解析
 

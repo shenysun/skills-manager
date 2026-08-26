@@ -2,22 +2,22 @@
 
 **English** | [简体中文](GETTING_STARTED.zh-CN.md)
 
-Welcome! This guide will help you get started with `@shenysun/skills-manager` in minutes.
+Welcome! This guide will help you get started with `agent-skills-manager` in minutes.
 
 ## Installation
 
 ### Option 1: Use without installing (Recommended)
 
 ```bash
-npx @shenysun/skills-manager web
+npx agent-skills-manager web
 ```
 
 ### Option 2: Install globally
 
 ```bash
-npm install -g @shenysun/skills-manager
+npm install -g agent-skills-manager
 # or
-pnpm add -g @shenysun/skills-manager
+pnpm add -g agent-skills-manager
 skills-manager web
 ```
 
