@@ -13,7 +13,7 @@ const { show } = useNotice();
 const preview = ref<InitRunResult | null>(null);
 const error = ref<string | null>(null);
 const busy = ref(false);
-/** Conflict decisions made inline: skill -> agent id (location's family) or 'hub'. */
+/** Conflict decisions made inline: skill -> runtime dir (a dir may serve several agents) or 'hub'. */
 const resolve = ref<Record<string, string>>({});
 
 onMounted(async () => {
@@ -36,9 +36,9 @@ const importableCount = computed(() => {
   return preview.value.discovered.length - unresolved;
 });
 
-/** Choices for a clash: every clashing origin, plus the hub copy when one exists there. */
+/** Choices for a clash: every clashing origin dir (the dir is the identity — it may serve several agents), plus the hub copy when one exists there. */
 function choicesFor(conflict: InitConflict) {
-  const originChoices = conflict.locations.map((location) => ({ value: location.agentId, label: location.agentId }));
+  const originChoices = conflict.locations.map((location) => ({ value: location.runtimeDir, label: location.runtimeDir }));
   return conflict.kind === 'hub-vs-runtime' ? [...originChoices, { value: 'hub', label: t('init.keepHub') }] : originChoices;
 }
 
@@ -103,5 +103,9 @@ async function runApply() {
 <style scoped>
 .init-choice {
   margin-left: 0.5rem;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 </style>

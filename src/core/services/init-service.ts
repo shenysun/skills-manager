@@ -12,7 +12,7 @@ import type { BackupService } from './backup-service.js';
 export type InitRunRequest = {
   /** Catalog agent ids to scan; omitted = the detected set on this machine. */
   agents?: readonly string[];
-  /** Conflict decisions: skill -> agent id whose copy wins, or 'hub' to keep the hub copy. */
+  /** Conflict decisions: skill -> runtime dir (or any agent id sharing it) whose copy wins, or 'hub' to keep the hub copy. */
   resolve?: Readonly<Record<string, string>>;
   dryRun?: boolean;
   /** Skip every conflict instead of pausing on it (hub wins hub-vs-runtime clashes). */
@@ -20,7 +20,8 @@ export type InitRunRequest = {
 };
 
 export type InitSkillLocation = {
-  agentId: string;
+  /** Every catalog agent sharing the runtime dir — a dir is the identity, not one agent. */
+  agentIds: string[];
   runtimeDir: string;
   /** The physical skill directory inside the agent's global runtime dir. */
   path: string;
@@ -55,6 +56,9 @@ type ScanGroup = {
   agents: string[];
 };
 
+/** Locations whose paths resolve to the same physical directory — one origin, not a clash. */
+type EntityGroup = InitSkillLocation[];
+
 /**
  * Reverse of distribute (ADR-0006): fold skills already living in detected
  * agents' global runtime directories into the hub. Content moves into hub
@@ -78,7 +82,7 @@ export class InitService {
     const { skills: discovered, invalid } = this.discover(groups);
 
     // Classification is read-only, so dry-run reports the exact plan untouched.
-    const imports: Array<{ skill: InitDiscoveredSkill; live: InitSkillLocation[]; choice: string | undefined }> = [];
+    const imports: Array<{ skill: InitDiscoveredSkill; groups: EntityGroup[]; choice: string | undefined }> = [];
     const skippedManaged = new Set<SkillName>();
     const conflicts: InitConflict[] = [];
     for (const skill of discovered) {
@@ -86,17 +90,20 @@ export class InitService {
       if (liveLocations.length < skill.locations.length) skippedManaged.add(skill.name);
       if (liveLocations.length === 0) continue;
 
+      // Entries linked to each other by symlinks are the same physical copy — merge
+      // them before clash detection so one skill laid out across agents isn't a conflict.
+      const groups = this.groupByEntity(liveLocations);
       const choice = request.resolve?.[skill.name];
       const hubHas = this.registry.skillExists(skill.name);
-      if (!choice && (liveLocations.length > 1 || hubHas)) {
+      if (!choice && (groups.length > 1 || hubHas)) {
         conflicts.push({
           skill: skill.name,
-          kind: liveLocations.length > 1 ? 'multi-runtime' : 'hub-vs-runtime',
-          locations: liveLocations,
+          kind: groups.length > 1 ? 'multi-runtime' : 'hub-vs-runtime',
+          locations: groups.map((group) => group[0]),
         });
         continue;
       }
-      imports.push({ skill, live: liveLocations, choice });
+      imports.push({ skill, groups, choice });
     }
 
     const result: InitRunResult = {
@@ -113,7 +120,7 @@ export class InitService {
     this.skillHome.ensure();
     for (const item of imports) {
       try {
-        this.importResolved(item.skill, item.live, item.choice);
+        this.importResolved(item.skill, item.groups, item.choice);
         result.imported.push(item.skill.name);
       } catch (error) {
         result.failed.push({ skill: item.skill.name, reason: (error as Error).message });
@@ -124,45 +131,68 @@ export class InitService {
   }
 
   /**
-   * Import one skill with its conflict decision applied. `choice` is an agent id
-   * whose copy wins, or 'hub' to keep the hub copy and only back-symlink origins.
+   * Import one skill with its conflict decision applied. `choice` is a runtime
+   * dir (or any agent id sharing it) whose copy wins, or 'hub' to keep the hub
+   * copy and only back-symlink origins.
    */
-  private importResolved(skill: InitDiscoveredSkill, live: InitSkillLocation[], choice: string | undefined) {
+  private importResolved(skill: InitDiscoveredSkill, groups: EntityGroup[], choice: string | undefined) {
     assertSafeSkillName(skill.name);
     const hubHas = this.registry.skillExists(skill.name);
-    const winner = choice && choice !== 'hub' ? this.locationForAgent(live, choice) : hubHas ? null : live[0];
+    const winnerGroup = choice && choice !== 'hub' ? this.groupForChoice(groups, choice, skill.name) : hubHas ? null : groups[0];
+    const locations = groups.flat();
 
-    if (winner) {
+    if (winnerGroup) {
       if (hubHas) {
         // The runtime copy wins: preserve the hub entity before it is replaced.
         this.fs.move(this.registry.skillDir(skill.name), this.backupDirFor(skill.name));
       }
       const hubDir = this.registry.skillDir(skill.name);
-      this.fs.copyDirectoryContents(winner.path, hubDir);
+      // Copy through symlinks: the hub needs the entity's contents, not a link to it.
+      this.fs.copyDirectoryContents(this.entityPathOf(winnerGroup[0].path), hubDir);
       this.registry.ensureEntry(skill.name, {
         imported: true,
         imported_at: new Date().toISOString(),
         title: skill.title,
         description: skill.description,
         // Every origin's agents are this skill's desired consumers (catalog ids only).
-        consumers: this.agentsForLocations(live),
+        consumers: this.agentsForLocations(locations),
       });
     }
-    // Move = backup + vacate in one step; the symlink takes each origin's place.
-    for (const location of live) this.fs.move(location.path, this.backupDirFor(skill.name));
-    this.distribute.apply({ to: 'user', skills: [skill.name], agents: this.agentsForLocations(live), mode: 'symlink' });
+    // Real directories are preserved as backups and vacated; symlinked entries are
+    // simply removed — distribute lays a managed symlink down in every origin's place.
+    for (const location of locations) {
+      if (this.fs.kind(location.path) === 'symlink') this.fs.removeFileOrSymlink(location.path);
+      else this.fs.move(location.path, this.backupDirFor(skill.name));
+    }
+    this.distribute.apply({ to: 'user', skills: [skill.name], agents: this.agentsForLocations(locations), mode: 'symlink' });
   }
 
-  private locationForAgent(live: InitSkillLocation[], agentId: string) {
-    const found = live.find((location) => this.agentsForDir(location.runtimeDir).includes(agentId));
+  private groupForChoice(groups: EntityGroup[], choice: string, skill: SkillName) {
+    const found = groups.find((group) => group.some((location) => location.runtimeDir === choice || location.agentIds.includes(choice)));
     if (!found) {
-      throw new SkillsManagerError('init_unknown_resolution', `Resolution "${agentId}" for skill "${live[0] ? this.skillNameOf(live[0]) : '?'}" matches none of the clashing locations. Pick one of the reported agent ids or 'hub'.`);
+      throw new SkillsManagerError('init_unknown_resolution', `Resolution "${choice}" for skill "${skill}" matches none of the clashing locations. Pick a reported runtime dir (or one of its agent ids) or 'hub'.`);
     }
     return found;
   }
 
-  private skillNameOf(location: InitSkillLocation) {
-    return path.basename(location.path);
+  /** Group locations by the physical directory they resolve to through symlink chains. */
+  private groupByEntity(locations: InitSkillLocation[]): EntityGroup[] {
+    return locations.reduce<EntityGroup[]>((groups, location) => {
+      const entity = this.entityPathOf(location.path);
+      const index = groups.findIndex((group) => this.entityPathOf(group[0].path) === entity);
+      return index === -1
+        ? [...groups, [location]]
+        : groups.map((group, i) => (i === index ? [...group, location] : group));
+    }, []);
+  }
+
+  /** Follow symlink chains (bounded — a loop must not hang import) to the physical path. */
+  private entityPathOf(locationPath: string): string {
+    let current = locationPath;
+    for (let hops = 0; this.fs.kind(current) === 'symlink' && hops < 8; hops += 1) {
+      current = path.resolve(path.dirname(current), this.fs.readlink(current));
+    }
+    return current;
   }
 
   private agentsForLocations(live: InitSkillLocation[]) {
@@ -243,7 +273,7 @@ export class InitService {
           invalid.push({ skill: entry.name, reason: (error as Error).message });
           continue;
         }
-        const location: InitSkillLocation = { agentId: group.agents[0], runtimeDir: group.runtimeDir, path: skillDir };
+        const location: InitSkillLocation = { agentIds: group.agents, runtimeDir: group.runtimeDir, path: skillDir };
         const existing = byName.get(name);
         if (existing) byName.set(name, { ...existing, locations: [...existing.locations, location] });
         else byName.set(name, { name, title, description, locations: [location] });

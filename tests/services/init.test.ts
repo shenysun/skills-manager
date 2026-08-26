@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -103,6 +103,76 @@ describe('init run (reverse import)', () => {
       expect(readlinkSync(dir)).toBe(path.join(home, 'skills', 'alpha'));
     }
     expect(s.backups.list().map((item) => item.skill).sort()).toEqual(['alpha', 'alpha']);
+  });
+
+  it('identifies clash locations by runtime dir (all member agents) and resolves by dir path', () => {
+    const claudeRuntimeDir = path.dirname(makeRuntimeSkill('.claude/skills', 'alpha', `---\nname: alpha\ntitle: claude copy\n---\n# alpha\n`));
+    const sharedRuntimeDir = path.dirname(makeRuntimeSkill('.agents/skills', 'alpha', `---\nname: alpha\ntitle: shared copy\n---\n# alpha\n`));
+    const agents = ['claude-code', 'zed', 'warp'];
+    const s = services();
+
+    const report = s.init.run({ agents });
+
+    const conflict = report.conflicts[0];
+    expect(conflict.locations).toHaveLength(2);
+    expect(conflict.locations.map((location) => location.runtimeDir)).toEqual(expect.arrayContaining([claudeRuntimeDir, sharedRuntimeDir]));
+    // A dir shared by several agents reports every member, not an arbitrary first one.
+    const sharedLocation = conflict.locations.find((location) => location.runtimeDir === sharedRuntimeDir);
+    expect(sharedLocation?.agentIds).toEqual(['warp', 'zed']);
+
+    // The runtime dir itself — what the UI shows — is an accepted resolution choice.
+    const resolved = s.init.run({ agents, resolve: { alpha: sharedRuntimeDir } });
+    expect(resolved.imported).toEqual(['alpha']);
+    expect(readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8')).toContain('shared copy');
+    for (const runtimeDir of [claudeRuntimeDir, sharedRuntimeDir]) {
+      expect(lstatSync(path.join(runtimeDir, 'alpha')).isSymbolicLink()).toBe(true);
+    }
+  });
+
+  it('treats symlink-linked runtime entries as one origin: no conflict, links replaced by hub', () => {
+    // Entity lives in the zed/warp shared dir; claude-code holds a symlink to it.
+    const entityDir = makeRuntimeSkill('.agents/skills', 'alpha');
+    const linkDir = path.join(userHome, '.claude', 'skills', 'alpha');
+    mkdirSync(path.dirname(linkDir), { recursive: true });
+    symlinkSync(entityDir, linkDir);
+    const s = services();
+
+    const report = s.init.run({ agents: ['claude-code', 'zed', 'warp'] });
+
+    // One physical copy — not a multi-runtime clash.
+    expect(report.conflicts).toEqual([]);
+    expect(report.imported).toEqual(['alpha']);
+    expect(readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8')).toContain('alpha title');
+    // Every position now links to the hub entity.
+    for (const dir of [linkDir, entityDir]) {
+      expect(lstatSync(dir).isSymbolicLink()).toBe(true);
+      expect(readlinkSync(dir)).toBe(path.join(home, 'skills', 'alpha'));
+    }
+    // The real directory is preserved as the single backup; the old symlink is gone (replaced).
+    const backups = s.backups.list();
+    expect(backups).toHaveLength(1);
+    expect(existsSync(path.join(backups[0].dir, 'SKILL.md'))).toBe(true);
+    expect(s.registry.getEntry('alpha')).toMatchObject({ consumers: ['claude-code', 'warp', 'zed'] });
+  });
+
+  it('resolves a clash by any location of a group, including a symlinked one', () => {
+    // Group 1: claude entity. Group 2: cursor entity + an .agents symlink pointing at it.
+    makeRuntimeSkill('.claude/skills', 'beta', `---\nname: beta\ntitle: claude copy\n---\n# beta\n`);
+    const cursorEntity = makeRuntimeSkill('.cursor/skills', 'beta', `---\nname: beta\ntitle: cursor copy\n---\n# beta\n`);
+    const agentsLinkDir = path.join(userHome, '.agents', 'skills', 'beta');
+    mkdirSync(path.dirname(agentsLinkDir), { recursive: true });
+    symlinkSync(cursorEntity, agentsLinkDir);
+    const agents = ['claude-code', 'cursor', 'zed'];
+    const s = services();
+
+    const report = s.init.run({ agents });
+    expect(report.conflicts).toHaveLength(1);
+    expect(report.conflicts[0].locations).toHaveLength(2);
+
+    // Picking the .agents runtime dir (a non-representative member of group 2) selects that group's copy.
+    const resolved = s.init.run({ agents, resolve: { beta: path.join(userHome, '.agents', 'skills') } });
+    expect(resolved.imported).toEqual(['beta']);
+    expect(readFileSync(path.join(home, 'skills', 'beta', 'SKILL.md'), 'utf8')).toContain('cursor copy');
   });
 
   it('keeps the hub copy on resolve=hub and only back-symlinks the origin', () => {
