@@ -54,6 +54,34 @@ program.command('doctor')
     print(s.doctor.check());
   });
 
+program.command('status')
+  .description('Summarize managed distribution health (managed/foreign/outdated/stale)')
+  .action((_opts, cmd) => {
+    const s = services(cmd);
+    const health = s.distribute.status();
+    console.log(`managed: ${health.managedEntries}, agents: ${health.agentCoverage}, foreign: ${health.foreign}`);
+    console.log(`stale: ${health.outdated}, outdated: ${health.outdated}, errored: ${countErrored(s)}`);
+    if (health.outdated > 0) {
+      console.log(`Stale copy targets: ${health.outdated}. Run \`skills redistribute --refresh\` to sync.`);
+    }
+    const records = s.distribute.listIndex();
+    const errored = records.flatMap((r) => r.entries.filter((e) => e.error));
+    if (errored.length > 0) {
+      console.log(`Refresh errors:`);
+      for (const entry of errored) {
+        console.log(`  ${entry.runtimePath}: ${entry.error?.message}`);
+      }
+    }
+  });
+
+function countErrored(s: ReturnType<typeof services>): number {
+  let count = 0;
+  for (const record of s.distribute.listIndex()) {
+    for (const entry of record.entries) if (entry.error) count += 1;
+  }
+  return count;
+}
+
 program.command('init')
   .description('Import skills already living in agent runtime dirs into the hub (reverse of distribute); origins become managed symlinks')
   .option('-a, --agent <id...>', 'catalog agent ids to scan; defaults to the detected set')
@@ -153,6 +181,10 @@ program.command('add')
     const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes) });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
     print(result);
+    const health = s.distribute.status();
+    if (health.outdated > 0) {
+      console.log(`提示：${health.outdated} 个 copy 目标落后于 hub，运行 \`skills redistribute --refresh\` 同步。`);
+    }
   });
 
 program.command('update')
@@ -166,6 +198,10 @@ program.command('update')
     const result = opts.source ? s.update.updateSource(opts.source) : s.update.updateSkills(opts.skill);
     s.activity.record({ action: 'cli-update', summary: `Updated ${result.updated.join(', ')}`, details: result });
     print(result);
+    const health = s.distribute.status();
+    if (health.outdated > 0) {
+      console.log(`提示：${health.outdated} 个 copy 目标落后于 hub，运行 \`skills redistribute --refresh\` 同步。`);
+    }
   });
 
 const distribute = program.command('distribute')
@@ -214,15 +250,17 @@ program.command('undistribute')
 
 program.command('redistribute')
   .description('Re-apply managed distributions')
-  .option('--outdated', 'only outdated fingerprints')
+  .option('--outdated', 'only outdated fingerprints (alias: --refresh)')
+  .option('--refresh', 'alias of --outdated: refresh every stale copy target')
   .option('--to <kind>', 'user or project')
   .option('--project <path>', 'project root filter')
   .option('--force', 'overwrite unmanaged runtime paths')
   .action((opts, cmd) => {
-    if (!opts.outdated) throw new Error('Pass --outdated to refresh managed targets');
+    if (!opts.outdated && !opts.refresh) throw new Error('Pass --outdated or --refresh to refresh managed targets');
     const s = services(cmd);
     const result = s.distribute.redistributeOutdated({ to: opts.to, projectRoot: opts.project, force: Boolean(opts.force) });
     s.activity.record({ action: 'cli-redistribute', summary: 'Redistributed outdated targets', details: opts });
+    if (opts.refresh) console.log(`Refreshed ${result.refreshed.length}, errored ${result.errored.length}.`);
     print(result);
   });
 
