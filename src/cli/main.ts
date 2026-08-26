@@ -60,7 +60,7 @@ program.command('status')
     const s = services(cmd);
     const health = s.distribute.status();
     console.log(`managed: ${health.managedEntries}, agents: ${health.agentCoverage}, foreign: ${health.foreign}`);
-    console.log(`stale: ${health.outdated}, outdated: ${health.outdated}, errored: ${countErrored(s)}`);
+    console.log(`outdated: ${health.outdated}, errored: ${countErrored(s)}`);
     if (health.outdated > 0) {
       console.log(`Stale copy targets: ${health.outdated}. Run \`skills redistribute --refresh\` to sync.`);
     }

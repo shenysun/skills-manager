@@ -45,7 +45,7 @@ describe('status / update reminder', () => {
     cli(['distribute', '--to', 'project', '--project', project, '--skill', 'alpha', '--agent', 'zed', '--mode', 'copy']);
     writeFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), `---\nname: alpha\n---\n# v2\n`);
     const out = cli(['status']);
-    expect(out).toMatch(/stale: 1|outdated: 1/);
+    expect(out).toMatch(/outdated: 1/);
   });
 
   it('update prints a trailing reminder when stale targets remain', () => {
