@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
 import { startDashboardServer } from '../dashboard/server/main.js';
 
+const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
 
 function services(cmd: Command) {
@@ -19,7 +21,7 @@ const program = new Command();
 program
   .name('skills-manager')
   .description('Local-first CLI and dashboard for managing agent skills')
-  .version('0.1.0')
+  .version(pkg.version)
   .option('--home <path>', 'skill home path; overrides SKILL_HOME and cwd detection')
   .showHelpAfterError();
 

@@ -1,6 +1,7 @@
 {
   "name": "@shenysun/skills-manager",
-  "version": "0.1.0",
+  "version": "2026.8.26",
+  "packageManager": "pnpm@10.33.0",
   "description": "Local-first CLI and dashboard for managing agent, Claude, and Codex skills",
   "scripts": {
     "skills-manager": "tsx src/cli.ts",
@@ -11,7 +12,8 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "catalog:extract": "tsx scripts/extract-agent-catalog.ts"
+    "catalog:extract": "tsx scripts/extract-agent-catalog.ts",
+    "release": "node scripts/release.mjs"
   },
   "keywords": [],
   "author": "",
