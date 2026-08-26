@@ -2,22 +2,22 @@
 
 [English](GETTING_STARTED.md) | **简体中文**
 
-欢迎！本指南帮你几分钟内上手 `agent-skills-manager`。
+欢迎！本指南帮你几分钟内上手 `skills-manager-cli`。
 
 ## 安装
 
 ### 方式一：免安装直接使用（推荐）
 
 ```bash
-npx agent-skills-manager web
+npx skills-manager-cli web
 ```
 
 ### 方式二：全局安装
 
 ```bash
-npm install -g agent-skills-manager
+npm install -g skills-manager-cli
 # 或
-pnpm add -g agent-skills-manager
+pnpm add -g skills-manager-cli
 skills-manager web
 ```
 

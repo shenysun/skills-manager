@@ -2,7 +2,7 @@
 
 [English](CLI.md) | **简体中文**
 
-`agent-skills-manager` 提供 `skills-manager` 可执行命令，管理本地优先的技能库。
+`skills-manager-cli` 提供 `skills-manager` 可执行命令，管理本地优先的技能库。
 
 ## 技能库解析
 

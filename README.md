@@ -2,14 +2,14 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-`agent-skills-manager` is a local-first CLI and dashboard for managing agent, Claude, and Codex skills from a registry-driven skill home.
+`skills-manager-cli` is a local-first CLI and dashboard for managing agent, Claude, and Codex skills from a registry-driven skill home.
 
 ## Quick Start
 
 **No setup needed** — just run:
 
 ```sh
-npx agent-skills-manager web
+npx skills-manager-cli web
 ```
 
 This automatically creates and initializes `~/.skills-manager/` on first run.
@@ -24,9 +24,9 @@ skills-manager init             # import
 Or install globally:
 
 ```sh
-npm install -g agent-skills-manager
+npm install -g skills-manager-cli
 # or
-pnpm add -g agent-skills-manager
+pnpm add -g skills-manager-cli
 skills-manager web
 ```
 
@@ -37,15 +37,15 @@ skills-manager web
 Use without installing globally:
 
 ```sh
-npx agent-skills-manager web
+npx skills-manager-cli web
 ```
 
 Or install globally from a published package or packed tarball:
 
 ```sh
-npm install -g agent-skills-manager
+npm install -g skills-manager-cli
 # or
-pnpm add -g agent-skills-manager
+pnpm add -g skills-manager-cli
 skills-manager web
 skills-manager doctor
 ```

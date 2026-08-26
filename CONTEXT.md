@@ -186,7 +186,7 @@ The project is evolving from a local skill repository into a publishable npm pac
 
 ### Package identity
 
-The npm package name is **`agent-skills-manager`**. The executable command is **`skills-manager`**.
+The npm package name is **`skills-manager-cli`**. The executable command is **`skills-manager`**.
 
 ### Architecture posture
 

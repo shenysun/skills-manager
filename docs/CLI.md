@@ -2,7 +2,7 @@
 
 **English** | [简体中文](CLI.zh-CN.md)
 
-`agent-skills-manager` provides the `skills-manager` executable for a local-first skill home.
+`skills-manager-cli` provides the `skills-manager` executable for a local-first skill home.
 
 ## Skill home resolution
 
