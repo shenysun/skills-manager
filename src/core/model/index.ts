@@ -147,6 +147,13 @@ export type DoctorReport = {
  * operate on; the logical layer (agents) records which catalog agent ids
  * motivated the write and drives reference counting on shared paths.
  */
+export type DistributionIndexError = {
+  code: string;
+  message: string;
+  /** ISO timestamp of when the refresh attempt failed. */
+  at: string;
+};
+
 export type DistributionIndexEntry = {
   skill: SkillName;
   runtimePath: string;
@@ -155,6 +162,8 @@ export type DistributionIndexEntry = {
   managed: boolean;
   agents: string[];
   appliedAt: string;
+  /** Set when the most recent refresh attempt failed; cleared on next successful refresh. */
+  error?: DistributionIndexError;
 };
 
 export type DistributionIndexRecord = {

@@ -110,21 +110,55 @@ export class DistributeService {
       return true;
     });
     const refreshed: DistributionIndexEntry[] = [];
+    const errored: DistributionIndexEntry[] = [];
     for (const record of records) {
-      const outdated = record.entries.filter((entry) => this.entryOutdated(entry));
-      for (const entry of outdated) {
-        const result = this.apply({
-          to: record.kind,
-          projectRoot: record.kind === 'project' ? record.targetRoot : undefined,
-          skills: [entry.skill],
-          agents: entry.agents,
-          mode: entry.mode,
-          force: filter.force,
-        });
-        refreshed.push(...result.entries);
+      const nextEntries: DistributionIndexEntry[] = [];
+      for (const entry of record.entries) {
+        if (!this.entryOutdated(entry)) {
+          nextEntries.push(entry);
+          continue;
+        }
+        try {
+          const refreshedEntry = this.refreshStaleEntry(record, entry, filter.force);
+          nextEntries.push(refreshedEntry);
+          refreshed.push(refreshedEntry);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const code = error instanceof SkillsManagerError ? error.code : 'refresh_failed';
+          const erroredEntry: DistributionIndexEntry = {
+            ...entry,
+            error: { code, message, at: new Date().toISOString() },
+          };
+          nextEntries.push(erroredEntry);
+          errored.push(erroredEntry);
+        }
+      }
+      if (nextEntries.length !== record.entries.length || nextEntries.some((e, i) => e !== record.entries[i])) {
+        this.writeRecord({ kind: record.kind, targetRoot: record.targetRoot, id: record.id }, nextEntries);
       }
     }
-    return { refreshed };
+    return { refreshed, errored };
+  }
+
+  /** Refresh a single stale entry by re-running apply() for it. Returns the new entry; never throws on per-entry failure (caller should catch). */
+  refreshStaleEntry(record: DistributionIndexRecord, entry: DistributionIndexEntry, force?: boolean): DistributionIndexEntry {
+    // The runtime directory's parent must still exist — we don't silently resurrect
+    // a runtime root that the user removed out from under us (ADR-0008).
+    if (this.fs.kind(path.dirname(entry.runtimePath)) === 'missing') {
+      throw new SkillsManagerError('distribute_target_missing', `Refresh target no longer exists: ${entry.runtimePath}`, { runtimePath: entry.runtimePath, skill: entry.skill, agents: entry.agents });
+    }
+    const result = this.apply({
+      to: record.kind,
+      projectRoot: record.kind === 'project' ? record.targetRoot : undefined,
+      skills: [entry.skill],
+      agents: entry.agents,
+      mode: entry.mode,
+      force: Boolean(force),
+    });
+    // `apply` writes its own record; the returned entry carries the new fingerprint and appliedAt.
+    // Strip any prior error — the refresh succeeded.
+    const next = result.entries[0];
+    return { ...next, error: undefined };
   }
 
   rollback(to: DistributionTargetKind, projectRoot?: string) {
