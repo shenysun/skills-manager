@@ -140,6 +140,40 @@ export class DistributeService {
     return { refreshed, errored };
   }
 
+  /** Refresh every stale copy target of `skill` across all records. Used by install / update cascade. */
+  redistributeOutdatedForSkill(skill: SkillName) {
+    const refreshed: DistributionIndexEntry[] = [];
+    const errored: DistributionIndexEntry[] = [];
+    for (const record of this.loadIndex()) {
+      const targets = record.entries.filter((entry) => entry.skill === skill);
+      if (targets.length === 0) continue;
+      const nextEntries = [...record.entries];
+      for (const entry of targets) {
+        if (!this.entryOutdated(entry)) continue;
+        try {
+          const refreshedEntry = this.refreshStaleEntry(record, entry);
+          const idx = nextEntries.findIndex((e) => e === entry);
+          nextEntries[idx] = refreshedEntry;
+          refreshed.push(refreshedEntry);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const code = error instanceof SkillsManagerError ? error.code : 'refresh_failed';
+          const erroredEntry: DistributionIndexEntry = {
+            ...entry,
+            error: { code, message, at: new Date().toISOString() },
+          };
+          const idx = nextEntries.findIndex((e) => e === entry);
+          nextEntries[idx] = erroredEntry;
+          errored.push(erroredEntry);
+        }
+      }
+      if (nextEntries.length !== record.entries.length || nextEntries.some((e, i) => e !== record.entries[i])) {
+        this.writeRecord({ kind: record.kind, targetRoot: record.targetRoot, id: record.id }, nextEntries);
+      }
+    }
+    return { refreshed, errored };
+  }
+
   /** Refresh a single stale entry by re-running apply() for it. Returns the new entry; never throws on per-entry failure (caller should catch). */
   refreshStaleEntry(record: DistributionIndexRecord, entry: DistributionIndexEntry, force?: boolean): DistributionIndexEntry {
     // The runtime directory's parent must still exist — we don't silently resurrect
@@ -393,6 +427,7 @@ export class DistributeService {
 
   private entryOutdated(entry: DistributionIndexEntry) {
     if (!this.registry.skillExists(entry.skill)) return false;
+    if (entry.mode === 'symlink') return false; // symlinks always proxy the live hub tree
     return entry.fingerprint !== this.fingerprint(entry.skill);
   }
 

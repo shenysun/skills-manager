@@ -42,7 +42,7 @@ export function createCoreServices(options: CoreServicesOptions) {
   const views = new ViewService(options.fs, home, registry);
   const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot, env: options.env, userHomeDir: options.userHome });
   const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);
-  const install = new InstallService(options.fs, home, registry, source, views);
+  const install = new InstallService(options.fs, home, registry, source, views, distribute);
   const update = new UpdateService(registry, source, install);
   const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog);
   const activity = new ActivityService(options.fs, options.git, home);

@@ -6,6 +6,7 @@ import { assertPathInside, parseAgentTags } from '../../shared/validation.js';
 import type { RegistryService } from './registry-service.js';
 import type { SourceService } from './source-service.js';
 import type { ViewService } from './view-service.js';
+import type { DistributeService } from './distribute-service.js';
 
 export class InstallService {
   constructor(
@@ -14,6 +15,7 @@ export class InstallService {
     private readonly registry: RegistryService,
     private readonly source: SourceService,
     private readonly views: ViewService,
+    private readonly distribute?: DistributeService,
   ) {}
 
   planInstall(sourceCheckout: SourceCheckout, discovered: DiscoveredSkill[], selectors: readonly string[], consumerValues?: readonly string[], options: { overwrite?: boolean } = {}): InstallPlan {
@@ -32,6 +34,11 @@ export class InstallService {
   installPlan(plan: InstallPlan): InstallResult {
     for (const skill of plan.selected) this.copySkillToCanonical(skill, plan.source, plan.consumers);
     this.views.rebuildCollections();
+    if (this.distribute) {
+      for (const skill of plan.selected) {
+        this.distribute.redistributeOutdatedForSkill(skill.name);
+      }
+    }
     return { installed: plan.selected.map((skill) => skill.name), plan };
   }
 

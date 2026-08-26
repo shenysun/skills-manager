@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -101,14 +101,27 @@ describe('outdated and redistribute', () => {
     expect(userRecord(s)?.entries).toBeUndefined();
   });
 
-  it('reports symlink targets as outdated for audit and refreshes them without error', () => {
+  it('never reports symlink targets as outdated and leaves them untouched on redistribute', () => {
+    // Per ADR-0008 "Stale" glossary: only copy-mode targets can be stale, because
+    // symlinks always proxy the live hub tree — re-applying them is a no-op rewrite
+    // of an already-current reference. redistributeOutdated must skip them.
     const s = services();
     s.distribute.apply({ to: 'user', skills: ['alpha'], agents: ['claude-code'], mode: 'symlink' });
+    const symlinkPath = path.join(userHome, '.claude', 'skills', 'alpha');
+    const hubSkill = path.join(home, 'skills', 'alpha');
+    expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(symlinkPath)).toBe(hubSkill);
+    // Mutate hub content.
     writeFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), `---\nname: alpha\ntitle: Alpha\ndescription: changed\n---\n# Changed\n`);
-    expect(s.distribute.status().outdated).toBe(1);
-    const refreshed = s.distribute.redistributeOutdated({ to: 'user' });
-    expect(refreshed.refreshed).toHaveLength(1);
+    // Symlink entries are never stale, so audit + refresh are both no-ops.
     expect(s.distribute.status().outdated).toBe(0);
+    const refreshed = s.distribute.redistributeOutdated({ to: 'user' });
+    expect(refreshed.refreshed).toHaveLength(0);
+    expect(refreshed.errored).toHaveLength(0);
+    expect(s.distribute.status().outdated).toBe(0);
+    // Symlink target survives the cascade intact and still points at the hub.
+    expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(symlinkPath)).toBe(hubSkill);
   });
 });
 
