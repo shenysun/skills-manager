@@ -1,5 +1,7 @@
 # Skills Manager
 
+**English** | [简体中文](README.zh-CN.md)
+
 `@shenysun/skills-manager` is a local-first CLI and dashboard for managing agent, Claude, and Codex skills from a registry-driven skill home.
 
 ## Quick Start

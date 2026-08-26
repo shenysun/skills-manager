@@ -1,5 +1,7 @@
 # Getting Started with Skills Manager
 
+**English** | [简体中文](GETTING_STARTED.zh-CN.md)
+
 Welcome! This guide will help you get started with `@shenysun/skills-manager` in minutes.
 
 ## Installation
