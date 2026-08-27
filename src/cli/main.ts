@@ -82,6 +82,18 @@ function countErrored(s: ReturnType<typeof services>): number {
   return count;
 }
 
+/** Stale-or-errored target count, same predicate as the dashboard stale badge (`entry.error || entryOutdated`), so the two never disagree. */
+function staleOrErroredCount(s: ReturnType<typeof services>): number {
+  return Object.values(s.distribute.staleSummary()).reduce((total, count) => total + count, 0);
+}
+
+function remindStaleTargets(s: ReturnType<typeof services>) {
+  const stale = staleOrErroredCount(s);
+  if (stale > 0) {
+    console.log(`Stale or errored copy targets: ${stale}. Run \`skills-manager redistribute --refresh\` to sync.`);
+  }
+}
+
 program.command('init')
   .description('Import skills already living in agent runtime dirs into the hub (reverse of distribute); origins become managed symlinks')
   .option('-a, --agent <id...>', 'catalog agent ids to scan; defaults to the detected set')
@@ -181,10 +193,7 @@ program.command('add')
     const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes) });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
     print(result);
-    const health = s.distribute.status();
-    if (health.outdated > 0) {
-      console.log(`提示：${health.outdated} 个 copy 目标落后于 hub，运行 \`skills redistribute --refresh\` 同步。`);
-    }
+    remindStaleTargets(s);
   });
 
 program.command('update')
@@ -198,10 +207,7 @@ program.command('update')
     const result = opts.source ? s.update.updateSource(opts.source) : s.update.updateSkills(opts.skill);
     s.activity.record({ action: 'cli-update', summary: `Updated ${result.updated.join(', ')}`, details: result });
     print(result);
-    const health = s.distribute.status();
-    if (health.outdated > 0) {
-      console.log(`提示：${health.outdated} 个 copy 目标落后于 hub，运行 \`skills redistribute --refresh\` 同步。`);
-    }
+    remindStaleTargets(s);
   });
 
 const distribute = program.command('distribute')
