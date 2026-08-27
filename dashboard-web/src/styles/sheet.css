@@ -97,21 +97,31 @@
   font-size: 13px;
 }
 
-/* Sticky picker controls: scope tabs, project path, search, and quick actions
-   stay pinned while the agent list scrolls past (overlay-level scroll on
-   short viewports). Spans the sheet's inner width so scrolled rows never
-   show through the padding gutters. */
-.picker-sticky {
-  position: sticky;
-  /* Sticky anchors to the overlay's content edge, which sits 8vh (the
-     overlay's padding-top) below the viewport top — pull up by the same
-     amount so the pinned controls sit flush at the viewport top. */
-  top: -8vh;
-  z-index: 2;
-  background: var(--bg);
-  margin: 0 -22px;
-  padding: 0 22px 6px;
-  border-bottom: 1px solid var(--line2);
+/* Fill layout: a tall sheet caps at the viewport and scrolls its list
+   internally, so the controls above the list stay in view on every viewport —
+   no reliance on overlay-level scrolling (which the list's 46vh cap usually
+   absorbs anyway, leaving sticky never triggered). */
+.sheet.fill {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(92vh - 48px);
+}
+
+.sheet.fill > .sheet-head {
+  flex: none;
+}
+
+.picker-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.picker-body .agent-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 /* Scope toggle: two text tabs, the active one underlined. */

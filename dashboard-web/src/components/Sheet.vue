@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 
-defineProps<{ title: string; wide?: boolean }>();
+defineProps<{ title: string; wide?: boolean; fill?: boolean }>();
 const emit = defineEmits<{ cancel: [] }>();
 
 function onKey(event: KeyboardEvent) {
@@ -41,7 +41,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div class="sheet-overlay" @click.self="emit('cancel')">
-      <div class="sheet" :class="{ wide }" role="dialog" :aria-label="title">
+      <div class="sheet" :class="{ wide, fill }" role="dialog" :aria-label="title">
         <div class="sheet-head">
           <h2>{{ title }}</h2>
           <slot name="head" />
