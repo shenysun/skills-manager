@@ -124,6 +124,7 @@ export default {
     imported: 'Imported: {skills}',
     importFailed: 'Import failed: {skill} — {message}',
     refreshed: 'Refreshed copies of {skill}',
+    refreshErrors: 'Refreshed, but {n} target(s) failed: {first}',
   },
   remove: {
     title: 'Remove from library',

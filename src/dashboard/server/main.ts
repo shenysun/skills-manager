@@ -483,14 +483,6 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     });
   });
 
-  // Stale-count summary for the single-page badge (ADR-0008). Server-side
-  // because the fingerprint diff is hub-side; the client can't recompute it
-  // without re-reading each hub tree.
-  app.get('/api/distributions/stale', async () => {
-    const services = getServices();
-    return data(services.distribute.staleSummary());
-  });
-
   return app;
 }
 

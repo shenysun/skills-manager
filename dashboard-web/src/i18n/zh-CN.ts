@@ -124,6 +124,7 @@ export default {
     imported: '已导入:{skills}',
     importFailed: '导入失败:{skill} —{message}',
     refreshed: '已刷新 {skill} 的副本',
+    refreshErrors: '刷新完成，但 {n} 个目标失败：{first}',
   },
   remove: {
     title: '从库中移除',

@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { deriveRowStatus, type RowStatus } from '../domain/rowStatus';
 import { rowBodyClick, rowNameClick } from '../domain/rowClick';
-import { refreshSkill, type SkillRowState } from '../api/client';
+import { refreshSkill, type RefreshResult, type SkillRowState } from '../api/client';
 import RowMenu from './RowMenu.vue';
 
 const props = defineProps<{ skill: SkillRowState; updating?: boolean; selected?: boolean; selecting?: boolean }>();
@@ -17,7 +17,7 @@ const emit = defineEmits<{
   remove: [skill: SkillRowState];
   preview: [skill: SkillRowState];
   toggle: [name: string];
-  refreshed: [name: string];
+  refreshed: [name: string, result: RefreshResult];
 }>();
 
 const { t } = useI18n();
@@ -52,14 +52,14 @@ function onBodyClick() {
 }
 
 // ADR-0008: refresh stale copy targets. Per-entry failures are surfaced by the
-// backend via the `errors` array; we just notify the parent so it can refetch
-// state (which will re-derive warning/staleCount).
+// backend via the `errors` array; we pass the result to the parent so it can
+// toast the failures and refetch state (which will re-derive warning/staleCount).
 async function onRefresh() {
   if (refreshing.value) return;
   refreshing.value = true;
   try {
-    await refreshSkill(props.skill.name);
-    emit('refreshed', props.skill.name);
+    const result = await refreshSkill(props.skill.name);
+    emit('refreshed', props.skill.name, result);
   } finally {
     refreshing.value = false;
   }

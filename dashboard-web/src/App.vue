@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { errorMessage, fetchState, initPreview, removeSkills, updateSkills, type DashboardState, type SkillRowState } from './api/client';
+import { errorMessage, fetchState, initPreview, removeSkills, updateSkills, type DashboardState, type RefreshResult, type SkillRowState } from './api/client';
 import { filterSkills } from './domain/filterSkills';
 import { removeConsequence } from './domain/remove';
 import { resolveHash } from './domain/resolveHash';
@@ -109,11 +109,16 @@ const updatingAll = computed(() => {
 
 // ADR-0008: refresh one skill's stale copy targets. Backend returns the
 // per-entry error list; we refetch state so the badge / warning / staleCount
-// update from the new hub fingerprint.
-async function onRefreshed(name: string) {
+// update from the new hub fingerprint, then toast per-entry failures.
+async function onRefreshed(name: string, result: RefreshResult) {
   try {
     state.value = await fetchState();
-    show('ok', t('notice.refreshed', { skill: name }));
+    show(
+      result.errored > 0 ? 'error' : 'ok',
+      result.errored > 0
+        ? t('notice.refreshErrors', { n: result.errored, first: result.errors[0]?.message ?? '' })
+        : t('notice.refreshed', { skill: name }),
+    );
   } catch (error) {
     show('error', errorMessage(error));
   }
