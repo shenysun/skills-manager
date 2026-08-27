@@ -84,4 +84,26 @@ describe('refreshStaleEntry — atomic per entry', () => {
     expect(entry?.error).toBeUndefined();
     expect(readFileSync(path.join(project, '.agents', 'skills', 'alpha', 'SKILL.md'), 'utf8')).toMatch(/v2/);
   });
+
+  it('re-applies an errored entry whose fingerprint matches again (no dead-end badge)', () => {
+    const s = services();
+    const original = readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8');
+    s.distribute.apply({ to: 'project', projectRoot: project, skills: ['alpha'], agents: ['zed'], mode: 'copy' });
+    writeFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), `---\nname: alpha\n---\n# Changed\n`);
+    rmSync(path.join(project, '.agents'), { recursive: true, force: true });
+    const first = s.distribute.redistributeOutdated({ to: 'project', projectRoot: project });
+    expect(first.errored).toHaveLength(1);
+    // Hub content reverts to the recorded fingerprint: fingerprint-stale is now
+    // false, but the entry still carries an error — the badge predicate
+    // (staleSummary) keeps counting it, so refresh admission must too.
+    writeFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), original);
+    expect(s.distribute.staleSummary()['alpha']).toBe(1);
+    mkdirSync(path.join(project, '.agents', 'skills'), { recursive: true });
+    const second = s.distribute.redistributeOutdated({ to: 'project', projectRoot: project });
+    expect(second.refreshed).toHaveLength(1);
+    expect(second.errored).toHaveLength(0);
+    const entry = s.distribute.listIndex().find((r) => r.kind === 'project')?.entries.find((e) => e.skill === 'alpha');
+    expect(entry?.error).toBeUndefined();
+    expect(readFileSync(path.join(project, '.agents', 'skills', 'alpha', 'SKILL.md'), 'utf8')).toBe(original);
+  });
 });

@@ -114,24 +114,14 @@ export class DistributeService {
     for (const record of records) {
       const nextEntries: DistributionIndexEntry[] = [];
       for (const entry of record.entries) {
-        if (!this.entryOutdated(entry)) {
+        if (!this.entryNeedsRefresh(entry)) {
           nextEntries.push(entry);
           continue;
         }
-        try {
-          const refreshedEntry = this.refreshStaleEntry(record, entry, filter.force);
-          nextEntries.push(refreshedEntry);
-          refreshed.push(refreshedEntry);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          const code = error instanceof SkillsManagerError ? error.code : 'refresh_failed';
-          const erroredEntry: DistributionIndexEntry = {
-            ...entry,
-            error: { code, message, at: new Date().toISOString() },
-          };
-          nextEntries.push(erroredEntry);
-          errored.push(erroredEntry);
-        }
+        const { entry: nextEntry, ok } = this.refreshEntryOrRecord(record, entry, filter.force);
+        nextEntries.push(nextEntry);
+        if (ok) refreshed.push(nextEntry);
+        else errored.push(nextEntry);
       }
       if (nextEntries.length !== record.entries.length || nextEntries.some((e, i) => e !== record.entries[i])) {
         this.writeRecord({ kind: record.kind, targetRoot: record.targetRoot, id: record.id }, nextEntries);
@@ -149,23 +139,11 @@ export class DistributeService {
       if (targets.length === 0) continue;
       const nextEntries = [...record.entries];
       for (const entry of targets) {
-        if (!this.entryOutdated(entry)) continue;
-        try {
-          const refreshedEntry = this.refreshStaleEntry(record, entry);
-          const idx = nextEntries.findIndex((e) => e === entry);
-          nextEntries[idx] = refreshedEntry;
-          refreshed.push(refreshedEntry);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          const code = error instanceof SkillsManagerError ? error.code : 'refresh_failed';
-          const erroredEntry: DistributionIndexEntry = {
-            ...entry,
-            error: { code, message, at: new Date().toISOString() },
-          };
-          const idx = nextEntries.findIndex((e) => e === entry);
-          nextEntries[idx] = erroredEntry;
-          errored.push(erroredEntry);
-        }
+        if (!this.entryNeedsRefresh(entry)) continue;
+        const { entry: nextEntry, ok } = this.refreshEntryOrRecord(record, entry);
+        nextEntries[nextEntries.findIndex((e) => e === entry)] = nextEntry;
+        if (ok) refreshed.push(nextEntry);
+        else errored.push(nextEntry);
       }
       if (nextEntries.length !== record.entries.length || nextEntries.some((e, i) => e !== record.entries[i])) {
         this.writeRecord({ kind: record.kind, targetRoot: record.targetRoot, id: record.id }, nextEntries);
@@ -174,7 +152,29 @@ export class DistributeService {
     return { refreshed, errored };
   }
 
-  /** Refresh a single stale entry by re-running apply() for it. Returns the new entry; never throws on per-entry failure (caller should catch). */
+  /** Refresh admission mirrors the stale badge predicate (`entry.error || entryOutdated`):
+   *  an errored entry stays refreshable even once its fingerprint matches again. */
+  private entryNeedsRefresh(entry: DistributionIndexEntry) {
+    return this.entryOutdated(entry) || Boolean(entry.error);
+  }
+
+  /** Refresh one stale entry, or record the failure on it — ADR-0008: a failing entry never blocks siblings. */
+  private refreshEntryOrRecord(record: DistributionIndexRecord, entry: DistributionIndexEntry, force?: boolean): { entry: DistributionIndexEntry; ok: boolean } {
+    try {
+      return { entry: this.refreshStaleEntry(record, entry, force), ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const code = error instanceof SkillsManagerError ? error.code : 'refresh_failed';
+      return { entry: { ...entry, error: { code, message, at: new Date().toISOString() } }, ok: false };
+    }
+  }
+
+  /**
+   * Refresh one entry by re-running apply() for it. THROWS on failure — the
+   * caller catches and records the error on the entry (ADR-0008). `force`
+   * defaults to false, so an unmanaged foreign file at the target throws
+   * `distribute_foreign_exists` for the caller to catch and record.
+   */
   refreshStaleEntry(record: DistributionIndexRecord, entry: DistributionIndexEntry, force?: boolean): DistributionIndexEntry {
     // The runtime directory's parent must still exist — we don't silently resurrect
     // a runtime root that the user removed out from under us (ADR-0008).
@@ -191,7 +191,7 @@ export class DistributeService {
     });
     // `apply` writes its own record; the returned entry carries the new fingerprint and appliedAt.
     // Strip any prior error — the refresh succeeded.
-    const next = result.entries[0];
+    const next = result.entries.find((e) => e.runtimePath === entry.runtimePath) ?? result.entries[0];
     return { ...next, error: undefined };
   }
 
