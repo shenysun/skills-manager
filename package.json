@@ -1,6 +1,6 @@
 {
   "name": "skills-manager-cli",
-  "version": "2026.8.26-1",
+  "version": "2026.8.27",
   "packageManager": "pnpm@10.33.0",
   "description": "Local-first CLI and dashboard for managing agent, Claude, and Codex skills",
   "repository": {
