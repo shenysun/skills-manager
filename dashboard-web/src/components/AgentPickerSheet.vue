@@ -128,39 +128,38 @@ async function apply() {
 </script>
 
 <template>
-  <Sheet v-if="!showBrowser" :title="t('picker.title', { n: skills.length })" fill @cancel="emit('close')">
-    <div class="picker-body">
-      <div class="scope-row">
-        <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
-        <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
-      </div>
+  <Sheet v-if="!showBrowser" :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
+    <div class="scope-row">
+      <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
+      <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
+    </div>
 
-      <div v-if="scope === 'project'" class="project-input-row">
-        <ProjectDropdown
-          v-model="projectRoot"
-          :recent-paths="recentPaths"
-          :known-projects="knownProjects"
-          :placeholder="t('picker.projectRoot')"
-          @update:model-value="() => void loadAgents()"
-          @browse="showBrowser = true"
-        />
-      </div>
+    <div v-if="scope === 'project'" class="project-input-row">
+      <ProjectDropdown
+        v-model="projectRoot"
+        :recent-paths="recentPaths"
+        :known-projects="knownProjects"
+        :placeholder="t('picker.projectRoot')"
+        @update:model-value="() => void loadAgents()"
+        @browse="showBrowser = true"
+      />
+    </div>
 
-      <div class="field-line">
-        <input v-model="query" type="search" :placeholder="t('picker.searchPlaceholder')" />
-      </div>
+    <div class="field-line">
+      <input v-model="query" type="search" :placeholder="t('picker.searchPlaceholder')" />
+    </div>
 
-      <div v-if="!loadError" class="quick-row">
-        <button class="text-btn" @click="selection = selectAllVisible(agents, query, selection)">
-          {{ t('picker.quick.selectAll') }}
-        </button>
-        <button class="text-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
-          {{ t('picker.quick.selectDetected') }}
-        </button>
-        <button class="text-btn" @click="selection = clearVisible(agents, query, selection)">
-          {{ t('picker.quick.clear') }}
-        </button>
-      </div>
+    <div v-if="!loadError" class="quick-row">
+      <button class="text-btn" @click="selection = selectAllVisible(agents, query, selection)">
+        {{ t('picker.quick.selectAll') }}
+      </button>
+      <button class="text-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
+        {{ t('picker.quick.selectDetected') }}
+      </button>
+      <button class="text-btn" @click="selection = clearVisible(agents, query, selection)">
+        {{ t('picker.quick.clear') }}
+      </button>
+    </div>
 
     <p v-if="loadError" class="picker-error">{{ t('error.loadFailed', { message: loadError }) }}</p>
 
@@ -228,13 +227,12 @@ async function apply() {
       <button :class="{ on: mode === 'copy' }" @click="mode = 'copy'">{{ t('picker.copy') }}</button>
     </div>
 
-      <div class="sheet-foot">
-        <span class="picker-count">{{ t('picker.selected', selection.length) }}</span>
-        <button class="text-btn" @click="emit('close')">{{ t('picker.cancel') }}</button>
-        <button class="primary-btn" :disabled="selection.length === 0 || applying || projectPending" @click="apply">
-          {{ applying ? t('picker.applying') : t('picker.apply') }}
-        </button>
-      </div>
+    <div class="sheet-foot">
+      <span class="picker-count">{{ t('picker.selected', selection.length) }}</span>
+      <button class="text-btn" @click="emit('close')">{{ t('picker.cancel') }}</button>
+      <button class="primary-btn" :disabled="selection.length === 0 || applying || projectPending" @click="apply">
+        {{ applying ? t('picker.applying') : t('picker.apply') }}
+      </button>
     </div>
   </Sheet>
 

@@ -97,33 +97,6 @@
   font-size: 13px;
 }
 
-/* Fill layout: a tall sheet caps at the viewport and scrolls its list
-   internally, so the controls above the list stay in view on every viewport —
-   no reliance on overlay-level scrolling (which the list's 46vh cap usually
-   absorbs anyway, leaving sticky never triggered). */
-.sheet.fill {
-  display: flex;
-  flex-direction: column;
-  max-height: calc(92vh - 48px);
-}
-
-.sheet.fill > .sheet-head {
-  flex: none;
-}
-
-.picker-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.picker-body .agent-list {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-}
-
 /* Scope toggle: two text tabs, the active one underlined. */
 .scope-row {
   display: flex;
