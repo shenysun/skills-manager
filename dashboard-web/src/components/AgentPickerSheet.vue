@@ -129,36 +129,38 @@ async function apply() {
 
 <template>
   <Sheet v-if="!showBrowser" :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
-    <div class="scope-row">
-      <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
-      <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
-    </div>
+    <div class="picker-sticky">
+      <div class="scope-row">
+        <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
+        <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
+      </div>
 
-    <div v-if="scope === 'project'" class="project-input-row">
-      <ProjectDropdown
-        v-model="projectRoot"
-        :recent-paths="recentPaths"
-        :known-projects="knownProjects"
-        :placeholder="t('picker.projectRoot')"
-        @update:model-value="() => void loadAgents()"
-        @browse="showBrowser = true"
-      />
-    </div>
+      <div v-if="scope === 'project'" class="project-input-row">
+        <ProjectDropdown
+          v-model="projectRoot"
+          :recent-paths="recentPaths"
+          :known-projects="knownProjects"
+          :placeholder="t('picker.projectRoot')"
+          @update:model-value="() => void loadAgents()"
+          @browse="showBrowser = true"
+        />
+      </div>
 
-    <div class="field-line">
-      <input v-model="query" type="search" :placeholder="t('picker.searchPlaceholder')" />
-    </div>
+      <div class="field-line">
+        <input v-model="query" type="search" :placeholder="t('picker.searchPlaceholder')" />
+      </div>
 
-    <div v-if="!loadError" class="quick-row">
-      <button class="text-btn" @click="selection = selectAllVisible(agents, query, selection)">
-        {{ t('picker.quick.selectAll') }}
-      </button>
-      <button class="text-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
-        {{ t('picker.quick.selectDetected') }}
-      </button>
-      <button class="text-btn" @click="selection = clearVisible(agents, query, selection)">
-        {{ t('picker.quick.clear') }}
-      </button>
+      <div v-if="!loadError" class="quick-row">
+        <button class="text-btn" @click="selection = selectAllVisible(agents, query, selection)">
+          {{ t('picker.quick.selectAll') }}
+        </button>
+        <button class="text-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
+          {{ t('picker.quick.selectDetected') }}
+        </button>
+        <button class="text-btn" @click="selection = clearVisible(agents, query, selection)">
+          {{ t('picker.quick.clear') }}
+        </button>
+      </div>
     </div>
 
     <p v-if="loadError" class="picker-error">{{ t('error.loadFailed', { message: loadError }) }}</p>
