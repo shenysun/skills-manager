@@ -209,7 +209,8 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   // Single-page state (ADR-0005): one row per skill, recent operations, and the
   // update count. distributedAgents is the logical layer of the hub
   // distribution index — observed agent ids, never registry consumers tags
-  // (desired defaults; see ADR-0004).
+  // (desired defaults; see ADR-0004). distribution is the same index grouped by
+  // target (physical layer), so the preview can answer "installed where".
   const state = async () => {
     const services = getServices();
     const listed = services.registry.listSkills({ includeArchived: false });
@@ -218,12 +219,20 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     const brokenPaths = new Set(services.doctor.check().brokenLinks);
     const skills = listed.map((skill) => {
       const agents = new Set<string>();
+      const distribution: Array<{
+        kind: 'user' | 'project';
+        targetRoot: string;
+        entries: Array<{ runtimePath: string; agents: string[] }>;
+      }> = [];
       let warning: 'broken-link' | 'outdated-copy' | null = null;
       let staleCount = 0;
       let hubFingerprint: string | null = null;
       for (const record of index) {
+        let target: (typeof distribution)[number] | undefined;
         for (const entry of record.entries) {
           if (entry.skill !== skill.name) continue;
+          target ??= { kind: record.kind, targetRoot: record.targetRoot, entries: [] };
+          target.entries.push({ runtimePath: entry.runtimePath, agents: [...entry.agents].sort() });
           entry.agents.forEach((id) => agents.add(id));
           if (brokenPaths.has(entry.runtimePath)) {
             warning ??= 'broken-link';
@@ -242,16 +251,27 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
             }
           }
         }
+        if (target) distribution.push(target);
       }
       return {
         name: skill.name,
         category: skill.category,
         description: skill.description,
-        sourceType: skill.source.type || 'local',
+        // Imported skills carry no source by design (ADR-0006) — null hides the
+        // 来源 segment instead of rendering an empty placeholder.
+        source: skill.source.url
+          ? {
+              type: skill.source.type || 'local',
+              url: skill.source.url,
+              subpath: skill.source.subpath ?? null,
+              ref: skill.source.ref ?? null,
+            }
+          : null,
         hasUpdate: updatable.get(skill.name) ?? false,
         warning,
         staleCount,
         distributedAgents: [...agents].sort(),
+        distribution,
       };
     });
     return {

@@ -241,3 +241,53 @@ body.selecting .item .cb input {
     animation: none;
   }
 }
+
+/* Operation feedback (visual baseline 2026-08-27): bottom-center floating
+   toast — out of the document flow so nothing shifts; a new notice replaces
+   the previous one (useNotice keeps a single slot). */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  max-width: min(560px, calc(100vw - 48px));
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  text-align: center;
+  z-index: 650;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: toast-in 0.16s ease-out;
+}
+
+/* Above the selection bar (same bottom-center slot) while selecting. */
+body.selecting .toast {
+  bottom: 84px;
+}
+
+.toast.ok {
+  color: var(--ok);
+}
+
+.toast.error {
+  color: var(--danger);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

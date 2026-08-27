@@ -48,7 +48,11 @@ async function runApply() {
   try {
     const result = await initApply({ resolve: resolve.value });
     if (result.imported.length > 0) show('ok', t('notice.imported', { skills: result.imported.join(', ') }));
-    for (const failure of result.failed) show('error', t('notice.importFailed', { skill: failure.skill, message: failure.reason }));
+    // One toast replaces the previous (visual baseline 2026-08-27), so batch
+    // the failures into a single message instead of flashing only the last.
+    if (result.failed.length > 0) {
+      show('error', result.failed.map((failure) => t('notice.importFailed', { skill: failure.skill, message: failure.reason })).join('; '));
+    }
     emit('close');
   } catch (cause) {
     error.value = errorMessage(cause);

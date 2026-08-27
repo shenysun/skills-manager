@@ -22,19 +22,28 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
 }
 
+/* Head carries title + right-side actions only (Skill preview structure,
+   2026-08-27): the title absorbs the slack, actions never get squeezed. */
 .sheet-head {
   display: flex;
   align-items: baseline;
+  gap: 10px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .sheet-head h2 {
   font-size: 17px;
   font-weight: 650;
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sheet-close {
-  margin-left: auto;
+  flex: none;
   color: var(--fg3);
   font-size: 13px;
 }
@@ -295,19 +304,8 @@
   background: var(--line2);
 }
 
-/* One-line operation feedback */
-.notice {
-  font-size: 13.5px;
-  margin: 0 0 6px;
-}
-
-.notice.ok {
-  color: var(--ok);
-}
-
-.notice.error {
-  color: var(--danger);
-}
+/* One-line operation feedback lives in .toast (page.css) — bottom-center, out
+   of the document flow. */
 
 /* Selection-mode floating bar (prototype variant C) */
 .selection-bar {

@@ -180,7 +180,11 @@ async function onRemoveConfirm() {
     const done = results.filter((result) => result.ok).map((result) => result.skill);
     const failed = results.filter((result) => !result.ok);
     if (done.length > 0) show('ok', t('notice.removed', { skills: done.join(', ') }));
-    for (const failure of failed) show('error', t('notice.removeFailed', { skill: failure.skill, message: failure.error.message }));
+    // One toast replaces the previous (visual baseline 2026-08-27), so batch
+    // the failures into a single message instead of flashing only the last.
+    if (failed.length > 0) {
+      show('error', failed.map((failure) => t('notice.removeFailed', { skill: failure.skill, message: failure.error.message })).join('; '));
+    }
   } catch (error) {
     show('error', errorMessage(error));
   }
@@ -204,7 +208,6 @@ async function onRemoveConfirm() {
       </div>
     </header>
     <p class="sub">{{ t('library.count', state?.skills.length ?? 0) }}</p>
-    <p v-if="notice" class="notice" :class="notice.kind">{{ notice.text }}</p>
     <div class="search-line">
       <input v-model="query" type="search" :placeholder="t('search.placeholder')" />
     </div>
@@ -306,5 +309,13 @@ async function onRemoveConfirm() {
       @remove="batchRemove"
       @cancel="selection = exitSelection(selection)"
     />
+
+    <!-- Operation feedback (visual baseline 2026-08-27): a bottom-center
+         floating toast — out of the document flow, so nothing shifts. -->
+    <Teleport to="body">
+      <div v-if="notice" class="toast" :class="notice.kind" role="status" aria-live="polite">
+        {{ notice.text }}
+      </div>
+    </Teleport>
   </main>
 </template>

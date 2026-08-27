@@ -64,17 +64,35 @@ describe('GET /api/state (single-page slim contract)', () => {
     expect(Object.keys(body.data).sort()).toEqual(['activity', 'knownProjects', 'skills', 'updateCount']);
   });
 
-  it('describes every skill in one row with the eight single-page fields', async () => {
+  it('describes every skill in one row with the ten single-page fields', async () => {
     const state = await getState();
     expect(state.skills).toHaveLength(1);
     const alpha = state.skills[0];
-    expect(Object.keys(alpha).sort()).toEqual(['category', 'description', 'distributedAgents', 'hasUpdate', 'name', 'sourceType', 'staleCount', 'warning']);
+    expect(Object.keys(alpha).sort()).toEqual(['category', 'description', 'distributedAgents', 'distribution', 'hasUpdate', 'name', 'source', 'staleCount', 'warning']);
     expect(alpha.name).toBe('alpha');
     expect(alpha.description).toBe('api');
-    expect(alpha.sourceType).toBe('local');
+    expect(alpha.source).toEqual({ type: 'local', url: sourceRoot, subpath: 'skills/alpha', ref: null });
     expect(alpha.warning).toBeNull();
     expect(alpha.staleCount).toBe(0);
     expect(alpha.distributedAgents).toEqual([]);
+    expect(alpha.distribution).toEqual([]);
+  });
+
+  it('carries a git source with url/subpath/ref for link rendering', async () => {
+    patchRegistry((entry) => {
+      entry.source = { type: 'git', url: 'https://github.com/owner/repo.git', subpath: 'skills/alpha', ref: 'main' };
+    });
+    const state = await getState();
+    expect(state.skills[0].source).toEqual({ type: 'git', url: 'https://github.com/owner/repo.git', subpath: 'skills/alpha', ref: 'main' });
+  });
+
+  it('nulls the source for imported skills with no recorded provenance', async () => {
+    patchRegistry((entry) => {
+      delete entry.source;
+      entry.imported = true;
+    });
+    const state = await getState();
+    expect(state.skills[0].source).toBeNull();
   });
 
   it('carries recent operations in activity', async () => {
@@ -113,6 +131,33 @@ describe('GET /api/state (single-page slim contract)', () => {
     });
     const state = await getState();
     expect(state.skills[0].distributedAgents).toEqual(['warp']);
+  });
+
+  it('exposes the per-skill distribution grouped by target, agents on each runtime path', async () => {
+    const projA = path.join(root, 'proj-a');
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['claude-code'] } });
+    const proj = await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: projA, skills: ['alpha'], agents: ['warp'] } });
+    expect(JSON.parse(proj.body).ok, proj.body).toBe(true);
+    const state = await getState();
+    expect(state.skills[0].distribution).toEqual([
+      {
+        kind: 'user',
+        targetRoot: userHome,
+        entries: [{ runtimePath: path.join(userHome, '.claude', 'skills', 'alpha'), agents: ['claude-code'] }],
+      },
+      {
+        kind: 'project',
+        targetRoot: projA,
+        entries: [{ runtimePath: expect.stringContaining(projA), agents: ['warp'] }],
+      },
+    ]);
+  });
+
+  it('drops distribution targets once every agent on them is undistributed', async () => {
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['claude-code'] } });
+    expect((await getState()).skills[0].distribution).toHaveLength(1);
+    await app.inject({ method: 'POST', url: '/api/undistribute', payload: { to: 'user', skills: ['alpha'], agents: ['claude-code'] } });
+    expect((await getState()).skills[0].distribution).toEqual([]);
   });
 
   it('reflects undistribute immediately in distributedAgents', async () => {

@@ -5,10 +5,13 @@ import Sheet from './Sheet.vue';
 import { errorMessage, fetchSkillFile, fetchSkillFiles, type SkillFileEntry, type SkillFilePayload, type SkillRowState } from '../api/client';
 import { buildFileTree, defaultPreviewPath, type FileTreeNode } from '../domain/fileTree';
 import { renderedView, togglePreviewView, type PreviewView } from '../domain/previewView';
+import { sourceLink } from '../domain/sourceLink';
+import { distCountsText, projectRootsOf } from '../domain/distribution';
 
-// Read-only skill preview (CONTEXT.md): a wide Sheet over the library — file
-// tree on the left, the selected file's content on the right. Opens with
-// SKILL.md selected; the rendered view innerHTMLs only server-sanitized HTML.
+// Read-only skill preview (CONTEXT.md): a wide Sheet over the library — head
+// carries only name + actions; a meta zone below holds the full description
+// and the 来源 · 接入 summary; then file tree left, file content right. The
+// rendered view innerHTMLs only server-sanitized HTML.
 const props = defineProps<{ skill: SkillRowState }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -19,6 +22,11 @@ const selectedPath = ref<string | null>(null);
 const file = ref<SkillFilePayload | null>(null);
 const loadError = ref<string | null>(null);
 const view = ref<PreviewView>(renderedView);
+
+const src = computed(() => sourceLink(props.skill.source));
+const projectRoots = computed(() => projectRootsOf(props.skill.distribution));
+const distributed = computed(() => props.skill.distributedAgents.length > 0);
+const distCounts = computed(() => distCountsText(t, props.skill.distributedAgents.length, projectRoots.value.length));
 
 const tree = computed(() => buildFileTree(files.value.map((entry) => entry.path)));
 
@@ -65,7 +73,6 @@ function formatSize(bytes: number): string {
 <template>
   <Sheet wide :title="skill.name" @cancel="emit('close')">
     <template #head>
-      <span class="preview-desc">{{ skill.description }}</span>
       <button
         v-if="file?.kind === 'markdown'"
         class="text-btn preview-toggle"
@@ -74,6 +81,33 @@ function formatSize(bytes: number): string {
         {{ view === 'rendered' ? t('preview.viewSource') : t('preview.viewRendered') }}
       </button>
     </template>
+
+    <div class="preview-meta">
+      <p v-if="skill.description" class="preview-desc-full">{{ skill.description }}</p>
+      <div v-if="src || distributed" class="preview-summary">
+        <span v-if="src">
+          {{ t('preview.sourceLabel') }}
+          <a v-if="src.href" :href="src.href" target="_blank" rel="noreferrer">{{ src.label }}</a>
+          <span v-else class="mono">{{ src.label }}</span>
+        </span>
+        <!-- 接入 reverse lookup: inline <details>, grouped by target (physical
+             layer); shared runtime paths appear once, agents on each. -->
+        <details v-if="distributed" class="dist-details">
+          <summary>{{ t('preview.distPrefix') }} {{ distCounts }}</summary>
+          <div class="dist-groups">
+            <div v-for="target in skill.distribution" :key="target.targetRoot" class="dist-target">
+              <p class="dist-target-name" :class="{ mono: target.kind === 'project' }">
+                {{ target.kind === 'user' ? t('preview.distUser') : target.targetRoot }}
+              </p>
+              <p v-for="entry in target.entries" :key="entry.runtimePath" class="dist-entry">
+                <span class="dist-agents">{{ entry.agents.join(', ') }}</span>
+                <span class="mono dist-path">{{ entry.runtimePath }}</span>
+              </p>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
 
     <div class="preview-body">
       <aside v-if="treeRows.length" class="preview-tree">

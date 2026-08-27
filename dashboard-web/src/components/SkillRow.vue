@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { deriveRowStatus, type RowStatus } from '../domain/rowStatus';
 import { rowBodyClick, rowNameClick } from '../domain/rowClick';
+import { distCountsText } from '../domain/distribution';
 import { refreshSkill, type RefreshResult, type SkillRowState } from '../api/client';
 import RowMenu from './RowMenu.vue';
 
@@ -31,7 +32,7 @@ const statusText = computed(() => {
     case 'updatable':
       return t('status.updatable');
     case 'distributed':
-      return t('status.agents', status.value.agentCount);
+      return distCountsText(t, status.value.agentCount, status.value.projectCount);
     case 'unlinked':
       return t('status.unlinked');
   }

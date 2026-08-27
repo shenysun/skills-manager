@@ -1,15 +1,20 @@
 import type { PickerAgent, Scope } from '../domain/picker';
+import type { SkillSourceInfo } from '../domain/sourceLink';
+import type { DistributionTarget } from '../domain/distribution';
 
 export type SkillRowState = {
   name: string;
   category: string;
   description: string;
-  sourceType: string;
+  /** Registry source for the 来源 segment; null for imported skills with no provenance (ADR-0006). */
+  source: SkillSourceInfo | null;
   hasUpdate: boolean;
   warning: 'broken-link' | 'outdated-copy' | null;
   /** Number of stale copy targets for this skill (ADR-0008). Always 0 for symlink-only skills. */
   staleCount: number;
   distributedAgents: string[];
+  /** The hub index grouped by target — the preview's 接入 reverse lookup. */
+  distribution: DistributionTarget[];
 };
 
 export type ActivityRecord = {

@@ -21,8 +21,8 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager web` for browsing, installing, updating, and distributing skills.
 - **Skill library (dashboard surface)**: The Dashboard UI's single page — hub skills as rows with in-place actions (接入 / 更新 / 删除). Ratified 2026-08-25 in [ADR-0005](docs/adr/0005-dashboard-single-surface-skill-library.md).
   _Avoid_: Overview / Sources / Registry / Activity as dashboard destinations; "primary navigation" as a dashboard concept (superseded five-surface IA of ADR-0002).
-- **Skill preview**: The Dashboard UI's **read-only** viewer for one hub skill, opened from a skill row as a wide Sheet: file tree on the left, selected file's content on the right (`.md` rendered as HTML, source files syntax-highlighted, other files a placeholder). No mutation from the preview.
-  _Avoid_: Editing from the preview; treating preview content as trusted HTML; a second detail surface outside this Sheet.
+- **Skill preview**: The Dashboard UI's **read-only** viewer for one hub skill, opened from a skill row as a wide Sheet. Head carries the name plus right-side actions (view toggle, close) — nothing else. Below the head sits a **meta zone** (amended 2026-08-27): the description on its own wrapping line (no single-line truncation), then one small summary line `来源 · 接入`. The 来源 segment renders a git source as an `owner/repo` link to the tree URL (carrying ref/subpath when present), a local source as plain text, and is omitted for imported skills with no source. The 接入 segment reads `N agents · M projects` and expands inline to a per-target breakdown (用户 / 项目 → agents; shared runtime paths listed once); omitted entirely when the skill is undistributed. Below the meta zone: file tree on the left, selected file's content on the right (`.md` rendered as HTML, source files syntax-highlighted, other files a placeholder). No mutation from the preview.
+  _Avoid_: Editing from the preview; treating preview content as trusted HTML; a second detail surface outside this Sheet; squeezing the description or extra elements back into the head row.
 - **Skill home / hub**: The **canonical** managed root where skill *content* lives: `skills/`, `collections/` (optional), `registry.yaml`, and distribution index under `.skills/`. Default hub: **`~/.skills-manager`**. Install/update/archive happen only here (unless operator explicitly points `--home` at another hub).
   _Avoid_: A hub-local `views/` tree as an expose layer — **removed from the product model**.
 - **Distribution target**: A user- or project-side place that **receives a selected subset** of hub skills for *use*, not a second independent source of truth for the same skill identity.
@@ -232,6 +232,8 @@ All legacy hashes redirect to the single page.
 - Update notice is one text line with a text button — no colored strip.
 
 Losing variants (A compact table rows, B airy cards) were rejected for chrome/visual-block weight; the prototype file keeps all three for reference.
+
+**Amended 2026-08-27 (dashboard-ux-pass):** Row status text widens to `7 agents · 2 projects` (the hover-actions-for-status swap is unchanged). Operation feedback (the ten notice messages) moves from the notice line above the search box to a **bottom-center floating toast**: thin small text, ~4 s auto-dismiss, a new notice replaces the previous one (no stacking), rendered outside the document flow so nothing shifts. No persistent hint block above the search box; guidance, empty states, the update line, and load errors stay inline in the content area. The Skill preview Sheet head/meta structure is recorded in the **Skill preview** glossary entry.
 
 ### Default skill home (hub)
 

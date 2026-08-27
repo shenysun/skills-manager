@@ -11,14 +11,86 @@
   flex: none;
 }
 
-.sheet-head .preview-desc {
-  margin-left: 12px;
-  margin-right: auto;
-  color: var(--fg3);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* View toggle sits in the head beside ✕ — never squeezed (flex: none). */
+.preview-toggle {
+  flex: none;
   white-space: nowrap;
+}
+
+/* Meta zone (Skill preview structure, 2026-08-27): full description on its
+   own wrapping line, then one small 来源 · 接入 summary line. */
+.preview-meta {
+  flex: none;
+  margin: 2px 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line2);
+}
+
+.preview-desc-full {
+  color: var(--fg2);
+  font-size: 13.5px;
+  line-height: 1.65;
+  margin: 0 0 6px;
+}
+
+.preview-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  align-items: baseline;
+  color: var(--fg3);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.preview-summary a {
+  color: var(--accent);
+}
+
+/* 接入 reverse lookup: inline disclosure grouped by target (用户 / project
+   path), one line per runtime path with its agents. */
+.dist-details {
+  min-width: 0;
+}
+
+.dist-details summary {
+  cursor: pointer;
+  color: var(--fg3);
+}
+
+.dist-details summary:hover {
+  color: var(--fg2);
+}
+
+.dist-groups {
+  display: grid;
+  gap: 10px;
+  padding: 8px 0 2px;
+}
+
+.dist-target-name {
+  color: var(--fg2);
+  font-size: 12.5px;
+  font-weight: 600;
+  margin: 0 0 2px;
+  overflow-wrap: anywhere;
+}
+
+.dist-entry {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--fg3);
+}
+
+.dist-entry .dist-agents {
+  flex: none;
+}
+
+.dist-entry .dist-path {
+  overflow-wrap: anywhere;
 }
 
 /* Tree on the left (fixed ~240px, own scroll), content on the right. */
