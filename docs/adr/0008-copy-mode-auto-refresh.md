@@ -27,7 +27,7 @@ The fix has to keep the "hub is the only authority" invariant intact. The merge 
 
 ## Decision
 
-1. **Hub is the only authority; copy targets are refreshed as whole subtrees.** Refreshing a stale copy target is: remove its managed files, write the current hub tree to the target's location. Atomic where the platform supports it (write to a sibling temp dir, then `rename` over). Local files that happen to live inside a managed target are treated as foreign and removed — copy targets are owned by skills-manager.
+1. **Hub is the only authority; copy targets are refreshed as whole subtrees.** Refreshing a stale copy target is: remove its managed files, write the current hub tree to the target's location. Atomicity is per-entry, not a platform-level temp-dir-then-`rename`: a failed refresh records an `error` on that entry while sibling entries proceed unaffected, and an interrupted copy self-heals on the next refresh because the entry stays stale (old fingerprint or recorded error) until a refresh lands. Local files that happen to live inside a managed target are treated as foreign and removed — copy targets are owned by skills-manager.
 2. **Single refresh primitive, three call sites.** A `refreshStaleTarget(record, hubSkill)` operation is the only place that decides "is this stale?" and "how do I write the new tree?" It is called from:
    - **`skills update <skill>` / `skills install` after the hub write succeeds** — for each `copy` mode distribution record of that skill, refresh if stale (skip symlinks).
    - **`skills status` / `skills list`** — shows stale count per skill and lists stale targets.
