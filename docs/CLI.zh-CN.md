@@ -31,6 +31,8 @@ skills-manager distribute --to user --skill my-skill --agent claude-code --agent
 skills-manager distribute --to project --project ./repo --skill my-skill --agent cursor --mode copy
 skills-manager undistribute --to user --skill my-skill --agent claude-code
 skills-manager redistribute --outdated
+skills-manager redistribute --refresh --to project --project ./repo
+skills-manager status
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
@@ -42,6 +44,16 @@ skills-manager rebuild-collections
 ```
 
 distribute 的目标可以是任意目录中的 agent id（`--agent`，可重复）。省略 `--agent` 时作用于本机检测到的 agent 集合。用户范围默认 `--mode symlink`，项目范围默认 `--mode copy`；每次应用只能用一种模式。
+
+### 副本过期与自动刷新（ADR-0008）
+
+`copy` 模式的目标在技能库内容变化后会落后于技能库；symlink 目标始终直连技能库实时内容，永不过期。过期判定只看 fingerprint，刷新是整棵受管子树替换（受管副本目标里的本地文件不会保留——技能库是唯一权威）。
+
+- `add` / `update` **级联**：技能库写入成功后，自动刷新所涉技能的每个过期副本目标；单条失败记录在索引条目上，不阻断兄弟目标。
+- `skills-manager status` 输出 `outdated: N, errored: M`，列出刷新错误的运行时路径，并给出修复命令。
+- `skills-manager redistribute --refresh`（`--outdated` 的别名）刷新全部过期副本目标，可用 `--to` / `--project` 过滤；输出 `Refreshed N, errored M.`
+- `add` / `update` 在仍有其他过期目标时，末尾追加一行提醒。
+- 仪表盘的技能行显示带数量的过期徽标和一键刷新按钮。
 
 ### init（反向导入）
 

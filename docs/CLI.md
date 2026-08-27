@@ -31,6 +31,8 @@ skills-manager distribute --to user --skill my-skill --agent claude-code --agent
 skills-manager distribute --to project --project ./repo --skill my-skill --agent cursor --mode copy
 skills-manager undistribute --to user --skill my-skill --agent claude-code
 skills-manager redistribute --outdated
+skills-manager redistribute --refresh --to project --project ./repo
+skills-manager status
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
@@ -42,6 +44,16 @@ skills-manager rebuild-collections
 ```
 
 Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--agent` applies to the detected set on this machine. User scope defaults to `--mode symlink`, project scope to `--mode copy`; one mode per apply.
+
+### Stale copy targets and auto-refresh (ADR-0008)
+
+`copy`-mode targets drift from the hub when skill content changes; symlink targets always proxy the live hub tree and never go stale. Staleness is fingerprint-only, and refreshing replaces the whole managed subtree (files local to a managed copy target are not preserved — the hub is the single authority).
+
+- `add` / `update` **cascade**: after the hub write succeeds, every stale copy target of the touched skills is refreshed automatically; per-entry failures are recorded on the index entry and never block siblings.
+- `skills-manager status` prints `outdated: N, errored: M`, lists refresh errors with their runtime paths, and points at the fix command.
+- `skills-manager redistribute --refresh` (alias of `--outdated`) refreshes every stale copy target, optionally filtered by `--to` / `--project`; it prints `Refreshed N, errored M.`
+- `add` / `update` print a one-line trailing reminder when other stale targets remain.
+- The dashboard shows a stale badge with a count and a one-click refresh button per skill row.
 
 ### init (reverse import)
 

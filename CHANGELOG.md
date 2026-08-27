@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-26 (copy-mode auto-refresh)
+
+- **Copy 模式自动刷新**（ADR-0008）：hub 技能内容变化后，`copy` 目标按 fingerprint 判定为过期并被整树刷新；symlink 目标直连技能库实时内容，永不判定过期（`entryOutdated` 对 symlink 短路）。刷新是原子算子 `refreshStaleEntry`：单条失败记录在索引条目 `error: { code, message, at }` 上，不阻断兄弟目标，下次成功即清除。
+- **add / update 级联刷新**：技能库写入成功后自动刷新所涉技能的全部过期副本目标（`redistributeOutdatedForSkill`，带 delta-guard 不写无变化的记录）。
+- **CLI**：新增 `skills-manager status`（`outdated: N, errored: M`、刷新错误明细、修复命令提示）；`redistribute --refresh` 作为 `--outdated` 的别名（输出 `Refreshed N, errored M.`）；`add` / `update` 成功后仍有其他过期目标时末尾追加一行提醒。
+- **Dashboard**：技能行新增 `staleCount`（`error` 与 fingerprint 过期都计入）与过期徽标 + 一键「刷新副本」按钮；新增 `POST /api/distribute/refresh`（按 skill 或全局）与 `GET /api/distributions/stale`（`staleSummary()`）。
+- 词汇表新增 **Stale** / **Stale target**（见 CONTEXT.md 与 ADR-0008）。
+
 ## 2026-08-26
 
 - **smoke scripts retired into vitest**: all six `scripts/smoke-*.mjs` and their package.json entries are deleted. The two layers vitest could not see — the compiled bin and the packed artifact — moved into `tests/cli/cli-bin.test.ts` (spawns `dist/cli.js`: home resolution, help, migrate-views) and `tests/package/package-smoke.test.ts` (pack → install tarball → bin doctor → dashboard API). The four service/api smokes were redundant with the vitest suites (same fakeGit/inject patterns, dist vs src only). Also this day: legacy prototype shell scripts (`doctor.sh`, `install-from-git.sh`, `update-from-git.sh`, `adopt-installed.sh`, `rebuild-collections.sh`, `rebuild-views.sh`) deleted — superseded by the CLI; dev tooling unified on pnpm (npm/pnpm pack JSON shape difference normalized in one helper).
