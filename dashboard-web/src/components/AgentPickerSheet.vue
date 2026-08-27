@@ -99,7 +99,6 @@ function reasonText(agent: CatalogAgent): string {
 
 function onBrowsedPath(path: string) {
   projectRoot.value = path;
-  rememberProjectPath();
   showBrowser.value = false;
   void loadAgents();
 }
@@ -114,6 +113,9 @@ async function apply() {
       agents: selection.value,
       mode: mode.value,
     });
+    // A project path becomes "recent" only once an apply actually used it —
+    // not on every keystroke of the input.
+    if (scope.value === 'project') rememberProjectPath();
     rememberApply(scope.value, selection.value);
     show('ok', t('notice.distributed', { skills: props.skills.join(', '), n: selection.value.length }));
     emit('close');
@@ -138,7 +140,7 @@ async function apply() {
         :recent-paths="recentPaths"
         :known-projects="knownProjects"
         :placeholder="t('picker.projectRoot')"
-        @update:model-value="loadAgents; rememberProjectPath()"
+        @update:model-value="() => void loadAgents()"
         @browse="showBrowser = true"
       />
     </div>
