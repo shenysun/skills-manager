@@ -20,6 +20,7 @@ import LogDrawer from './components/LogDrawer.vue';
 import { useTheme } from './composables/useTheme';
 import { useLocale } from './composables/useLocale';
 import { ToastProvider } from 'reka-ui';
+import NoticeToast from './components/NoticeToast.vue';
 
 
 const { t } = useI18n();
@@ -195,7 +196,7 @@ async function onRemoveConfirm() {
 </script>
 
 <template>
-  <ToastProvider :duration="4000" :label="t('library.title')">
+  <ToastProvider :duration="4000" disable-swipe :label="t('library.title')">
   <main class="mx-auto max-w-[720px] px-[24px] pb-[80px] pt-[56px]">
 
     <header class="mb-[6px] flex items-baseline gap-[12px]">
@@ -323,13 +324,7 @@ async function onRemoveConfirm() {
       @cancel="selection = exitSelection(selection)"
     />
 
-    <!-- Operation feedback (visual baseline 2026-08-27): a bottom-center
-         floating toast — out of the document flow, so nothing shifts. -->
-    <Teleport to="body">
-      <div v-if="notice" class="toast" :class="notice.kind" role="status" aria-live="polite">
-        {{ notice.text }}
-      </div>
-    </Teleport>
+    <NoticeToast :notice="notice" :raised="selection.active" />
   </main>
   </ToastProvider>
 </template>
