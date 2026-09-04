@@ -130,8 +130,8 @@ async function apply() {
 <template>
   <Sheet :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
     <div class="scope-row">
-      <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
-      <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
+      <button class="scope-tab" :class="scope === 'user' ? 'scope-tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
+      <button class="scope-tab" :class="scope === 'project' ? 'scope-tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
 
     <div v-if="scope === 'project'" class="project-input-row">
@@ -145,18 +145,18 @@ async function apply() {
       />
     </div>
 
-    <div class="field-line">
-      <input v-model="query" type="search" :placeholder="t('picker.searchPlaceholder')" />
+    <div>
+      <input v-model="query" type="search" class="field-input" :placeholder="t('picker.searchPlaceholder')" />
     </div>
 
     <div v-if="!loadError" class="quick-row">
-      <button class="text-btn" @click="selection = selectAllVisible(agents, query, selection)">
+      <button class="quick-btn" @click="selection = selectAllVisible(agents, query, selection)">
         {{ t('picker.quick.selectAll') }}
       </button>
-      <button class="text-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
+      <button class="quick-btn" @click="selection = selectDetectedVisible(agents, query, selection)">
         {{ t('picker.quick.selectDetected') }}
       </button>
-      <button class="text-btn" @click="selection = clearVisible(agents, query, selection)">
+      <button class="quick-btn" @click="selection = clearVisible(agents, query, selection)">
         {{ t('picker.quick.clear') }}
       </button>
     </div>
@@ -169,7 +169,7 @@ async function apply() {
 
     <div v-else class="agent-list">
       <section v-if="detected.length > 0">
-        <h3>{{ t('picker.detected') }}</h3>
+        <h3 class="agent-heading">{{ t('picker.detected') }}</h3>
         <label v-for="agent in detected" :key="agent.id" class="agent-row">
           <input
             type="checkbox"
@@ -182,7 +182,7 @@ async function apply() {
       </section>
 
       <section>
-        <h3>{{ t('picker.allAgents') }}</h3>
+        <h3 class="agent-heading">{{ t('picker.allAgents') }}</h3>
         <div v-for="family in grouping.families" :key="family.familyKey" class="family">
           <button class="family-all" @click="selection = toggleFamily(visible, selection, family.familyKey)">
             {{ familyName(family.familyKey) }} · {{ t('picker.selectAll') }}
@@ -212,8 +212,8 @@ async function apply() {
       </section>
 
       <section v-if="invalid.length > 0">
-        <h3>{{ t('picker.invalid') }}</h3>
-        <label v-for="agent in invalid" :key="agent.id" class="agent-row invalid">
+        <h3 class="agent-heading">{{ t('picker.invalid') }}</h3>
+        <label v-for="agent in invalid" :key="agent.id" class="agent-row agent-row-invalid">
           <input type="checkbox" disabled />
           <span class="agent-id mono">{{ agent.id }}</span>
           <span class="agent-label">{{ reasonText(agent) }}</span>
@@ -223,8 +223,8 @@ async function apply() {
 
     <div class="mode-row">
       <span class="mode-label">{{ t('picker.mode') }}</span>
-      <button :class="{ on: mode === 'symlink' }" @click="mode = 'symlink'">{{ t('picker.symlink') }}</button>
-      <button :class="{ on: mode === 'copy' }" @click="mode = 'copy'">{{ t('picker.copy') }}</button>
+      <button class="mode-tab" :class="mode === 'symlink' ? 'mode-tab-on' : ''" @click="mode = 'symlink'">{{ t('picker.symlink') }}</button>
+      <button class="mode-tab" :class="mode === 'copy' ? 'mode-tab-on' : ''" @click="mode = 'copy'">{{ t('picker.copy') }}</button>
     </div>
 
     <div class="sheet-foot">

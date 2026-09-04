@@ -1,21 +1,6 @@
 /* Skill preview Sheet (CONTEXT.md · Skill preview): a wide, read-only viewer.
-   The sheet body owns scrolling; 02 will add the file-tree column beside it. */
-.sheet.wide {
-  width: min(92vw, 1080px);
-  height: calc(92vh - 24px);
-  display: flex;
-  flex-direction: column;
-}
-
-.sheet.wide .sheet-head {
-  flex: none;
-}
-
-/* View toggle sits in the head beside ✕ — never squeezed (flex: none). */
-.preview-toggle {
-  flex: none;
-  white-space: nowrap;
-}
+   Page/Sheet chrome now lives in Uno; this file keeps preview body layout
+   plus the Shiki dual-theme exception. */
 
 /* Meta zone (Skill preview structure, 2026-08-27): full description on its
    own wrapping line, then one small 来源 · 接入 summary line. */
@@ -140,11 +125,6 @@
   min-width: 0;
   overflow-y: auto;
   padding: 0 20px;
-}
-
-/* Row-name preview entry: link-styled per the ratified IA. */
-.item .name.preview-link:hover {
-  text-decoration: underline;
 }
 
 /* Rendered markdown, server-sanitized HTML. */

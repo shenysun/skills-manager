@@ -52,11 +52,11 @@ async function apply() {
   <Sheet :title="t('undistribute.title', { skill })" @cancel="emit('close')">
     <p class="picker-hint">{{ t('undistribute.hint') }}</p>
     <div class="scope-row">
-      <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
-      <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
+      <button class="scope-tab" :class="scope === 'user' ? 'scope-tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
+      <button class="scope-tab" :class="scope === 'project' ? 'scope-tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
-    <div v-if="scope === 'project'" class="field-line">
-      <input v-model="projectRoot" type="text" :placeholder="t('picker.projectRoot')" list="undistribute-known-projects" />
+    <div v-if="scope === 'project'">
+      <input v-model="projectRoot" type="text" class="field-input" :placeholder="t('picker.projectRoot')" list="undistribute-known-projects" />
       <datalist id="undistribute-known-projects">
         <option v-for="project in knownProjects" :key="project" :value="project" />
       </datalist>

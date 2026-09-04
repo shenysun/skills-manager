@@ -16,7 +16,7 @@ const { t } = useI18n();
     <div class="sheet-foot">
       <span></span>
       <button class="text-btn" @click="emit('cancel')">{{ t('remove.cancel') }}</button>
-      <button class="primary-btn" :class="{ danger }" @click="emit('confirm')">{{ confirmLabel }}</button>
+      <button class="primary-btn" :class="danger ? 'bg-danger' : ''" @click="emit('confirm')">{{ confirmLabel }}</button>
     </div>
   </Sheet>
 </template>

@@ -66,10 +66,11 @@ async function runInstall(overwrite: boolean) {
 <template>
   <Sheet :title="t('add.title')" @cancel="emit('close')">
     <template v-if="step === 'source'">
-      <div class="field-line">
+      <div>
         <input
           v-model="sourceInput"
           type="text"
+          class="field-input"
           :placeholder="t('add.sourcePlaceholder')"
           @keydown.enter="runDiscover"
         />
@@ -101,7 +102,7 @@ async function runInstall(overwrite: boolean) {
         <p>{{ t('add.overwriteBody', { skills: overwriteAsk.join(', ') }) }}</p>
         <div class="overwrite-actions">
           <button class="text-btn" @click="overwriteAsk = null">{{ t('remove.cancel') }}</button>
-          <button class="primary-btn danger" @click="runInstall(true)">{{ t('add.overwriteConfirm') }}</button>
+          <button class="primary-btn bg-danger" @click="runInstall(true)">{{ t('add.overwriteConfirm') }}</button>
         </div>
       </div>
       <p v-else-if="error" class="picker-error">{{ error }}</p>

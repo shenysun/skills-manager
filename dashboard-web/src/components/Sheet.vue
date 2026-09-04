@@ -29,7 +29,7 @@ onUnmounted(() => releaseDialogScrollLock());
       <DialogOverlay class="sheet-overlay">
         <DialogContent
           class="sheet"
-          :class="{ wide }"
+          :class="wide ? 'sheet-wide' : ''"
           :aria-describedby="undefined"
           @pointer-down-outside="
             (event) => {
@@ -41,8 +41,8 @@ onUnmounted(() => releaseDialogScrollLock());
             }
           "
         >
-          <div class="sheet-head">
-            <DialogTitle as="h2">{{ title }}</DialogTitle>
+          <div class="sheet-head" :class="wide ? 'shrink-0' : ''">
+            <DialogTitle as="h2" class="sheet-title">{{ title }}</DialogTitle>
             <slot name="head" />
             <DialogClose class="sheet-close" :aria-label="t('chrome.close')">✕</DialogClose>
           </div>
