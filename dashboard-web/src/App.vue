@@ -196,55 +196,64 @@ async function onRemoveConfirm() {
 
 <template>
   <ToastProvider :duration="4000" :label="t('library.title')">
-  <main class="page">
+  <main class="mx-auto max-w-[720px] px-[24px] pb-[80px] pt-[56px]">
 
-    <header class="head">
-      <h1>{{ t('library.title') }}</h1>
-      <div class="links">
-        <button @click="logOpen = true">{{ t('log.link') }}</button>
-        <button @click="addOpen = true">{{ t('add.link') }}</button>
-        <button @click="initOpen = true">{{ t('init.link') }}</button>
-        <button :title="t('chrome.themeHint')" @click="toggleTheme">{{ theme === 'dark' ? '☀' : '◐' }}</button>
-        <button @click="setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')">
+    <header class="mb-[6px] flex items-baseline gap-[12px]">
+      <h1 class="text-[22px] font-bold tracking-[-0.01em]">{{ t('library.title') }}</h1>
+      <div class="ml-auto flex gap-[16px] text-[13.5px] text-fg2">
+        <button class="hover:text-fg" @click="logOpen = true">{{ t('log.link') }}</button>
+        <button class="hover:text-fg" @click="addOpen = true">{{ t('add.link') }}</button>
+        <button class="hover:text-fg" @click="initOpen = true">{{ t('init.link') }}</button>
+        <button class="hover:text-fg" :title="t('chrome.themeHint')" @click="toggleTheme">{{ theme === 'dark' ? '☀' : '◐' }}</button>
+        <button class="hover:text-fg" @click="setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')">
           {{ locale === 'zh-CN' ? 'EN' : '中文' }}
         </button>
-        <a href="https://github.com/shenysun/skills-manager" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="text-inherit no-underline hover:text-fg" href="https://github.com/shenysun/skills-manager" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </header>
-    <p class="sub">{{ t('library.count', state?.skills.length ?? 0) }}</p>
-    <div class="search-line">
-      <input v-model="query" type="search" :placeholder="t('search.placeholder')" />
+    <p class="mb-[18px] text-[13px] text-fg3">{{ t('library.count', state?.skills.length ?? 0) }}</p>
+    <div class="mb-[8px] border-b border-line">
+      <input
+        v-model="query"
+        type="search"
+        class="w-full border-none bg-transparent py-[8px] px-[2px] text-[14.5px] outline-none placeholder:text-fg3"
+        :placeholder="t('search.placeholder')"
+      />
     </div>
 
-    <p v-if="stripVisible" class="update-line">
-      <b>{{ t('strip.text', state?.updateCount ?? 0) }}</b>
-      <button :disabled="updating.size > 0" @click="runUpdate(updatableNames(state?.skills ?? []))">
+    <p v-if="stripVisible" class="py-[10px] px-[2px] text-[14px] text-fg2">
+      <b class="font-semibold text-fg">{{ t('strip.text', state?.updateCount ?? 0) }}</b>
+      <button
+        class="ml-[12px] font-semibold text-accent disabled:cursor-default disabled:opacity-60"
+        :disabled="updating.size > 0"
+        @click="runUpdate(updatableNames(state?.skills ?? []))"
+      >
         {{ updatingAll ? t('strip.updating') : t('strip.updateAll') }}
       </button>
     </p>
 
-    <div v-if="loadError" class="error">
-      <p class="title">{{ t('error.loadFailed', { message: loadError }) }}</p>
-      <button class="retry" @click="load">{{ t('error.retry') }}</button>
+    <div v-if="loadError" class="px-[2px] py-[48px] text-fg2">
+      <p class="mb-[6px] text-[16px] font-semibold text-fg">{{ t('error.loadFailed', { message: loadError }) }}</p>
+      <button class="mt-[10px] text-[13.5px] font-semibold text-accent" @click="load">{{ t('error.retry') }}</button>
     </div>
 
-    <div v-else-if="!state" class="loading" role="status">
-      <span class="loading-mark" aria-hidden="true"></span>
+    <div v-else-if="!state" class="flex items-center justify-center gap-[10px] px-[2px] py-[48px] text-fg2" role="status">
+      <span class="size-[12px] animate-spin rounded-full border-[1.5px] border-fg3 border-t-transparent" aria-hidden="true"></span>
       {{ t('library.loading') }}
     </div>
 
     <template v-else-if="state">
-      <div v-if="rows.length === 0" class="empty">
+      <div v-if="rows.length === 0" class="px-[2px] py-[48px] text-fg2">
         <template v-if="!isFiltering && (importableCount ?? 0) > 0">
-          <p class="title">{{ t('empty.guided.title', importableCount ?? 0) }}</p>
-          <p class="hint">{{ t('empty.guided.hint') }}</p>
-          <button class="primary-btn guided-import" @click="initOpen = true">{{ t('empty.guided.action') }}</button>
+          <p class="mb-[6px] text-[16px] font-semibold text-fg">{{ t('empty.guided.title', importableCount ?? 0) }}</p>
+          <p class="text-[13.5px] text-fg3">{{ t('empty.guided.hint') }}</p>
+          <button class="primary-btn mt-[12px]" @click="initOpen = true">{{ t('empty.guided.action') }}</button>
         </template>
         <template v-else>
-          <p class="title">
+          <p class="mb-[6px] text-[16px] font-semibold text-fg">
             {{ isFiltering ? t('empty.filtered.title', { query: query.trim() }) : t('empty.library.title') }}
           </p>
-          <p class="hint">{{ isFiltering ? t('empty.filtered.hint') : t('empty.library.hint') }}</p>
+          <p class="text-[13.5px] text-fg3">{{ isFiltering ? t('empty.filtered.hint') : t('empty.library.hint') }}</p>
         </template>
       </div>
       <SkillRow

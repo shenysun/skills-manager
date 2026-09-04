@@ -6,6 +6,7 @@ import { rowBodyClick, rowNameClick } from '../domain/rowClick';
 import { distCountsText } from '../domain/distribution';
 import { refreshSkill, type RefreshResult, type SkillRowState } from '../api/client';
 import RowMenu from './RowMenu.vue';
+import Check from './Check.vue';
 
 const props = defineProps<{ skill: SkillRowState; updating?: boolean; selected?: boolean; selecting?: boolean }>();
 const menuOpen = ref(false);
@@ -38,8 +39,17 @@ const statusText = computed(() => {
   }
 });
 
-// ADR-0005: outside selection mode the name opens the preview; inside it,
-// every click on the row (the name included) toggles the checkbox.
+const statusColor = computed(() => {
+  switch (status.value.kind) {
+    case 'warning':
+      return 'text-warn';
+    case 'updatable':
+      return 'text-accent font-semibold';
+    default:
+      return 'text-fg3';
+  }
+});
+
 function onNameClick() {
   if (rowNameClick(props.selecting ?? false) === 'toggle') {
     emit('toggle', props.skill.name);
@@ -52,9 +62,6 @@ function onBodyClick() {
   if (rowBodyClick(props.selecting ?? false) === 'toggle') emit('toggle', props.skill.name);
 }
 
-// ADR-0008: refresh stale copy targets. Per-entry failures are surfaced by the
-// backend via the `errors` array; we pass the result to the parent so it can
-// toast the failures and refetch state (which will re-derive warning/staleCount).
 async function onRefresh() {
   if (refreshing.value) return;
   refreshing.value = true;
@@ -68,36 +75,67 @@ async function onRefresh() {
 </script>
 
 <template>
-  <div class="item" :class="{ 'menu-open': menuOpen }" @click="onBodyClick">
-    <label class="cb" @click.stop>
-      <input type="checkbox" :checked="selected" @change="$emit('toggle', skill.name)" />
-    </label>
-    <div class="main">
-      <div class="l1">
-        <!-- The row name is the preview entry (CONTEXT.md · Skill preview): link-styled, no whole-row click. -->
-        <button class="name mono preview-link" :title="t('preview.openHint')" @click.stop="onNameClick">
+  <div
+    class="group flex items-baseline gap-[10px] border-b border-line2 py-[13px] px-[2px]"
+    @click="onBodyClick"
+  >
+    <span
+      class="flex w-[22px] shrink-0 self-center transition-opacity duration-100"
+      :class="selecting ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+      @click.stop
+    >
+      <Check :checked="selected" @toggle="$emit('toggle', skill.name)" />
+    </span>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-baseline gap-[10px]">
+        <button
+          class="mono text-[15px] font-semibold hover:underline"
+          :title="t('preview.openHint')"
+          @click.stop="onNameClick"
+        >
           {{ skill.name }}
         </button>
-        <span class="meta" :class="status.kind">{{ statusText }}</span>
-        <!-- ADR-0008: stale count badge surfaces how many copy targets lag the hub. -->
+        <span
+          class="ml-auto whitespace-nowrap text-[12.5px]"
+          :class="[statusColor, menuOpen ? 'hidden' : 'group-hover:hidden']"
+        >
+          {{ statusText }}
+        </span>
         <span
           v-if="skill.staleCount > 0"
-          class="meta stale-badge"
+          class="whitespace-nowrap text-[12.5px] text-warn"
+          :class="menuOpen ? 'hidden' : 'group-hover:hidden'"
           :title="t('status.staleHint', { count: skill.staleCount })"
         >
           {{ t('status.staleBadge', { count: skill.staleCount }) }}
         </span>
       </div>
-      <div class="desc">{{ skill.description || t('row.noDescription') }}</div>
+      <div class="mt-[3px] overflow-hidden text-ellipsis whitespace-nowrap text-[13.5px] text-fg2">
+        {{ skill.description || t('row.noDescription') }}
+      </div>
     </div>
-    <div class="hover-acts" @click.stop>
-      <button v-if="skill.staleCount > 0" class="upd refresh" :disabled="refreshing" @click="onRefresh">
+    <div
+      class="hidden items-center gap-[12px] self-center text-[13px] text-fg2 group-hover:flex"
+      :class="{ flex: menuOpen }"
+      @click.stop
+    >
+      <button
+        v-if="skill.staleCount > 0"
+        class="font-semibold text-accent hover:text-fg disabled:cursor-default disabled:opacity-60"
+        :disabled="refreshing"
+        @click="onRefresh"
+      >
         {{ refreshing ? t('action.refreshing') : t('action.refresh') }}
       </button>
-      <button v-if="skill.hasUpdate" class="upd" :disabled="updating" @click="$emit('update', skill.name)">
+      <button
+        v-if="skill.hasUpdate"
+        class="font-semibold text-accent hover:text-fg disabled:cursor-default disabled:opacity-60"
+        :disabled="updating"
+        @click="$emit('update', skill.name)"
+      >
         {{ updating ? t('action.updating') : t('action.update') }}
       </button>
-      <button @click="$emit('distribute', skill.name)">{{ t('action.distribute') }}</button>
+      <button class="hover:text-fg" @click="$emit('distribute', skill.name)">{{ t('action.distribute') }}</button>
       <RowMenu v-model="menuOpen" @preview="$emit('preview', skill)" @undistribute="$emit('undistribute', skill)" @remove="$emit('remove', skill)" />
     </div>
   </div>
