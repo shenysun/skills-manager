@@ -19,6 +19,8 @@ import InitSheet from './components/InitSheet.vue';
 import LogDrawer from './components/LogDrawer.vue';
 import { useTheme } from './composables/useTheme';
 import { useLocale } from './composables/useLocale';
+import { ToastProvider } from 'reka-ui';
+
 
 const { t } = useI18n();
 const { notice, show } = useNotice();
@@ -193,7 +195,9 @@ async function onRemoveConfirm() {
 </script>
 
 <template>
+  <ToastProvider :duration="4000" :label="t('library.title')">
   <main class="page">
+
     <header class="head">
       <h1>{{ t('library.title') }}</h1>
       <div class="links">
@@ -318,4 +322,5 @@ async function onRemoveConfirm() {
       </div>
     </Teleport>
   </main>
+  </ToastProvider>
 </template>
