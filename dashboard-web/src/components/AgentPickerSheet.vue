@@ -26,6 +26,7 @@ import {
 import { usePickerMemory } from '../composables/usePickerMemory';
 import { useNotice } from '../composables/useNotice';
 import { useBrowserHistory } from '../composables/useBrowserHistory';
+import Check from './Check.vue';
 
 const props = defineProps<{ skills: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
@@ -171,11 +172,7 @@ async function apply() {
       <section v-if="detected.length > 0">
         <h3 class="agent-heading">{{ t('picker.detected') }}</h3>
         <label v-for="agent in detected" :key="agent.id" class="agent-row">
-          <input
-            type="checkbox"
-            :checked="selection.includes(agent.id)"
-            @change="selection = toggleAgent(selection, agent.id)"
-          />
+          <Check :checked="selection.includes(agent.id)" @toggle="selection = toggleAgent(selection, agent.id)" />
           <span class="agent-id mono">{{ agent.id }}</span>
           <span class="agent-label">{{ agent.label }}</span>
         </label>
@@ -188,21 +185,13 @@ async function apply() {
             {{ familyName(family.familyKey) }} · {{ t('picker.selectAll') }}
           </button>
           <label v-for="agent in family.members" :key="agent.id" class="agent-row">
-            <input
-              type="checkbox"
-              :checked="selection.includes(agent.id)"
-              @change="selection = toggleAgent(selection, agent.id)"
-            />
+            <Check :checked="selection.includes(agent.id)" @toggle="selection = toggleAgent(selection, agent.id)" />
             <span class="agent-id mono">{{ agent.id }}</span>
             <span class="agent-label">{{ agent.label }}</span>
           </label>
         </div>
         <label v-for="agent in grouping.singletons" :key="agent.id" class="agent-row">
-          <input
-            type="checkbox"
-            :checked="selection.includes(agent.id)"
-            @change="selection = toggleAgent(selection, agent.id)"
-          />
+          <Check :checked="selection.includes(agent.id)" @toggle="selection = toggleAgent(selection, agent.id)" />
           <span class="agent-id mono">{{ agent.id }}</span>
           <span class="agent-label">{{ agent.label }}</span>
         </label>
@@ -214,7 +203,7 @@ async function apply() {
       <section v-if="invalid.length > 0">
         <h3 class="agent-heading">{{ t('picker.invalid') }}</h3>
         <label v-for="agent in invalid" :key="agent.id" class="agent-row agent-row-invalid">
-          <input type="checkbox" disabled />
+          <Check disabled />
           <span class="agent-id mono">{{ agent.id }}</span>
           <span class="agent-label">{{ reasonText(agent) }}</span>
         </label>

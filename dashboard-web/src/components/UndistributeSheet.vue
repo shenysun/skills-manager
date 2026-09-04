@@ -5,6 +5,7 @@ import Sheet from './Sheet.vue';
 import { errorMessage, undistribute, type Scope } from '../api/client';
 import { defaultProjectRoot, toggleAgent } from '../domain/picker';
 import { useNotice } from '../composables/useNotice';
+import Check from './Check.vue';
 
 const props = defineProps<{ skill: string; agents: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
@@ -65,7 +66,7 @@ async function apply() {
     <p v-if="agents.length === 0" class="picker-hint">{{ t('undistribute.none') }}</p>
     <div v-else class="agent-list">
       <label v-for="id in agents" :key="id" class="agent-row">
-        <input type="checkbox" :checked="selection.includes(id)" @change="toggle(id)" />
+        <Check :checked="selection.includes(id)" @toggle="toggle(id)" />
         <span class="agent-id mono">{{ id }}</span>
       </label>
     </div>

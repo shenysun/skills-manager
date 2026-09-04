@@ -5,6 +5,7 @@ import Sheet from './Sheet.vue';
 import { ApiError, discover, errorMessage, installFromSource, type DiscoveredSkill } from '../api/client';
 import { toggleAgent } from '../domain/picker';
 import { useNotice } from '../composables/useNotice';
+import Check from './Check.vue';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -89,7 +90,7 @@ async function runInstall(overwrite: boolean) {
       <p class="picker-hint">{{ t('add.discoveredAt', { source: sourceInput }) }}</p>
       <div class="agent-list">
         <label v-for="skill in discovered" :key="skill.subpath" class="agent-row">
-          <input type="checkbox" :checked="selected.includes(skill.subpath)" @change="toggle(skill.subpath)" />
+          <Check :checked="selected.includes(skill.subpath)" @toggle="toggle(skill.subpath)" />
           <span class="agent-id mono">{{ skill.name }}</span>
           <span class="agent-label">
             {{ skill.description || t('row.noDescription') }}
