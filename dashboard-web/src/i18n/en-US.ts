@@ -121,6 +121,7 @@ export default {
     cancel: 'Cancel',
   },
   menu: {
+    more: 'More',
     preview: 'Preview…',
     undistribute: 'Undistribute…',
     remove: 'Remove from library…',

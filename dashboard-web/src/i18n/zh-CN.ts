@@ -121,6 +121,7 @@ export default {
     cancel: '取消',
   },
   menu: {
+    more: '更多',
     preview: '预览…',
     undistribute: '撤除接入…',
     remove: '从库中移除…',
