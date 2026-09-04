@@ -75,15 +75,17 @@ skills-manager init
 
 ### 处理冲突
 
-当同名技能存在于多个运行时目录（或已在技能库中）时，`init` 保持非交互：**跳过冲突并报告**，同时给出建议的解决方式：
+当同名技能存在于多个运行时目录（或已在技能库中）时，`init` 保持非交互：**默认跳过冲突**。可以给这一次导入声明 **冲突优先级**，或只裁决某一个技能：
 
 ```bash
-# 指定哪个副本胜出（报告中的 agent id，或 'hub' 保留技能库副本）
-skills-manager init --resolve my-skill=cursor
-skills-manager init --resolve my-skill=hub
+# 这一次：先偏 Claude 的运行时目录，再偏共享的 .agents 目录，再保留库中已有副本
+skills-manager init --prefer claude-code ~/.agents/skills hub
+
+# 单个技能覆盖优先级；其余仍按 --prefer
+skills-manager init --prefer claude-code --resolve my-skill=hub
 ```
 
-胜出的副本进入技能库，**所有**冲突位置都软链接到它。
+列表里第一个真正持有该技能的来源胜出。胜出的副本进入技能库，**所有**冲突位置都软链接到它。没有 `--prefer` / `--resolve` 的冲突继续跳过。Dashboard 的导入面板提供同一套排序。
 
 ### 回滚
 

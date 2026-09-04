@@ -75,6 +75,13 @@ describe('distribute CLI surface', () => {
     expect(existsSync(path.join(userHome, '.agents', 'skills', 'alpha'))).toBe(false);
   });
 
+  it('init help offers --prefer and not --all', () => {
+    const help = run(['init', '--help']);
+    expect(help.status).toBe(0);
+    expect(help.stdout).toMatch(/--prefer/);
+    expect(help.stdout).not.toMatch(/--all/);
+  });
+
   it('exposes migrate-consumers and catalog commands', () => {
     const migration = run(['migrate-consumers', '--dry-run']);
     expect(migration.status).toBe(0);

@@ -129,6 +129,7 @@ export type InitConflict = {
   skill: string;
   kind: 'multi-runtime' | 'hub-vs-runtime';
   locations: InitSkillLocation[];
+  hub: boolean;
 };
 
 export type InitRunResult = {
@@ -136,17 +137,20 @@ export type InitRunResult = {
   scanned: Array<{ agentId: string; runtimeDir: string }>;
   discovered: InitDiscoveredSkill[];
   imported: string[];
+  choices: Record<string, string>;
   skippedManaged: string[];
   conflicts: InitConflict[];
   failed: Array<{ skill: string; reason: string }>;
 };
 
-/** Reverse import (ADR-0006): preview is a dry-run of the same operation. */
-export function initPreview() {
-  return api<InitRunResult>('/api/init/preview', { method: 'POST', body: JSON.stringify({}) });
+export type InitRequest = { resolve?: Record<string, string>; prefer?: string[] };
+
+/** Reverse import (ADR-0006 / ADR-0009): preview is a dry-run of the same operation. */
+export function initPreview(body: InitRequest = {}) {
+  return api<InitRunResult>('/api/init/preview', { method: 'POST', body: JSON.stringify(body) });
 }
 
-export function initApply(body: { resolve?: Record<string, string> }) {
+export function initApply(body: InitRequest = {}) {
   return api<InitRunResult>('/api/init/apply', { method: 'POST', body: JSON.stringify(body) });
 }
 

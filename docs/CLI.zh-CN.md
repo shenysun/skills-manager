@@ -35,6 +35,7 @@ skills-manager redistribute --refresh --to project --project ./repo
 skills-manager status
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
+skills-manager init --prefer claude-code ~/.agents/skills hub
 skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
 skills-manager backup list
 skills-manager backup restore my-skill
@@ -57,7 +58,7 @@ distribute 的目标可以是任意目录中的 agent id（`--agent`，可重复
 
 ### init（反向导入）
 
-`init` 是 distribute 的反向操作：扫描**检测到的目录 agent 的全局运行时目录**（`~/.claude/skills`、`~/.cursor/skills`、…），把发现的技能导入技能库，并把每个原位置变成指回 `skills/<name>/` 的受管软链接（原内容会先移入 `<home>/.backups/`；备份 30 天后过期）。导入条目标记 `imported: true` 且无 source —— Skills Manager 从不猜测来源。CLI 是非交互的：冲突技能（多个运行时同名，或技能库与运行时同名）会被跳过并报告，附带建议的 `--resolve <skill>=<agent-id|hub>` 重跑命令；胜出的副本进入技能库，**所有**冲突原位置都软链接到它。`doctor` 会列出没有受管来源的导入技能；`edit <skill> --source-url <url>` 补充上游地址后即可进入正常的更新管理。见 [ADR-0006](adr/0006-init-reverse-import-symlinks.md)。
+`init` 是 distribute 的反向操作：扫描**检测到的目录 agent 的全局运行时目录**（`~/.claude/skills`、`~/.cursor/skills`、…），把发现的技能导入技能库，并把每个原位置变成指回 `skills/<name>/` 的受管软链接（原内容会先移入 `<home>/.backups/`；备份 30 天后过期）。导入条目标记 `imported: true` 且无 source —— Skills Manager 从不猜测来源。CLI 是非交互的：冲突默认跳过，除非这次导入声明了 **冲突优先级**（`--prefer <运行时目录|agent-id|hub...>`）或逐条 `--resolve`。`--prefer` 里第一个真正持有该技能的来源胜出；`--resolve` 覆盖单个技能。整树指纹相同的副本算同一实体，不是冲突。prefer 项必须是 `hub` 或本轮扫描到的目录。Dashboard 导入面板是同一套列表。见 [ADR-0006](adr/0006-init-reverse-import-symlinks.md) 与 [ADR-0009](adr/0009-init-conflict-priority.md)。
 
 ## Agent 目录快照
 

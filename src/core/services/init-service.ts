@@ -14,9 +14,9 @@ export type InitRunRequest = {
   agents?: readonly string[];
   /** Conflict decisions: skill -> runtime dir (or any agent id sharing it) whose copy wins, or 'hub' to keep the hub copy. */
   resolve?: Readonly<Record<string, string>>;
+  /** Per-import conflict priority: ordered runtime dirs, agent ids, or 'hub'. */
+  prefer?: readonly string[];
   dryRun?: boolean;
-  /** Skip every conflict instead of pausing on it (hub wins hub-vs-runtime clashes). */
-  all?: boolean;
 };
 
 export type InitSkillLocation = {
@@ -38,6 +38,8 @@ export type InitConflict = {
   skill: SkillName;
   kind: 'multi-runtime' | 'hub-vs-runtime';
   locations: InitSkillLocation[];
+  /** True when the hub already holds this skill — `hub` is a valid choice. */
+  hub: boolean;
 };
 
 export type InitRunResult = {
@@ -45,6 +47,8 @@ export type InitRunResult = {
   scanned: Array<{ agentId: string; runtimeDir: string }>;
   discovered: InitDiscoveredSkill[];
   imported: SkillName[];
+  /** Winner for each imported skill: `hub` or the winning runtime dir. */
+  choices: Record<string, string>;
   /** Origins already symlinked to the hub — nothing to do. */
   skippedManaged: SkillName[];
   conflicts: InitConflict[];
@@ -78,44 +82,57 @@ export class InitService {
 
   run(request: InitRunRequest = {}): InitRunResult {
     const agents = this.resolveAgents(request.agents);
-    const groups = this.scanGroups(agents);
-    const { skills: discovered, invalid } = this.discover(groups);
+    const scans = this.scanGroups(agents);
+    this.assertPrefer(request.prefer, scans.map((scan) => scan.runtimeDir));
+    const { skills: discovered, invalid } = this.discover(scans);
 
     // Classification is read-only, so dry-run reports the exact plan untouched.
     const imports: Array<{ skill: InitDiscoveredSkill; groups: EntityGroup[]; choice: string | undefined }> = [];
     const skippedManaged = new Set<SkillName>();
     const conflicts: InitConflict[] = [];
+    const scannedDirs = new Set(scans.map((scan) => scan.runtimeDir));
     for (const skill of discovered) {
       const liveLocations = skill.locations.filter((location) => !this.isManagedSymlink(location.path, skill.name));
       if (liveLocations.length < skill.locations.length) skippedManaged.add(skill.name);
       if (liveLocations.length === 0) continue;
 
-      // Entries linked to each other by symlinks are the same physical copy — merge
-      // them before clash detection so one skill laid out across agents isn't a conflict.
-      const groups = this.groupByEntity(liveLocations);
-      const choice = request.resolve?.[skill.name];
+      // Same physical path, then same full-tree fingerprint, are one entity — not a clash.
+      const groups = this.mergeIdentical(this.groupByEntity(liveLocations));
       const hubHas = this.registry.skillExists(skill.name);
-      if (!choice && (groups.length > 1 || hubHas)) {
+      const hubFp = hubHas ? this.distribute.fingerprint(skill.name) : null;
+      const competing = hubFp ? groups.filter((group) => this.groupFingerprint(group) !== hubFp) : groups;
+      const needsDecision = competing.length > 1 || (hubHas && competing.length >= 1);
+      const choice = request.resolve?.[skill.name] ?? (needsDecision ? this.pickPrefer(request.prefer, groups, skill.name, hubHas, scannedDirs) : undefined);
+      if (needsDecision && !choice) {
         conflicts.push({
           skill: skill.name,
-          kind: groups.length > 1 ? 'multi-runtime' : 'hub-vs-runtime',
-          locations: groups.map((group) => group[0]),
+          kind: competing.length > 1 ? 'multi-runtime' : 'hub-vs-runtime',
+          locations: competing.map((group) => group[0]),
+          hub: hubHas,
         });
         continue;
       }
-      imports.push({ skill, groups, choice });
+      const implicit = !choice && hubHas && competing.length === 0 ? 'hub' : choice;
+      imports.push({ skill, groups, choice: implicit });
     }
 
     const result: InitRunResult = {
       dryRun: Boolean(request.dryRun),
-      scanned: groups.flatMap((group) => group.agents.map((agentId) => ({ agentId, runtimeDir: group.runtimeDir }))),
+      scanned: scans.flatMap((scan) => scan.agents.map((agentId) => ({ agentId, runtimeDir: scan.runtimeDir }))),
       discovered,
       imported: [],
+      choices: {},
       skippedManaged: [...skippedManaged],
       conflicts,
       failed: [...invalid],
     };
-    if (request.dryRun) return result;
+    for (const item of imports) {
+      result.choices[item.skill.name] = this.winnerKey(item.groups, item.choice);
+    }
+    if (request.dryRun) {
+      result.imported = imports.map((item) => item.skill.name);
+      return result;
+    }
 
     this.skillHome.ensure();
     for (const item of imports) {
@@ -124,6 +141,7 @@ export class InitService {
         result.imported.push(item.skill.name);
       } catch (error) {
         result.failed.push({ skill: item.skill.name, reason: (error as Error).message });
+        result.choices = Object.fromEntries(Object.entries(result.choices).filter(([name]) => name !== item.skill.name));
       }
     }
     this.backups.prune();
@@ -165,6 +183,63 @@ export class InitService {
       else this.fs.move(location.path, this.backupDirFor(skill.name));
     }
     this.distribute.apply({ to: 'user', skills: [skill.name], agents: this.agentsForLocations(locations), mode: 'symlink' });
+  }
+
+  private assertPrefer(prefer: readonly string[] | undefined, scannedDirs: readonly string[]) {
+    if (!prefer || prefer.length === 0) return;
+    const dirs = new Set(scannedDirs);
+    for (const item of prefer) this.resolvePreferItem(item, dirs);
+  }
+
+  private resolvePreferItem(item: string, scannedDirs: Set<string>): string {
+    if (item === 'hub') return 'hub';
+    if (scannedDirs.has(item)) return item;
+    const resolvedPath = path.resolve(item);
+    if (scannedDirs.has(resolvedPath)) return resolvedPath;
+    const fromAgent = this.catalog.resolveGlobalDir(item);
+    if (fromAgent && scannedDirs.has(fromAgent)) return fromAgent;
+    throw new SkillsManagerError(
+      'init_unknown_prefer',
+      `Prefer item "${item}" is not hub and does not resolve to a runtime directory scanned this run.`,
+    );
+  }
+
+  private pickPrefer(prefer: readonly string[] | undefined, groups: EntityGroup[], skill: SkillName, hubHas: boolean, scannedDirs: Set<string>): string | undefined {
+    if (!prefer || prefer.length === 0) return undefined;
+    const hubFp = hubHas ? this.distribute.fingerprint(skill) : null;
+    for (const item of prefer) {
+      const key = this.resolvePreferItem(item, scannedDirs);
+      if (key === 'hub') {
+        if (hubHas) return 'hub';
+        continue;
+      }
+      const found = groups.find((group) => group.some((location) => location.runtimeDir === key || location.agentIds.includes(item)));
+      if (!found) continue;
+      if (hubFp && this.groupFingerprint(found) === hubFp) return 'hub';
+      return found[0].runtimeDir;
+    }
+    return undefined;
+  }
+
+  private mergeIdentical(groups: EntityGroup[]): EntityGroup[] {
+    return groups.reduce<EntityGroup[]>((merged, group) => {
+      const fingerprint = this.groupFingerprint(group);
+      const index = merged.findIndex((item) => this.groupFingerprint(item) === fingerprint);
+      return index === -1 ? [...merged, group] : merged.map((item, i) => (i === index ? [...item, ...group] : item));
+    }, []);
+  }
+
+  private groupFingerprint(group: EntityGroup) {
+    return this.distribute.fingerprintDir(this.entityPathOf(group[0].path));
+  }
+
+  private winnerKey(groups: EntityGroup[], choice: string | undefined) {
+    if (choice === 'hub' || (!choice && groups.length === 0)) return 'hub';
+    if (choice && choice !== 'hub') {
+      const found = groups.find((group) => group.some((location) => location.runtimeDir === choice || location.agentIds.includes(choice)));
+      return found ? found[0].runtimeDir : choice;
+    }
+    return groups[0][0].runtimeDir;
   }
 
   private groupForChoice(groups: EntityGroup[], choice: string, skill: SkillName) {

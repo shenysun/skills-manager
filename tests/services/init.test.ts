@@ -224,26 +224,80 @@ describe('init run (reverse import)', () => {
     expect(plan.dryRun).toBe(true);
     expect(plan.discovered.map((skill) => skill.name)).toEqual(['alpha', 'beta']);
     expect(plan.conflicts.map((conflict) => conflict.skill)).toEqual([]);
-    expect(plan.imported).toEqual([]);
+    expect(plan.imported).toEqual(['alpha', 'beta']);
+    expect(plan.choices).toMatchObject({ alpha: path.join(userHome, '.claude', 'skills'), beta: path.join(userHome, '.cursor', 'skills') });
     expect(lstatSync(runtimeDir).isSymbolicLink()).toBe(false);
     expect(existsSync(path.join(home, 'skills'))).toBe(false);
     expect(s.backups.list()).toHaveLength(0);
   });
 
-  it('all skips clashing skills and imports the rest (hub wins hub-vs-runtime)', () => {
+  it('skips clashing skills and imports the rest when no priority is declared', () => {
     makeRuntimeSkill('.claude/skills', 'alpha', `---\nname: alpha\ntitle: claude copy\n---\n# alpha\n`);
     makeRuntimeSkill('.cursor/skills', 'alpha', `---\nname: alpha\ntitle: cursor copy\n---\n# alpha\n`);
     makeRuntimeSkill('.cursor/skills', 'beta');
     const s = services();
     s.skillHome.ensure();
 
-    const result = s.init.run({ all: true });
+    const result = s.init.run();
 
     expect(result.imported).toEqual(['beta']);
     expect(result.conflicts.map((conflict) => conflict.skill)).toEqual(['alpha']);
     expect(result.failed).toEqual([]);
     expect(existsSync(path.join(home, 'skills', 'beta', 'SKILL.md'))).toBe(true);
     expect(existsSync(path.join(home, 'skills', 'alpha'))).toBe(false);
+  });
+
+  it('prefer picks the first listed source that holds a copy', () => {
+    const claudeDir = makeRuntimeSkill('.claude/skills', 'alpha', `---\nname: alpha\ntitle: claude copy\n---\n# alpha\n`);
+    const cursorDir = makeRuntimeSkill('.cursor/skills', 'alpha', `---\nname: alpha\ntitle: cursor copy\n---\n# alpha\n`);
+    const s = services();
+
+    const preferred = s.init.run({ prefer: ['claude-code', 'cursor'] });
+    expect(preferred.imported).toEqual(['alpha']);
+    expect(preferred.choices).toEqual({ alpha: path.join(userHome, '.claude', 'skills') });
+    expect(readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8')).toContain('claude copy');
+    for (const dir of [claudeDir, cursorDir]) {
+      expect(lstatSync(dir).isSymbolicLink()).toBe(true);
+    }
+  });
+
+  it('per-skill resolve overrides prefer', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha', `---\nname: alpha\ntitle: claude copy\n---\n# alpha\n`);
+    makeRuntimeSkill('.cursor/skills', 'alpha', `---\nname: alpha\ntitle: cursor copy\n---\n# alpha\n`);
+    const s = services();
+
+    const overridden = s.init.run({ prefer: ['claude-code'], resolve: { alpha: 'cursor' } });
+    expect(readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8')).toContain('cursor copy');
+    expect(overridden.choices).toEqual({ alpha: path.join(userHome, '.cursor', 'skills') });
+  });
+
+  it('prefer hub keeps the hub copy; identical trees are not a conflict', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha', `---\nname: alpha\ntitle: runtime copy\n---\n# alpha\n`);
+    const s = services();
+    s.skillHome.ensure();
+    mkdirSync(path.join(home, 'skills', 'alpha'), { recursive: true });
+    writeFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), `---\nname: alpha\ntitle: hub copy\n---\n# alpha\n`);
+    s.registry.ensureEntry('alpha', { title: 'hub copy' });
+
+    const kept = s.init.run({ prefer: ['hub'] });
+    expect(kept.imported).toEqual(['alpha']);
+    expect(kept.choices).toEqual({ alpha: 'hub' });
+    expect(readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8')).toContain('hub copy');
+
+    const same = `---\nname: twin\ntitle: twin\n---\n# twin\n`;
+    makeRuntimeSkill('.claude/skills', 'twin', same);
+    makeRuntimeSkill('.cursor/skills', 'twin', same);
+    const merged = s.init.run();
+    expect(merged.conflicts.map((conflict) => conflict.skill)).not.toContain('twin');
+    expect(merged.imported).toEqual(['twin']);
+    expect(readFileSync(path.join(home, 'skills', 'twin', 'SKILL.md'), 'utf8')).toContain('# twin');
+  });
+
+  it('rejects a prefer item that is not hub and not a directory scanned this run', () => {
+    makeRuntimeSkill('.cursor/skills', 'alpha');
+    const s = services();
+    expect(() => s.init.run({ agents: ['cursor'], prefer: ['claude-code'] })).toThrow(/prefer/i);
+    expect(() => s.init.run({ prefer: ['not-an-agent'] })).toThrow(/prefer/i);
   });
 
   it('reports a failing skill and keeps processing the rest', () => {

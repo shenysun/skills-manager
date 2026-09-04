@@ -75,15 +75,17 @@ What happens to each imported skill:
 
 ### Handling conflicts
 
-If the same skill name exists in multiple runtime directories (or already in the hub), `init` is non-interactive: it **skips the clash and reports it** with a suggested resolution:
+If the same skill name exists in multiple runtime directories (or already in the hub), `init` is non-interactive: it **skips the clash** unless you declare a **conflict priority** for this run, or resolve one skill:
 
 ```bash
-# Pick which copy wins (agent id from the report, or 'hub' to keep the hub copy)
-skills-manager init --resolve my-skill=cursor
-skills-manager init --resolve my-skill=hub
+# This run: prefer Claude's runtime dir, then the shared .agents dir, then keep the hub copy
+skills-manager init --prefer claude-code ~/.agents/skills hub
+
+# Override one skill; everything else still follows --prefer
+skills-manager init --prefer claude-code --resolve my-skill=hub
 ```
 
-The winning copy enters the hub and **all** clashing locations symlink to it.
+The first listed source that actually holds a copy wins. The winning copy enters the hub and **all** clashing locations symlink to it. Without `--prefer` / `--resolve`, clashes stay skipped. The dashboard import sheet exposes the same ordered list.
 
 ### Rollback
 

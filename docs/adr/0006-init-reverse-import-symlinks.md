@@ -14,7 +14,7 @@ Users arrive with skills already installed in agent runtime directories (`~/.cla
 
 2. **Entities move into the hub; runtimes become back-symlinks.** Skill content is copied into hub `skills/<name>/`; each originating runtime path is replaced by a symlink pointing back at it (same direction as user-distribute symlinks). One canonical copy; every tool keeps loading from its familiar path.
 
-3. **Non-interactive conflict protocol.** The CLI stays non-interactive: conflicts are skipped and reported with a copy-paste re-run command (`--resolve <skill>=<agent-id|hub>`). `--all` skips all conflicts (hub wins hub-vs-runtime conflicts). Rich per-conflict selection lives in the dashboard (inline dropdowns, submitted as the same resolve map). Multi-location name clashes: the chosen version enters the hub and **all** clashing locations symlink to it.
+3. **Non-interactive conflict protocol.** The CLI stays non-interactive: unresolved conflicts are skipped and reported with a copy-paste re-run command (`--resolve <skill>=<agent-id|hub>`). An optional per-import **conflict priority** (`--prefer`, or the same list from the dashboard import sheet) auto-picks a winner; see [ADR-0009](0009-init-conflict-priority.md). Multi-location name clashes: the chosen version enters the hub and **all** clashing locations symlink to it.
 
 4. **Safety.** A runtime directory is moved to hub `.backups/<name>-<timestamp>/` before its path becomes a symlink (move = backup + vacate in one step). Backups expire after 30 days; `backup list` / `backup restore <skill>` provide self-service rollback. A per-skill failure restores that skill's prior state and processing continues; symlink failures never degrade to copies.
 

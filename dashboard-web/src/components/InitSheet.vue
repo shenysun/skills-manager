@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
 import { errorMessage, initApply, initPreview, type InitConflict, type InitRunResult } from '../api/client';
+import { addPrefer, movePrefer, preferOptions, removePrefer } from '../domain/initPrefer';
 import { useNotice } from '../composables/useNotice';
 
 const emit = defineEmits<{ close: [] }>();
@@ -15,10 +16,28 @@ const error = ref<string | null>(null);
 const busy = ref(false);
 /** Conflict decisions made inline: skill -> runtime dir (a dir may serve several agents) or 'hub'. */
 const resolve = ref<Record<string, string>>({});
+/** Per-import conflict priority (ADR-0009); empty means do not guess. */
+const prefer = ref<string[]>([]);
+
+async function loadPreview() {
+  preview.value = await initPreview({
+    prefer: prefer.value.length > 0 ? prefer.value : undefined,
+    resolve: Object.keys(resolve.value).length > 0 ? resolve.value : undefined,
+  });
+}
 
 onMounted(async () => {
   try {
-    preview.value = await initPreview();
+    await loadPreview();
+  } catch (cause) {
+    error.value = errorMessage(cause);
+  }
+});
+
+watch(prefer, async () => {
+  if (!preview.value) return;
+  try {
+    await loadPreview();
   } catch (cause) {
     error.value = errorMessage(cause);
   }
@@ -30,23 +49,39 @@ const conflictBySkill = computed(() => {
   return map;
 });
 
+const sources = computed(() => preferOptions(preview.value?.scanned ?? []));
+
+const remainingSources = computed(() => {
+  const taken = new Set(prefer.value);
+  const options = sources.value.filter((source) => !taken.has(source.value));
+  return taken.has('hub') ? options : [...options, { value: 'hub', agentIds: [] as string[] }];
+});
+
 const importableCount = computed(() => {
   if (!preview.value) return 0;
   const unresolved = preview.value.conflicts.filter((conflict) => !resolve.value[conflict.skill]).length;
   return preview.value.discovered.length - unresolved;
 });
 
-/** Choices for a clash: every clashing origin dir (the dir is the identity — it may serve several agents), plus the hub copy when one exists there. */
+function sourceLabel(value: string) {
+  if (value === 'hub') return t('init.preferHub');
+  const source = sources.value.find((item) => item.value === value);
+  return source && source.agentIds.length > 0 ? `${value} (${source.agentIds.join(', ')})` : value;
+}
+
 function choicesFor(conflict: InitConflict) {
   const originChoices = conflict.locations.map((location) => ({ value: location.runtimeDir, label: location.runtimeDir }));
-  return conflict.kind === 'hub-vs-runtime' ? [...originChoices, { value: 'hub', label: t('init.keepHub') }] : originChoices;
+  return conflict.hub || conflict.kind === 'hub-vs-runtime' ? [...originChoices, { value: 'hub', label: t('init.keepHub') }] : originChoices;
 }
 
 async function runApply() {
   busy.value = true;
   error.value = null;
   try {
-    const result = await initApply({ resolve: resolve.value });
+    const result = await initApply({
+      resolve: resolve.value,
+      prefer: prefer.value.length > 0 ? prefer.value : undefined,
+    });
     if (result.imported.length > 0) show('ok', t('notice.imported', { skills: result.imported.join(', ') }));
     // One toast replaces the previous (visual baseline 2026-08-27), so batch
     // the failures into a single message instead of flashing only the last.
@@ -68,6 +103,29 @@ async function runApply() {
     <p v-else-if="!preview" class="picker-hint">{{ t('init.scanning') }}</p>
     <template v-else>
       <p class="picker-hint">{{ t('init.hint') }}</p>
+      <div class="prefer-block">
+        <p class="picker-hint">{{ t('init.preferHint') }}</p>
+        <p v-if="prefer.length === 0" class="picker-hint">{{ t('init.preferEmpty') }}</p>
+        <ol v-else class="prefer-list">
+          <li v-for="(item, index) in prefer" :key="item" class="prefer-row">
+            <span class="mono">{{ sourceLabel(item) }}</span>
+            <button type="button" class="text-btn" :disabled="index === 0" @click="prefer = movePrefer(prefer, index, -1)">{{ t('init.preferUp') }}</button>
+            <button type="button" class="text-btn" :disabled="index === prefer.length - 1" @click="prefer = movePrefer(prefer, index, 1)">{{ t('init.preferDown') }}</button>
+            <button type="button" class="text-btn" @click="prefer = removePrefer(prefer, item)">{{ t('init.preferRemove') }}</button>
+          </li>
+        </ol>
+        <select
+          v-if="remainingSources.length > 0"
+          class="init-choice"
+          :value="''"
+          @change="prefer = addPrefer(prefer, ($event.target as HTMLSelectElement).value)"
+        >
+          <option value="" disabled>{{ t('init.preferAdd') }}</option>
+          <option v-for="source in remainingSources" :key="source.value" :value="source.value">
+            {{ sourceLabel(source.value) }}
+          </option>
+        </select>
+      </div>
       <div v-if="preview.discovered.length === 0 && preview.skippedManaged.length === 0" class="picker-hint">
         {{ t('init.empty') }}
       </div>
@@ -111,5 +169,28 @@ async function runApply() {
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: bottom;
+}
+
+.prefer-block {
+  margin: 0 0 12px;
+}
+
+.prefer-list {
+  margin: 0 0 8px;
+  padding-left: 1.2rem;
+}
+
+.prefer-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.prefer-row .mono {
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

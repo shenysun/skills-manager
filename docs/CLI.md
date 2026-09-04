@@ -35,6 +35,7 @@ skills-manager redistribute --refresh --to project --project ./repo
 skills-manager status
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
+skills-manager init --prefer claude-code ~/.agents/skills hub
 skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
 skills-manager backup list
 skills-manager backup restore my-skill
@@ -57,7 +58,7 @@ Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--age
 
 ### init (reverse import)
 
-`init` is the reverse of distribute: it scans the **global runtime directories of detected catalog agents** (`~/.claude/skills`, `~/.cursor/skills`, …), imports discovered skills into the hub, and turns each origin into a managed symlink back to `skills/<name>/` (the original is moved to `<home>/.backups/` first; backups expire after 30 days). Imported entries are stamped `imported: true` with no source — Skills Manager never guesses provenance. The CLI is non-interactive: clashing skills (same name in several runtimes, or in both hub and runtime) are skipped and reported with a suggested `--resolve <skill>=<agent-id|hub>` re-run; the winning copy enters the hub and **all** clashing origins symlink to it. `doctor` lists imported skills without a managed source; `edit <skill> --source-url <url>` supplies the upstream and enables normal update management. See [ADR-0006](adr/0006-init-reverse-import-symlinks.md).
+`init` is the reverse of distribute: it scans the **global runtime directories of detected catalog agents** (`~/.claude/skills`, `~/.cursor/skills`, …), imports discovered skills into the hub, and turns each origin into a managed symlink back to `skills/<name>/` (the original is moved to `<home>/.backups/` first; backups expire after 30 days). Imported entries are stamped `imported: true` with no source — Skills Manager never guesses provenance. The CLI is non-interactive: clashing skills are skipped unless this run declares a **conflict priority** (`--prefer <runtime-dir|agent-id|hub...>`) or a per-skill `--resolve`. The first `--prefer` source that actually holds a copy wins; `--resolve` overrides it for that skill. Identical full trees are one entity, not a clash. Prefer items must be `hub` or a directory scanned this run. The dashboard import sheet is the same list. See [ADR-0006](adr/0006-init-reverse-import-symlinks.md) and [ADR-0009](adr/0009-init-conflict-priority.md).
 
 ## Agent catalog snapshot
 

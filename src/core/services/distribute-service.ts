@@ -305,7 +305,11 @@ export class DistributeService {
   }
 
   fingerprint(skill: SkillName) {
-    const root = this.registry.skillDir(skill);
+    return this.fingerprintDir(this.registry.skillDir(skill));
+  }
+
+  /** Full-tree fingerprint of any skill directory (hub or runtime). */
+  fingerprintDir(root: string) {
     const hash = createHash('sha256');
     for (const relative of this.listTree(root)) {
       const full = path.join(root, relative);

@@ -79,6 +79,7 @@ skills-manager add owner/repo --all --consumer agents --consumer claude --yes
 skills-manager update --plan
 skills-manager update --skill my-skill
 skills-manager init --dry-run                    # preview runtime-skill import
+skills-manager init --prefer claude-code hub     # this-run conflict priority
 skills-manager init --resolve my-skill=cursor    # import with a conflict decision
 skills-manager backup list                       # inspect init backups
 skills-manager backup restore my-skill           # roll one import back

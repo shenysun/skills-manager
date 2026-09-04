@@ -66,6 +66,7 @@ const initBody = {
   additionalProperties: false,
   properties: {
     resolve: { type: 'object', additionalProperties: { type: 'string' } },
+    prefer: { type: 'array', items: { type: 'string' } },
   },
 } as const;
 
@@ -391,17 +392,18 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return data({ sourceInfo: source, discovered: services.source.discover(source), existing: services.registry.listCanonicalSkills() });
   });
 
-  // Reverse import (ADR-0006): the dashboard's conflict decisions arrive as the
-  // same resolve map the CLI's --resolve flags produce.
-  app.post('/api/init/preview', async () => {
+  // Reverse import (ADR-0006 / ADR-0009): dashboard prefer + resolve are the
+  // same lists the CLI's --prefer / --resolve flags produce.
+  app.post('/api/init/preview', { schema: { body: initBody } }, async (request) => {
+    const body = (request.body ?? {}) as { resolve?: Record<string, string>; prefer?: string[] };
     const services = getServices();
-    return data(services.init.run({ dryRun: true }));
+    return data(services.init.run({ dryRun: true, resolve: body.resolve, prefer: body.prefer }));
   });
 
   app.post('/api/init/apply', { schema: { body: initBody } }, async (request) => {
-    const body = request.body as { resolve?: Record<string, string> };
+    const body = request.body as { resolve?: Record<string, string>; prefer?: string[] };
     const services = getServices();
-    const result = services.init.run({ resolve: body.resolve });
+    const result = services.init.run({ resolve: body.resolve, prefer: body.prefer });
     services.activity.record({ action: 'init', summary: `Imported ${result.imported.join(', ') || 'nothing'} from runtime dirs`, details: { imported: result.imported, conflicts: result.conflicts.map((conflict) => conflict.skill), failed: result.failed } });
     return data(result);
   });

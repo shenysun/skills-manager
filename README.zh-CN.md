@@ -79,6 +79,7 @@ skills-manager add owner/repo --all --consumer agents --consumer claude --yes
 skills-manager update --plan
 skills-manager update --skill my-skill
 skills-manager init --dry-run                    # 预览运行时技能导入
+skills-manager init --prefer claude-code hub     # 本次导入的冲突优先级
 skills-manager init --resolve my-skill=cursor    # 按冲突决策导入
 skills-manager backup list                       # 查看 init 备份
 skills-manager backup restore my-skill           # 回滚某次导入

@@ -98,11 +98,11 @@ program.command('init')
   .description('Import skills already living in agent runtime dirs into the hub (reverse of distribute); origins become managed symlinks')
   .option('-a, --agent <id...>', 'catalog agent ids to scan; defaults to the detected set')
   .option('-r, --resolve <skill=choice...>', 'conflict decisions: <skill>=<runtime-dir|agent-id|hub>')
-  .option('--all', 'import everything unambiguous; skip clashing skills (hub wins hub-vs-runtime)')
+  .option('--prefer <item...>', 'conflict priority this run: ordered runtime-dir, agent-id, or hub')
   .option('--dry-run', 'print the full plan without touching disk')
   .action((opts, cmd) => {
     const s = services(cmd);
-    const result = s.init.run({ agents: opts.agent, resolve: parseResolve(opts.resolve), dryRun: Boolean(opts.dryRun), all: Boolean(opts.all) });
+    const result = s.init.run({ agents: opts.agent, resolve: parseResolve(opts.resolve), prefer: opts.prefer, dryRun: Boolean(opts.dryRun) });
     if (!opts.dryRun) s.activity.record({ action: 'cli-init', summary: `Imported ${result.imported.join(', ') || 'nothing'} from runtime dirs`, details: { imported: result.imported, conflicts: result.conflicts, failed: result.failed } });
     print(result);
   });
