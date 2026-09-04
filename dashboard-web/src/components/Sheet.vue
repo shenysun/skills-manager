@@ -1,54 +1,54 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import {
+  DialogClose,
+  DialogContent,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+} from 'reka-ui';
+import { acquireDialogScrollLock, releaseDialogScrollLock } from '../composables/dialogScrollLock';
 
 defineProps<{ title: string; wide?: boolean }>();
 const emit = defineEmits<{ cancel: [] }>();
+const { t } = useI18n();
 
-function onKey(event: KeyboardEvent) {
-  if (event.key === 'Escape') emit('cancel');
+function onOpenChange(open: boolean) {
+  if (!open) emit('cancel');
 }
 
-// Body scroll lock lives in the Sheet base so every layer (picker, undistribute,
-// wizard, confirm, preview) inherits it. A module-level counter — not a boolean — keeps
-// nested sheets locked until the last one closes; `scrollbar-gutter: stable`
-// (tokens.css) stops the hidden scrollbar from shifting the page sideways.
-let openSheets = 0;
-let savedOverflow = '';
-
-function acquireScrollLock() {
-  if (openSheets === 0) {
-    savedOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-  }
-  openSheets += 1;
-}
-
-function releaseScrollLock() {
-  openSheets = Math.max(0, openSheets - 1);
-  if (openSheets === 0) document.body.style.overflow = savedOverflow;
-}
-
-onMounted(() => {
-  acquireScrollLock();
-  window.addEventListener('keydown', onKey);
-});
-onUnmounted(() => {
-  releaseScrollLock();
-  window.removeEventListener('keydown', onKey);
-});
+onMounted(() => acquireDialogScrollLock());
+onUnmounted(() => releaseDialogScrollLock());
 </script>
 
 <template>
-  <Teleport to="body">
-    <div class="sheet-overlay" @click.self="emit('cancel')">
-      <div class="sheet" :class="{ wide }" role="dialog" :aria-label="title">
-        <div class="sheet-head">
-          <h2>{{ title }}</h2>
-          <slot name="head" />
-          <button class="sheet-close" @click="emit('cancel')">✕</button>
-        </div>
-        <slot />
-      </div>
-    </div>
-  </Teleport>
+  <DialogRoot :open="true" modal @update:open="onOpenChange">
+    <DialogPortal>
+      <DialogOverlay class="sheet-overlay">
+        <DialogContent
+          class="sheet"
+          :class="{ wide }"
+          :aria-describedby="undefined"
+          @pointer-down-outside="
+            (event) => {
+              const original = event.detail.originalEvent;
+              const target = original.target as HTMLElement;
+              if (original.offsetX > target.clientWidth || original.offsetY > target.clientHeight) {
+                event.preventDefault();
+              }
+            }
+          "
+        >
+          <div class="sheet-head">
+            <DialogTitle as="h2">{{ title }}</DialogTitle>
+            <slot name="head" />
+            <DialogClose class="sheet-close" :aria-label="t('chrome.close')">✕</DialogClose>
+          </div>
+          <slot />
+        </DialogContent>
+      </DialogOverlay>
+    </DialogPortal>
+  </DialogRoot>
 </template>

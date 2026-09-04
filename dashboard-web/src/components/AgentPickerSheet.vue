@@ -128,7 +128,7 @@ async function apply() {
 </script>
 
 <template>
-  <Sheet v-if="!showBrowser" :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
+  <Sheet :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
     <div class="scope-row">
       <button :class="{ on: scope === 'user' }" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
       <button :class="{ on: scope === 'project' }" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
@@ -237,7 +237,7 @@ async function apply() {
   </Sheet>
 
   <DirectoryBrowser
-    v-else
+    v-if="showBrowser"
     :initial-path="projectRoot.trim() ? projectRoot.trim() : undefined"
     @select="onBrowsedPath"
     @cancel="showBrowser = false"

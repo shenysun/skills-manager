@@ -172,6 +172,7 @@ export default {
   },
   chrome: {
     themeHint: '切换明暗主题',
+    close: '关闭',
   },
   browser: {
     title: '选择项目目录',

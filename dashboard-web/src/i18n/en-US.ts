@@ -172,6 +172,7 @@ export default {
   },
   chrome: {
     themeHint: 'Toggle light/dark theme',
+    close: 'Close',
   },
   browser: {
     title: 'Select project directory',
