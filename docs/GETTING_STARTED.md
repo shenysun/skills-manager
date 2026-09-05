@@ -71,7 +71,7 @@ What happens to each imported skill:
 
 1. The skill **moves into** the skill home (`~/.skills-manager/skills/<name>/`) — the single canonical copy
 2. Its original runtime location is **preserved as a backup** (`~/.skills-manager/.backups/`), then becomes a **symlink back to the hub** — every tool keeps loading from its familiar path
-3. The registry marks it `imported: true` — provenance is unknown, so Skills Manager will not try to update it
+3. The registry marks it `imported: true` — provenance is never guessed, but lockfile evidence is adopted when present ([ADR-0011](adr/0011-init-adopts-lockfile-evidence.md)); without evidence the skill stays a snapshot until you supply a source (`edit <skill> --source-git owner/repo --subpath …`) or backfill evidence (`provenance adopt`)
 
 ### Handling conflicts
 
