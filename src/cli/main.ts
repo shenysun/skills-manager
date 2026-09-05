@@ -147,6 +147,29 @@ program.command('edit')
     print(result);
   });
 
+const provenance = program.command('provenance').description('Backfill provenance for source-less skills (lockfile evidence adoption, ADR-0011/0012)');
+provenance.command('adopt')
+  .description('Adopt npx skills lockfile evidence onto legacy imported skills that have no source yet')
+  .option('--dry-run', 'print what would be adopted without touching the registry')
+  .option('-s, --skill <skill...>', 'limit adoption to specific skills')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.provenance.adopt({ dryRun: Boolean(opts.dryRun), skills: opts.skill });
+    if (!opts.dryRun) s.activity.record({ action: 'cli-provenance-adopt', summary: `Adopted lockfile evidence for ${result.adopted.map((item) => item.skill).join(', ') || 'nothing'}`, details: { adopted: result.adopted.map((item) => item.skill), skipped: result.skipped } });
+    print(result);
+  });
+provenance.command('list')
+  .description('List skills still missing a source: imported-without-source vs locally authored')
+  .option('--json', 'machine-readable output for agents')
+  .action((opts, cmd) => {
+    const pending = services(cmd).provenance.pending();
+    if (opts.json) return print(pending);
+    console.log(`Imported without source (${pending.importedWithoutSource.length}):`);
+    for (const item of pending.importedWithoutSource) console.log(`  ${item.skill}${item.importedAt ? ` (imported ${item.importedAt})` : ''}`);
+    console.log(`Locally authored, no upstream recorded (${pending.locallyAuthored.length}):`);
+    for (const skill of pending.locallyAuthored) console.log(`  ${skill}`);
+  });
+
 const backup = program.command('backup').description('Inspect and restore init backups (hub .backups/, 30-day retention)');backup.command('list')
   .description('List saved backups')
   .action((_opts, cmd) => print(services(cmd).backups.list()));

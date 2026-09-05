@@ -42,6 +42,9 @@ skills-manager backup restore my-skill
 skills-manager edit my-skill --source-url https://github.com/owner/repo
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
+skills-manager provenance list
+skills-manager provenance adopt
+skills-manager provenance adopt --dry-run --skill my-skill
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
@@ -57,6 +60,10 @@ Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--age
 - `skills-manager redistribute --refresh` (alias of `--outdated`) refreshes every stale copy target, optionally filtered by `--to` / `--project`; it prints `Refreshed N, errored M.`
 - `add` / `update` print a one-line trailing reminder when other stale targets remain.
 - The dashboard shows a stale badge with a count and a one-click refresh button per skill row.
+
+### provenance (source backfill)
+
+`provenance list` shows every skill still missing a usable source, split into **imported-without-source** (entered via init, no evidence or supplied source) and **locally authored** (never imported, no upstream recorded); archived skills are excluded. `provenance adopt` re-runs the ADR-0011 lockfile-evidence adoption over that legacy imported queue — the same gate init applies at import time, minus the "fresh import this run" condition, so skills imported before ADR-0011 finally pick up their lockfile evidence. It never guesses: skills with no lock entry are skipped (`no_lock_evidence`). `--dry-run` previews; `--skill` limits. Guessed sources are not this command's job — candidates found by searching belong to an agent session and land through `edit` only after the user approves each one (ADR-0012). See [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md).
 
 ### init (reverse import)
 

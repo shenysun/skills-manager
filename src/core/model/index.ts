@@ -143,6 +143,19 @@ export type DoctorReport = {
   importedWithoutSource: Array<{ skill: string; importedAt: string | null }>;
 };
 
+/** Skills still missing a usable source, split by how they entered the hub (provenance backfill queue). */
+export type ProvenancePending = {
+  importedWithoutSource: Array<{ skill: SkillName; importedAt: string | null }>;
+  locallyAuthored: SkillName[];
+};
+
+/** One `provenance adopt` run: which skills got lockfile evidence, which stayed source-less and why. */
+export type ProvenanceAdoptResult = {
+  dryRun: boolean;
+  adopted: Array<{ skill: SkillName; source: SkillSource }>;
+  skipped: Array<{ skill: SkillName; reason: 'no_lock_evidence' | 'not_pending' }>;
+};
+
 /**
  * Dual-layer distribution entry (ADR-0004): the physical layer (runtimePath,
  * mode, fingerprint, managed) is what undistribute/outdated/foreign-refusal

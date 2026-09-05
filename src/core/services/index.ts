@@ -16,6 +16,7 @@ import { MigrationService } from './migration-service.js';
 import { InitService } from './init-service.js';
 import { BackupService } from './backup-service.js';
 import { SkillLockService } from './skill-lock-service.js';
+import { ProvenanceService } from './provenance-service.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
@@ -53,8 +54,9 @@ export function createCoreServices(options: CoreServicesOptions) {
   const backups = new BackupService(options.fs, home, registry, distribute);
   const skillLock = new SkillLockService(options.fs, { env: options.env, userHomeDir: options.userHome });
   const init = new InitService(options.fs, home, skillHome, registry, distribute, catalog, backups, skillLock);
+  const provenance = new ProvenanceService(registry, skillLock);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, package: packageService };
+  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
@@ -76,5 +78,6 @@ export { InitService } from './init-service.js';
 export type { InitRunRequest, InitRunResult, InitDiscoveredSkill, InitConflict, InitSkillLocation } from './init-service.js';
 export { SkillLockService, lockEntryToSource } from './skill-lock-service.js';
 export type { SkillLockEntry, SkillLockOptions } from './skill-lock-service.js';
+export { ProvenanceService } from './provenance-service.js';
 export { BackupService } from './backup-service.js';
 export type { BackupInfo } from './backup-service.js';
