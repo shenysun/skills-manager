@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
+import InlineCombobox from './InlineCombobox.vue';
 import InlineSelect from './InlineSelect.vue';
 import { errorMessage, initApply, initPreview, type InitConflict, type InitRunResult } from '../api/client';
 import { addPrefer, movePrefer, preferOptions, removePrefer } from '../domain/initPrefer';
@@ -107,8 +108,7 @@ async function runApply() {
       <p class="picker-hint">{{ t('init.hint') }}</p>
       <div class="mb-[12px]">
         <p class="picker-hint">{{ t('init.preferHint') }}</p>
-        <p v-if="prefer.length === 0" class="picker-hint">{{ t('init.preferEmpty') }}</p>
-        <ol v-else class="mb-[8px] pl-[1.2rem]">
+        <ol v-if="prefer.length > 0" class="mb-[8px] pl-[1.2rem]">
           <li v-for="(item, index) in prefer" :key="item" class="flex items-baseline gap-[8px] text-[13px]">
             <span class="mono mr-auto min-w-0 overflow-hidden text-ellipsis">{{ sourceLabel(item) }}</span>
             <button type="button" class="text-btn" :disabled="index === 0" @click="prefer = movePrefer(prefer, index, -1)">{{ t('init.preferUp') }}</button>
@@ -116,13 +116,15 @@ async function runApply() {
             <button type="button" class="text-btn" @click="prefer = removePrefer(prefer, item)">{{ t('init.preferRemove') }}</button>
           </li>
         </ol>
-        <!-- Always-placeholder picker: choosing an option appends it to the
-             priority list; the control itself keeps no selection. -->
-        <InlineSelect
+        <!-- Search-to-add: picking an option appends it to the priority list;
+             the control resets to its placeholder. -->
+        <InlineCombobox
           v-if="remainingSources.length > 0"
+          class="mt-[6px]"
           :placeholder="t('init.preferAdd')"
+          :empty-text="t('init.preferNoMatch')"
           :options="remainingSources.map((source) => ({ value: source.value, label: sourceLabel(source.value) }))"
-          @update:model-value="(value) => (prefer = addPrefer(prefer, value))"
+          @select="(value) => (prefer = addPrefer(prefer, value))"
         />
       </div>
       <div v-if="preview.discovered.length === 0 && preview.skippedManaged.length === 0" class="picker-hint">
