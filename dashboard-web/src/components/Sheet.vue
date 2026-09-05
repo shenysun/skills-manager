@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, watch } from 'vue';
+import { watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   DialogClose,
@@ -9,33 +9,17 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui';
-import { acquireDialogScrollLock, releaseDialogScrollLock } from '../composables/dialogScrollLock';
 
 defineProps<{ title: string; wide?: boolean; side?: 'right' }>();
 const emit = defineEmits<{ closed: [] }>();
 const open = defineModel<boolean>('open', { default: false });
 const { t } = useI18n();
 
-// Nested-dialog scroll lock (CONTEXT.md): the shared counter keeps the body
-// locked until the last sheet closes — tied to open transitions, not mounts.
-watch(
-  open,
-  (value, previous) => {
-    if (value) {
-      acquireDialogScrollLock();
-      return;
-    }
-    if (previous) {
-      releaseDialogScrollLock();
-      emit('closed');
-    }
-  },
-  { immediate: true },
-);
-// The parent may end the session while we are still open (v-if pull after an
-// apply); release what this instance acquired.
-onUnmounted(() => {
-  if (open.value) releaseDialogScrollLock();
+// Body scroll lock: Reka's modal Dialog already owns it (nested layers counted,
+// original overflow restored on last close); `scrollbar-gutter: stable` in
+// tokens.css keeps the page from shifting. Do not add a second lock writer.
+watch(open, (value, previous) => {
+  if (!value && previous) emit('closed');
 });
 </script>
 

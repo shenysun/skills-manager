@@ -76,7 +76,7 @@ async function onRefresh() {
 
 <template>
   <div
-    class="group flex items-baseline gap-[10px] border-b border-line2 py-[13px] px-[2px]"
+    class="group relative flex items-baseline gap-[10px] border-b border-line2 py-[13px] px-[2px]"
     @click="onBodyClick"
   >
     <span
@@ -114,9 +114,12 @@ async function onRefresh() {
         {{ skill.description || t('row.noDescription') }}
       </div>
     </div>
+    <!-- Actions stay in the DOM (opacity/pointer-events gated, zero layout
+         footprint via absolute placement): a dialog opened from here can hand
+         focus back to its trigger, and keyboard operators can reach them. -->
     <div
-      class="hidden items-center gap-[12px] self-center text-[13px] text-fg2 group-hover:flex"
-      :class="{ flex: menuOpen }"
+      class="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-[12px] text-[13px] text-fg2 opacity-0 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
+      :class="{ 'pointer-events-auto opacity-100': menuOpen }"
       @click.stop
     >
       <button
