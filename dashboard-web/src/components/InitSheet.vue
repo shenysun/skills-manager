@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
+import InlineSelect from './InlineSelect.vue';
 import { errorMessage, initApply, initPreview, type InitConflict, type InitRunResult } from '../api/client';
 import { addPrefer, movePrefer, preferOptions, removePrefer } from '../domain/initPrefer';
 import { useNotice } from '../composables/useNotice';
@@ -115,17 +116,14 @@ async function runApply() {
             <button type="button" class="text-btn" @click="prefer = removePrefer(prefer, item)">{{ t('init.preferRemove') }}</button>
           </li>
         </ol>
-        <select
+        <!-- Always-placeholder picker: choosing an option appends it to the
+             priority list; the control itself keeps no selection. -->
+        <InlineSelect
           v-if="remainingSources.length > 0"
-          class="ml-[0.5rem] max-w-[22rem] overflow-hidden align-bottom text-ellipsis"
-          :value="''"
-          @change="prefer = addPrefer(prefer, ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="" disabled>{{ t('init.preferAdd') }}</option>
-          <option v-for="source in remainingSources" :key="source.value" :value="source.value">
-            {{ sourceLabel(source.value) }}
-          </option>
-        </select>
+          :placeholder="t('init.preferAdd')"
+          :options="remainingSources.map((source) => ({ value: source.value, label: sourceLabel(source.value) }))"
+          @update:model-value="(value) => (prefer = addPrefer(prefer, value))"
+        />
       </div>
       <div v-if="preview.discovered.length === 0 && preview.skippedManaged.length === 0" class="picker-hint">
         {{ t('init.empty') }}
@@ -138,12 +136,11 @@ async function runApply() {
             <em v-if="preview.skippedManaged.includes(skill.name)" class="existing-mark">{{ t('init.managedBadge') }}</em>
             <template v-if="conflictBySkill.has(skill.name)">
               <em class="existing-mark">{{ t('init.conflictBadge') }}</em>
-              <select v-model="resolve[skill.name]" class="ml-[0.5rem] max-w-[22rem] overflow-hidden align-bottom text-ellipsis">
-                <option :value="undefined">{{ t('init.choicePlaceholder') }}</option>
-                <option v-for="choice in choicesFor(conflictBySkill.get(skill.name)!)" :key="choice.value" :value="choice.value">
-                  {{ choice.label }}
-                </option>
-              </select>
+              <InlineSelect
+                v-model="resolve[skill.name]"
+                :placeholder="t('init.choicePlaceholder')"
+                :options="choicesFor(conflictBySkill.get(skill.name)!)"
+              />
             </template>
           </span>
         </label>

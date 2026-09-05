@@ -57,11 +57,6 @@ input {
   color: inherit;
 }
 
-input[type='checkbox'] {
-  accent-color: var(--accent);
-  align-self: center;
-}
-
 .mono {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
 }

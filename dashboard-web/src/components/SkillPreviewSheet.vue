@@ -83,26 +83,29 @@ function formatSize(bytes: number): string {
       </button>
     </template>
 
-    <div class="preview-meta">
-      <p v-if="skill.description" class="preview-desc-full">{{ skill.description }}</p>
-      <div v-if="src || distributed" class="preview-summary">
+    <div class="mt-[2px] mb-[12px] shrink-0 border-b border-line2 pb-[10px]">
+      <p v-if="skill.description" class="mb-[6px] text-[13.5px] leading-[1.65] text-fg2">{{ skill.description }}</p>
+      <div v-if="src || distributed" class="flex flex-wrap items-baseline gap-x-[18px] gap-y-[4px] text-[12.5px] text-fg3">
         <span v-if="src">
           {{ t('preview.sourceLabel') }}
-          <a v-if="src.href" :href="src.href" target="_blank" rel="noreferrer">{{ src.label }}</a>
+          <a v-if="src.href" class="text-accent" :href="src.href" target="_blank" rel="noreferrer">{{ src.label }}</a>
           <span v-else class="mono">{{ src.label }}</span>
         </span>
         <!-- 接入 reverse lookup: inline <details>, grouped by target (physical
              layer); shared runtime paths appear once, agents on each. -->
-        <details v-if="distributed" class="dist-details">
-          <summary>{{ t('preview.distPrefix') }} {{ distCounts }}</summary>
-          <div class="dist-groups">
-            <div v-for="target in skill.distribution" :key="target.targetRoot" class="dist-target">
-              <p class="dist-target-name" :class="{ mono: target.kind === 'project' }">
+        <details v-if="distributed" class="min-w-0">
+          <summary class="cursor-pointer text-fg3 hover:text-fg2">{{ t('preview.distPrefix') }} {{ distCounts }}</summary>
+          <div class="grid gap-[10px] pt-[8px] pb-[2px]">
+            <div v-for="target in skill.distribution" :key="target.targetRoot">
+              <p
+                class="mb-[2px] text-[12.5px] font-semibold text-fg2 [overflow-wrap:anywhere]"
+                :class="{ mono: target.kind === 'project' }"
+              >
                 {{ target.kind === 'user' ? t('preview.distUser') : target.targetRoot }}
               </p>
-              <p v-for="entry in target.entries" :key="entry.runtimePath" class="dist-entry">
-                <span class="dist-agents">{{ entry.agents.join(', ') }}</span>
-                <span class="mono dist-path">{{ entry.runtimePath }}</span>
+              <p v-for="entry in target.entries" :key="entry.runtimePath" class="flex items-baseline gap-[12px] text-[12.5px] text-fg3">
+                <span class="shrink-0">{{ entry.agents.join(', ') }}</span>
+                <span class="mono [overflow-wrap:anywhere]">{{ entry.runtimePath }}</span>
               </p>
             </div>
           </div>
@@ -110,13 +113,16 @@ function formatSize(bytes: number): string {
       </div>
     </div>
 
-    <div class="preview-body">
-      <aside v-if="treeRows.length" class="preview-tree">
+    <div class="flex min-h-0 flex-1">
+      <aside v-if="treeRows.length" class="w-[240px] shrink-0 overflow-y-auto border-r border-line2 pt-[6px] pb-[16px]">
         <button
           v-for="row in treeRows"
           :key="row.path"
-          class="preview-tree-row mono"
-          :class="{ dir: row.isDir, on: row.path === selectedPath }"
+          class="mono block w-full overflow-hidden text-ellipsis whitespace-nowrap px-[10px] py-[3px] text-left text-[12.5px]"
+          :class="[
+            row.path === selectedPath ? 'bg-line2 text-accent' : '',
+            row.isDir ? 'cursor-default font-semibold text-fg3' : 'text-fg2 hover:text-fg',
+          ]"
           :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
           :disabled="row.isDir"
           @click="select(row.path)"
@@ -125,19 +131,19 @@ function formatSize(bytes: number): string {
         </button>
       </aside>
 
-      <div class="preview-content">
-        <p v-if="loadError" class="preview-error">{{ t('preview.loadFailed', { message: loadError }) }}</p>
-        <p v-else-if="!file" class="preview-hint">{{ t('preview.loading') }}</p>
+      <div class="min-w-0 flex-1 overflow-y-auto px-[20px]">
+        <p v-if="loadError" class="text-[13.5px] text-danger">{{ t('preview.loadFailed', { message: loadError }) }}</p>
+        <p v-else-if="!file" class="text-[13px] text-fg3">{{ t('preview.loading') }}</p>
         <template v-else>
-          <p v-if="file.kind !== 'binary' && file.truncated" class="preview-hint preview-truncated">
+          <p v-if="file.kind !== 'binary' && file.truncated" class="text-[13px] text-warn">
             {{ t('preview.truncated') }}
           </p>
-          <p v-if="file.kind === 'binary'" class="preview-hint">{{ t('preview.binary', { size: formatSize(file.size) }) }}</p>
+          <p v-if="file.kind === 'binary'" class="text-[13px] text-fg3">{{ t('preview.binary', { size: formatSize(file.size) }) }}</p>
           <!-- v-html is safe here: the server pipeline sanitizes everything it puts in html. -->
           <div v-if="file.kind === 'markdown' && view === 'rendered'" class="preview-md" v-html="file.html"></div>
-          <pre v-else-if="file.kind === 'markdown'" class="preview-source mono">{{ file.raw }}</pre>
-          <div v-else-if="file.kind === 'source'" class="preview-code" v-html="file.html"></div>
-          <pre v-else-if="file.kind === 'text'" class="preview-source mono">{{ file.raw }}</pre>
+          <pre v-else-if="file.kind === 'markdown'" class="mono break-words pt-[6px] pb-[28px] text-[13px] leading-[1.65] whitespace-pre-wrap text-fg2">{{ file.raw }}</pre>
+          <div v-else-if="file.kind === 'source'" class="preview-code pt-[8px] pb-[28px]" v-html="file.html"></div>
+          <pre v-else-if="file.kind === 'text'" class="mono break-words pt-[6px] pb-[28px] text-[13px] leading-[1.65] whitespace-pre-wrap text-fg2">{{ file.raw }}</pre>
         </template>
       </div>
     </div>
