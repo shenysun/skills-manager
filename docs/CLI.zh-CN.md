@@ -10,10 +10,10 @@
 
 1. `--home <path>`
 2. `SKILL_HOME`
-3. 当前目录（当它已包含 `skills/`、`views/`、`collections/` 和 `registry.yaml` 时）
+3. 当前目录（当它已经是一个技能库时）
 4. `~/.skills-manager`（自动初始化）
 
-初始化会创建 `skills/`、`views/`、`collections/`、`registry.yaml`，以及 `.skills/activity.jsonl` 的父目录。
+初始化会创建 `skills/`、`collections/`、`registry.yaml`，以及 `.skills/` 数据目录。
 
 ## 命令
 
@@ -40,6 +40,11 @@ skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
 skills-manager backup list
 skills-manager backup restore my-skill
 skills-manager edit my-skill --source-url https://github.com/owner/repo
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
+skills-manager provenance list
+skills-manager provenance adopt
+skills-manager provenance adopt --dry-run --skill my-skill
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
@@ -56,9 +61,13 @@ distribute 的目标可以是任意目录中的 agent id（`--agent`，可重复
 - `add` / `update` 在仍有其他过期目标时，末尾追加一行提醒。
 - 仪表盘的技能行显示带数量的过期徽标和一键刷新按钮。
 
+### provenance（来源补齐）
+
+`provenance list` 列出所有仍缺可用来源的技能，分为 **imported-without-source**（经 init 进入、无证据也无补录来源）与 **本地自建**（从未导入、无上游记录）两类；已归档技能不列入。`provenance adopt` 对该存量导入队列重跑 ADR-0011 的锁文件证据采纳 —— 与 init 导入时同一套门禁，仅去掉「本轮新导入」条件，让 ADR-0011 之前导入的技能也能补上锁文件证据。它从不猜测：锁中无条目的技能直接跳过（`no_lock_evidence`）。`--dry-run` 仅预览；`--skill` 限定范围。搜索得来的候选不归这个命令管 —— 猜测性来源属于 agent 会话，经用户逐条拍板后才能通过 `edit` 写入（ADR-0012）。见 [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md)。
+
 ### init（反向导入）
 
-`init` 是 distribute 的反向操作：扫描**检测到的目录 agent 的全局运行时目录**（`~/.claude/skills`、`~/.cursor/skills`、…），把发现的技能导入技能库，并把每个原位置变成指回 `skills/<name>/` 的受管软链接（原内容会先移入 `<home>/.backups/`；备份 30 天后过期）。导入条目标记 `imported: true` 且无 source —— Skills Manager 从不猜测来源。CLI 是非交互的：冲突默认跳过，除非这次导入声明了 **冲突优先级**（`--prefer <运行时目录|agent-id|hub...>`）或逐条 `--resolve`。`--prefer` 里第一个真正持有该技能的来源胜出；`--resolve` 覆盖单个技能。整树指纹相同的副本算同一实体，不是冲突。prefer 项必须是 `hub` 或本轮扫描到的目录。Dashboard 导入面板是同一套列表。见 [ADR-0006](adr/0006-init-reverse-import-symlinks.md) 与 [ADR-0009](adr/0009-init-conflict-priority.md)。
+`init` 是 distribute 的反向操作：扫描**检测到的目录 agent 的全局运行时目录**（`~/.claude/skills`、`~/.cursor/skills`、…），把发现的技能导入技能库，并把每个原位置变成指回 `skills/<name>/` 的受管软链接（原内容会先移入 `<home>/.backups/`；备份 30 天后过期）。导入条目标记 `imported: true`；来源从不猜测，但**有证据就采纳**（[ADR-0011](adr/0011-init-adopts-lockfile-evidence.md)）—— ADR-0011 之前导入的存量技能可用 `provenance adopt` 补采证据。CLI 是非交互的：冲突默认跳过，除非这次导入声明了 **冲突优先级**（`--prefer <运行时目录|agent-id|hub...>`）或逐条 `--resolve`。`--prefer` 里第一个真正持有该技能的来源胜出；`--resolve` 覆盖单个技能。整树指纹相同的副本算同一实体，不是冲突。prefer 项必须是 `hub` 或本轮扫描到的目录。Dashboard 导入面板是同一套列表。见 [ADR-0006](adr/0006-init-reverse-import-symlinks.md) 与 [ADR-0009](adr/0009-init-conflict-priority.md)。
 
 ## Agent 目录快照
 

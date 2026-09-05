@@ -49,10 +49,11 @@ After initialization, your skill home will look like:
 ~/.skills-manager/
 ├── skills/           # Your skill definitions
 ├── registry.yaml     # Metadata and configuration
-├── views/            # Generated symlink trees (auto-created)
 ├── collections/      # Generated category links (auto-created)
+├── .backups/         # Pre-init originals (30-day retention)
 └── .skills/
-    └── activity.jsonl  # Operation log
+    ├── activity.jsonl         # Operation log
+    └── distributions.jsonl    # Distribution index (what went where)
 ```
 
 ## Migrate Existing Skills (init)
@@ -98,11 +99,13 @@ skills-manager backup restore my-skill   # roll one skill fully back
 
 ### Imported skills and updates
 
-Imported skills are snapshots — Skills Manager doesn't know their upstream. `doctor` lists imported skills without a managed source so staleness stays visible. When you know the origin, supply it and the skill joins the normal update flow:
+Imported skills never get a guessed upstream, but lockfile **evidence is adopted** when present ([ADR-0011](adr/0011-init-adopts-lockfile-evidence.md)) — skills installed by `npx skills` carry a machine-global lockfile, and matching entries become real sources on import, putting those skills straight into the update flow. `doctor` lists what still has no source so staleness stays visible. When you know the origin, supply it and the skill joins the update flow:
 
 ```bash
-skills-manager edit my-skill --source-url https://github.com/owner/repo
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 ```
+
+For skills imported before evidence adoption existed, `skills-manager provenance adopt` backfills the lockfile evidence in one pass.
 
 ## Common Tasks
 
@@ -133,6 +136,23 @@ skills-manager add owner/repo --skill skill-name-1 --skill skill-name-2
 skills-manager add https://github.com/owner/repo.git --all
 skills-manager add /local/path/to/skills --all
 ```
+
+### Backfill missing sources
+
+```bash
+skills-manager provenance list          # what's still source-less (two buckets)
+skills-manager provenance adopt          # adopt lockfile evidence where it exists
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
+```
+
+Evidence is adopted automatically; anything found by *searching* is only ever written after you approve it, one skill at a time (ADR-0012). The official agent skill automates the whole loop: install it, then just tell your agent "补齐所有来源" and it adopts evidence, searches the skills ecosystem (skills.sh / GitHub), verifies candidates against the local copy, and asks you to pick:
+
+```bash
+skills-manager add <this-repo-url> --skill skills-manager
+skills-manager distribute --to user --skill skills-manager
+```
+
+That skill also documents every CLI command for your agent, task by task.
 
 ### Open the Dashboard
 

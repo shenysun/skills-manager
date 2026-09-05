@@ -21,6 +21,13 @@ skills-manager init --dry-run   # 预览
 skills-manager init             # 导入
 ```
 
+**想让 agent 直接替你操作这个 CLI？** 本仓库自带一个官方 agent skill（`skills/skills-manager/`），覆盖全部命令，并内置「来源补齐」工作流（采纳锁文件证据 → 搜索并验证候选 → 你逐条拍板写入，ADR-0012）：
+
+```sh
+skills-manager add <本仓库地址> --skill skills-manager
+skills-manager distribute --to user --skill skills-manager
+```
+
 或者全局安装：
 
 ```sh
@@ -57,10 +64,10 @@ skills-manager doctor
 一个技能库包含：
 
 - `skills/`：规范技能目录，扁平存放为 `skills/<skill-name>/SKILL.md`
-- `views/`：生成的消费方软链接树，如 `views/agents/` 和 `views/claude/`
-- `collections/`：生成的分类软链接树
-- `registry.yaml`：元数据、来源、消费方、分类、source 与更新策略
-- `.skills/activity.jsonl`：控制台/CLI 写入的操作记录
+- `collections/`：生成的分类软链接树（仅供浏览）
+- `registry.yaml`：元数据 —— 分类、标签、消费方、来源（仓库、子路径、ref、基线）、更新策略
+- `.skills/`：分发索引（`distributions.jsonl`）、活动日志、可选的 agent 目录覆盖
+- `.backups/`：init 前的原始内容，保留 30 天
 
 技能库解析优先级：
 
@@ -75,7 +82,8 @@ skills-manager doctor
 skills-manager web --home ~/.skills-manager
 skills-manager doctor --home ~/.skills-manager
 skills-manager list --home ~/.skills-manager
-skills-manager add owner/repo --all --consumer agents --consumer claude --yes
+skills-manager add owner/repo --all --yes
+skills-manager distribute --to user --skill my-skill --agent claude-code
 skills-manager update --plan
 skills-manager update --skill my-skill
 skills-manager init --dry-run                    # 预览运行时技能导入
@@ -83,7 +91,9 @@ skills-manager init --prefer claude-code hub     # 本次导入的冲突优先�
 skills-manager init --resolve my-skill=cursor    # 按冲突决策导入
 skills-manager backup list                       # 查看 init 备份
 skills-manager backup restore my-skill           # 回滚某次导入
-skills-manager edit my-skill --source-url https://github.com/owner/repo
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
+skills-manager provenance list                   # 仍缺来源的技能清单
+skills-manager provenance adopt                  # 补采锁文件证据
 skills-manager archive old-skill
 ```
 

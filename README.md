@@ -64,10 +64,10 @@ skills-manager doctor
 A skill home contains:
 
 - `skills/`: canonical skill directories, kept flat as `skills/<skill-name>/SKILL.md`
-- `views/`: generated consumer symlink trees such as `views/agents/` and `views/claude/`
-- `collections/`: generated category symlink trees
-- `registry.yaml`: metadata, provenance, consumers, category, source, and update policy
-- `.skills/activity.jsonl`: operation records written by the dashboard/CLI
+- `collections/`: generated category symlink trees (browse-only)
+- `registry.yaml`: metadata — category, tags, consumers, source (repo, subpath, ref, baseline), update policy
+- `.skills/`: distribution index (`distributions.jsonl`), activity log, optional agent-catalog override
+- `.backups/`: pre-init originals, kept for 30 days
 
 Skill home resolution priority:
 
@@ -82,7 +82,8 @@ Skill home resolution priority:
 skills-manager web --home ~/.skills-manager
 skills-manager doctor --home ~/.skills-manager
 skills-manager list --home ~/.skills-manager
-skills-manager add owner/repo --all --consumer agents --consumer claude --yes
+skills-manager add owner/repo --all --yes
+skills-manager distribute --to user --skill my-skill --agent claude-code
 skills-manager update --plan
 skills-manager update --skill my-skill
 skills-manager init --dry-run                    # preview runtime-skill import
@@ -90,7 +91,9 @@ skills-manager init --prefer claude-code hub     # this-run conflict priority
 skills-manager init --resolve my-skill=cursor    # import with a conflict decision
 skills-manager backup list                       # inspect init backups
 skills-manager backup restore my-skill           # roll one import back
-skills-manager edit my-skill --source-url https://github.com/owner/repo
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
+skills-manager provenance list                   # skills still missing a source
+skills-manager provenance adopt                  # backfill lockfile evidence
 skills-manager archive old-skill
 ```
 

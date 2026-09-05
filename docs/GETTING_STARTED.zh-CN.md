@@ -49,10 +49,11 @@ Skills Manager 按以下顺序查找技能库：
 ~/.skills-manager/
 ├── skills/           # 你的技能定义
 ├── registry.yaml     # 元数据与配置
-├── views/            # 生成的软链接树（自动创建）
 ├── collections/      # 生成的分类链接（自动创建）
+├── .backups/         # init 前的原始内容（保留 30 天）
 └── .skills/
-    └── activity.jsonl  # 操作日志
+    ├── activity.jsonl         # 操作日志
+    └── distributions.jsonl    # 分发索引（发到了哪里）
 ```
 
 ## 迁移已有技能（init）
@@ -98,11 +99,13 @@ skills-manager backup restore my-skill   # 完整回滚某个技能
 
 ### 导入的技能与更新
 
-导入的技能是快照 —— Skills Manager 不知道它们的上游。`doctor` 会列出没有受管来源的导入技能，让陈旧状态始终可见。当你知道来源时，补上它，技能就进入正常的更新流程：
+导入的技能不会被猜测上游，但**有证据就采纳**（[ADR-0011](adr/0011-init-adopts-lockfile-evidence.md)）—— 经 `npx skills` 安装的技能带有一份机器级锁文件，导入时同名条目会自动变成真实的来源，直接进入更新流程。`doctor` 会列出仍无来源的技能，让陈旧状态始终可见。当你知道来源时，补上它，技能就进入正常的更新流程：
 
 ```bash
-skills-manager edit my-skill --source-url https://github.com/owner/repo
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 ```
+
+证据采纳机制出现之前导入的存量技能，用 `skills-manager provenance adopt` 一次性补采锁文件证据。
 
 ## 常见任务
 
@@ -133,6 +136,23 @@ skills-manager add owner/repo --skill skill-name-1 --skill skill-name-2
 skills-manager add https://github.com/owner/repo.git --all
 skills-manager add /local/path/to/skills --all
 ```
+
+### 补齐缺失的来源
+
+```bash
+skills-manager provenance list          # 仍缺来源的技能（分两类）
+skills-manager provenance adopt          # 补采锁文件证据
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
+```
+
+证据自动采纳；任何靠**搜索**得来的候选，都必须经你逐条拍板才会写入（ADR-0012）。官方 agent skill 把整个流程自动化：装好之后直接对 agent 说「补齐所有来源」，它会补采证据、搜索技能生态（skills.sh / GitHub）、对照本地内容验证候选、再请你逐条选择：
+
+```bash
+skills-manager add <本仓库地址> --skill skills-manager
+skills-manager distribute --to user --skill skills-manager
+```
+
+这个 skill 还按任务分类为你的 agent 讲解了全部 CLI 命令。
 
 ### 打开控制台
 
