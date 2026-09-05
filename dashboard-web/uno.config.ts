@@ -27,7 +27,7 @@ export default defineConfig({
     'log-panel':
       'fixed top-0 right-0 bottom-0 z-[451] w-[min(420px,92vw)] overflow-y-auto border-l border-line bg-bg px-[22px] py-[20px] shadow-[-12px_0_32px_rgba(0,0,0,0.12)]',
     sheet:
-      'w-[640px] max-w-full rounded-[12px] border border-line bg-bg px-[22px] pt-[20px] pb-[18px] shadow-[0_18px_48px_rgba(0,0,0,0.14)]',
+      'w-[760px] max-w-full rounded-[12px] border border-line bg-bg px-[22px] pt-[20px] pb-[18px] shadow-[0_18px_48px_rgba(0,0,0,0.14)]',
     'sheet-wide':
       'flex h-[calc(92vh-24px)] w-[min(92vw,1080px)] max-w-full flex-col',
     'sheet-head': 'mb-[12px] flex min-w-0 items-baseline gap-[10px]',

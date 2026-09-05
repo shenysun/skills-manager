@@ -27,14 +27,11 @@ watch(open, (value, previous) => {
   <DialogRoot v-model:open="open" modal>
     <DialogPortal>
       <DialogOverlay class="sheet-overlay" :class="side === 'right' ? 'log-overlay' : ''" />
-      <DialogContent
-        :class="[
-          side === 'right' ? 'log-panel' : 'sheet-place',
-          side !== 'right' && !wide ? 'sheet max-h-[84vh] overflow-y-auto' : '',
-          side !== 'right' && wide ? 'sheet sheet-wide' : '',
-        ]"
-        :aria-describedby="undefined"
-      >
+      <DialogContent :class="[
+        side === 'right' ? 'log-panel' : 'sheet-place',
+        side !== 'right' && !wide ? 'sheet max-h-[84vh] overflow-y-auto' : '',
+        side !== 'right' && wide ? 'sheet sheet-wide' : '',
+      ]" :aria-describedby="undefined">
         <div class="sheet-head" :class="wide ? 'shrink-0' : ''">
           <DialogTitle as="h2" class="sheet-title">{{ title }}</DialogTitle>
           <slot name="head" />
