@@ -26,11 +26,9 @@
   --ok: #22c55e;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* Global reset lives in @unocss/reset/tailwind.css (main.ts). Kept here only
+   what the preflight does not cover: scrollbar gutter, dashboard font/color
+   stack, and pointer cursor on buttons (wind3 preflight leaves it default). */
 
 /* Reserve the scrollbar gutter so locking body scroll for a sheet never
    reflows the page sideways (Sheet.vue owns the lock itself). */
@@ -45,16 +43,7 @@ body {
 }
 
 button {
-  font: inherit;
   cursor: pointer;
-  border: none;
-  background: none;
-  color: inherit;
-}
-
-input {
-  font: inherit;
-  color: inherit;
 }
 
 .mono {

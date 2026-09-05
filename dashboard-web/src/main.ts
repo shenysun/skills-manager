@@ -2,6 +2,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { createDashboardI18n } from './i18n';
 import { bindLocaleToI18n } from './composables/useLocale';
+import '@unocss/reset/tailwind.css';
 import 'virtual:uno.css';
 import './styles/tokens.css';
 import './styles/preview.css';

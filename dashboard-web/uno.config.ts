@@ -1,9 +1,9 @@
-import { defineConfig, presetUno } from 'unocss';
+import { defineConfig, presetWind3 } from 'unocss';
 
 /** Map utilities onto the dashboard token variables so Uno's default greys/blues
  *  cannot replace --bg / --fg / --accent. Class-only (no attributify, no icons). */
 export default defineConfig({
-  presets: [presetUno()],
+  presets: [presetWind3()],
   theme: {
     colors: {
       bg: 'var(--bg)',

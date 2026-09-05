@@ -19,6 +19,7 @@
 .preview-md h4 {
   margin: 1.5em 0 0.5em;
   line-height: 1.3;
+  font-weight: 600; /* preflight resets headings to inherit */
 }
 
 .preview-md h1 { font-size: 1.5em; }
@@ -63,6 +64,9 @@
   padding-left: 1.5em;
   margin: 0.6em 0;
 }
+
+.preview-md ul { list-style: disc; } /* preflight strips list markers */
+.preview-md ol { list-style: decimal; }
 
 .preview-md li { margin: 0.25em 0; }
 
