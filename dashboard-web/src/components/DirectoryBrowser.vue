@@ -6,7 +6,8 @@ import { browseDirectory, errorMessage, type BrowseDirectory } from '../api/clie
 import { useBrowserHistory } from '../composables/useBrowserHistory';
 
 const props = defineProps<{ initialPath?: string }>();
-const emit = defineEmits<{ select: [path: string]; cancel: [] }>();
+const emit = defineEmits<{ select: [path: string] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 const { recentPaths, addPath } = useBrowserHistory();
@@ -49,17 +50,19 @@ function goParent() {
 function select() {
   if (browse.value) {
     addPath(browse.value.path);
+    open.value = false;
     emit('select', browse.value.path);
   }
 }
 
-watch(() => props.initialPath, () => {
-  void load(props.initialPath);
-}, { immediate: true });
+// Load lazily on open: a mounted-but-closed browser costs no request.
+watch(open, (value) => {
+  if (value) void load(props.initialPath);
+});
 </script>
 
 <template>
-  <Sheet :title="t('browser.title')" @cancel="emit('cancel')">
+  <Sheet :title="t('browser.title')" v-model:open="open">
     <!-- Recent paths quick access -->
     <div v-if="recentPaths.length > 0" class="border-b border-line2 px-[1rem] py-[0.75rem]">
       <div class="mb-[0.5rem] text-[0.75rem] font-semibold tracking-[0.08em] text-fg3 uppercase">{{ t('browser.recent') }}</div>
@@ -125,7 +128,7 @@ watch(() => props.initialPath, () => {
 
     <div class="sheet-foot">
       <span class="flex-1"></span>
-      <button class="text-btn" @click="emit('cancel')">{{ t('browser.cancel') }}</button>
+      <button class="text-btn" @click="open = false">{{ t('browser.cancel') }}</button>
       <button class="primary-btn" :disabled="!browse" @click="select">{{ t('browser.select') }}</button>
     </div>
   </Sheet>

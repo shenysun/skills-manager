@@ -7,6 +7,7 @@ import { addPrefer, movePrefer, preferOptions, removePrefer } from '../domain/in
 import { useNotice } from '../composables/useNotice';
 
 const emit = defineEmits<{ close: [] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 const { show } = useNotice();
@@ -98,7 +99,7 @@ async function runApply() {
 </script>
 
 <template>
-  <Sheet :title="t('init.title')" @cancel="emit('close')">
+  <Sheet :title="t('init.title')" v-model:open="open" @closed="emit('close')">
     <p v-if="error" class="picker-error">{{ error }}</p>
     <p v-else-if="!preview" class="picker-hint">{{ t('init.scanning') }}</p>
     <template v-else>

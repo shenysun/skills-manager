@@ -32,12 +32,22 @@ const state = ref<DashboardState | null>(null);
 const loadError = ref<string | null>(null);
 const query = ref('');
 
+// Overlays follow a session + open pair: the session ref keeps a payload and
+// mounts the sheet fresh (state resets per open); `open` is the Dialog switch
+// so Escape / ✕ / overlay close through Reka (focus restore) before the
+// session ends. The log drawer carries no state and stays mounted, open-only.
 const pickerSkills = ref<string[] | null>(null);
+const pickerOpen = ref(false);
 const previewTarget = ref<SkillRowState | null>(null);
+const previewOpen = ref(false);
 const undistributeTarget = ref<SkillRowState | null>(null);
+const undistributeOpen = ref(false);
 const removeTargets = ref<SkillRowState[] | null>(null);
+const removeOpen = ref(false);
+const addSession = ref(false);
 const addOpen = ref(false);
 const logOpen = ref(false);
+const initSession = ref(false);
 const initOpen = ref(false);
 /** Empty-state onboarding: runtime skills init could fold in; null = not probed yet. */
 const importableCount = ref<number | null>(null);
@@ -65,6 +75,7 @@ async function batchUpdate() {
 
 function batchDistribute() {
   pickerSkills.value = [...selection.value.names];
+  pickerOpen.value = true;
 }
 
 async function load() {
@@ -144,18 +155,47 @@ async function runUpdate(names: string[]) {
 
 function openPicker(name: string) {
   pickerSkills.value = [name];
+  pickerOpen.value = true;
+}
+
+function openPreview(skill: SkillRowState) {
+  previewTarget.value = skill;
+  previewOpen.value = true;
+}
+
+function openUndistribute(skill: SkillRowState) {
+  undistributeTarget.value = skill;
+  undistributeOpen.value = true;
+}
+
+function openRemove(skill: SkillRowState) {
+  removeTargets.value = [skill];
+  removeOpen.value = true;
 }
 
 function batchRemove() {
   removeTargets.value = selectedSkillStates.value;
+  removeOpen.value = true;
+}
+
+function beginAdd() {
+  addSession.value = true;
+  addOpen.value = true;
+}
+
+function beginInit() {
+  initSession.value = true;
+  initOpen.value = true;
 }
 
 async function onAddClose() {
+  addSession.value = false;
   addOpen.value = false;
   await load();
 }
 
 async function onInitClose() {
+  initSession.value = false;
   initOpen.value = false;
   importableCount.value = null; // the next empty-state load re-probes
   await load();
@@ -163,13 +203,25 @@ async function onInitClose() {
 
 async function onPickerClose() {
   pickerSkills.value = null;
+  pickerOpen.value = false;
   selection.value = exitSelection(selection.value);
   await load();
 }
 
 async function onUndistributeClose() {
   undistributeTarget.value = null;
+  undistributeOpen.value = false;
   await load();
+}
+
+function onRemoveCancel() {
+  removeTargets.value = null;
+  removeOpen.value = false;
+}
+
+function onPreviewClose() {
+  previewTarget.value = null;
+  previewOpen.value = false;
 }
 
 const removeSummary = computed(() => (removeTargets.value ? removeConsequence(removeTargets.value) : null));
@@ -203,8 +255,8 @@ async function onRemoveConfirm() {
       <h1 class="text-[22px] font-bold tracking-[-0.01em]">{{ t('library.title') }}</h1>
       <div class="ml-auto flex gap-[16px] text-[13.5px] text-fg2">
         <button class="hover:text-fg" @click="logOpen = true">{{ t('log.link') }}</button>
-        <button class="hover:text-fg" @click="addOpen = true">{{ t('add.link') }}</button>
-        <button class="hover:text-fg" @click="initOpen = true">{{ t('init.link') }}</button>
+        <button class="hover:text-fg" @click="beginAdd">{{ t('add.link') }}</button>
+        <button class="hover:text-fg" @click="beginInit">{{ t('init.link') }}</button>
         <button class="hover:text-fg" :title="t('chrome.themeHint')" @click="toggleTheme">{{ theme === 'dark' ? '☀' : '◐' }}</button>
         <button class="hover:text-fg" @click="setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')">
           {{ locale === 'zh-CN' ? 'EN' : '中文' }}
@@ -248,7 +300,7 @@ async function onRemoveConfirm() {
         <template v-if="!isFiltering && (importableCount ?? 0) > 0">
           <p class="mb-[6px] text-[16px] font-semibold text-fg">{{ t('empty.guided.title', importableCount ?? 0) }}</p>
           <p class="text-[13.5px] text-fg3">{{ t('empty.guided.hint') }}</p>
-          <button class="primary-btn mt-[12px]" @click="initOpen = true">{{ t('empty.guided.action') }}</button>
+          <button class="primary-btn mt-[12px]" @click="beginInit">{{ t('empty.guided.action') }}</button>
         </template>
         <template v-else>
           <p class="mb-[6px] text-[16px] font-semibold text-fg">
@@ -267,21 +319,23 @@ async function onRemoveConfirm() {
         @toggle="onRowToggle"
         @distribute="openPicker"
         @update="(name) => runUpdate([name])"
-        @undistribute="(skill) => (undistributeTarget = skill)"
-        @remove="(skill) => (removeTargets = [skill])"
-        @preview="(skill) => (previewTarget = skill)"
+        @undistribute="openUndistribute"
+        @remove="openRemove"
+        @preview="openPreview"
         @refreshed="onRefreshed"
       />
     </template>
 
     <AgentPickerSheet
       v-if="pickerSkills"
+      v-model:open="pickerOpen"
       :skills="pickerSkills"
       :known-projects="state?.knownProjects ?? []"
       @close="onPickerClose"
     />
     <UndistributeSheet
       v-if="undistributeTarget"
+      v-model:open="undistributeOpen"
       :skill="undistributeTarget.name"
       :agents="undistributeTarget.distributedAgents"
       :known-projects="state?.knownProjects ?? []"
@@ -289,10 +343,11 @@ async function onRemoveConfirm() {
     />
     <ConfirmSheet
       v-if="removeTargets && removeSummary"
+      v-model:open="removeOpen"
       :title="t('remove.title')"
       :confirm-label="t('remove.confirm')"
       danger
-      @cancel="removeTargets = null"
+      @cancel="onRemoveCancel"
       @confirm="onRemoveConfirm"
     >
       <p>
@@ -306,13 +361,13 @@ async function onRemoveConfirm() {
       <p class="confirm-skills mono">{{ removeTargets.map((skill) => skill.name).join(' · ') }}</p>
     </ConfirmSheet>
 
-    <AddWizard v-if="addOpen" @close="onAddClose" />
+    <AddWizard v-if="addSession" v-model:open="addOpen" @close="onAddClose" />
 
-    <SkillPreviewSheet v-if="previewTarget" :skill="previewTarget" @close="previewTarget = null" />
+    <SkillPreviewSheet v-if="previewTarget" v-model:open="previewOpen" :skill="previewTarget" @close="onPreviewClose" />
 
-    <InitSheet v-if="initOpen" @close="onInitClose" />
+    <InitSheet v-if="initSession" v-model:open="initOpen" @close="onInitClose" />
 
-    <LogDrawer v-if="logOpen" :records="state?.activity ?? []" @close="logOpen = false" />
+    <LogDrawer v-model:open="logOpen" :records="state?.activity ?? []" />
 
     <SelectionBar
       v-if="selection.active"

@@ -12,6 +12,7 @@ import Check from './Check.vue';
 
 const props = defineProps<{ skill: string; agents: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 const { show } = useNotice();
@@ -38,7 +39,6 @@ function toggle(id: string) {
 
 function onBrowsedPath(path: string) {
   projectRoot.value = path;
-  showBrowser.value = false;
 }
 
 async function apply() {
@@ -63,7 +63,7 @@ async function apply() {
 </script>
 
 <template>
-  <Sheet :title="t('undistribute.title', { skill })" @cancel="emit('close')">
+  <Sheet :title="t('undistribute.title', { skill })" v-model:open="open" @closed="emit('close')">
     <p class="picker-hint">{{ t('undistribute.hint') }}</p>
     <div class="scope-row">
       <button class="scope-tab" :class="scope === 'user' ? 'scope-tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
@@ -96,9 +96,8 @@ async function apply() {
   </Sheet>
 
   <DirectoryBrowser
-    v-if="showBrowser"
+    v-model:open="showBrowser"
     :initial-path="projectRoot.trim() ? projectRoot.trim() : undefined"
     @select="onBrowsedPath"
-    @cancel="showBrowser = false"
   />
 </template>

@@ -14,6 +14,7 @@ import { distCountsText, projectRootsOf } from '../domain/distribution';
 // rendered view innerHTMLs only server-sanitized HTML.
 const props = defineProps<{ skill: SkillRowState }>();
 const emit = defineEmits<{ close: [] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 
@@ -71,7 +72,7 @@ function formatSize(bytes: number): string {
 </script>
 
 <template>
-  <Sheet wide :title="skill.name" @cancel="emit('close')">
+  <Sheet wide :title="skill.name" v-model:open="open" @closed="emit('close')">
     <template #head>
       <button
         v-if="file?.kind === 'markdown'"

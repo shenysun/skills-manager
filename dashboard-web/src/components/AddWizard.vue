@@ -8,6 +8,7 @@ import { useNotice } from '../composables/useNotice';
 import Check from './Check.vue';
 
 const emit = defineEmits<{ close: [] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 const { show } = useNotice();
@@ -65,7 +66,7 @@ async function runInstall(overwrite: boolean) {
 </script>
 
 <template>
-  <Sheet :title="t('add.title')" @cancel="emit('close')">
+  <Sheet :title="t('add.title')" v-model:open="open" @closed="emit('close')">
     <template v-if="step === 'source'">
       <div>
         <input

@@ -4,12 +4,13 @@ import Sheet from './Sheet.vue';
 
 defineProps<{ title: string; confirmLabel: string; danger?: boolean }>();
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 </script>
 
 <template>
-  <Sheet :title="title" @cancel="emit('cancel')">
+  <Sheet :title="title" v-model:open="open" @closed="emit('cancel')">
     <div class="confirm-body">
       <slot />
     </div>

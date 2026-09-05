@@ -30,6 +30,7 @@ import Check from './Check.vue';
 
 const props = defineProps<{ skills: string[]; knownProjects: string[] }>();
 const emit = defineEmits<{ close: [] }>();
+const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 const { memory, rememberApply } = usePickerMemory();
@@ -100,7 +101,6 @@ function reasonText(agent: CatalogAgent): string {
 
 function onBrowsedPath(path: string) {
   projectRoot.value = path;
-  showBrowser.value = false;
   void loadAgents();
 }
 
@@ -129,7 +129,7 @@ async function apply() {
 </script>
 
 <template>
-  <Sheet :title="t('picker.title', { n: skills.length })" @cancel="emit('close')">
+  <Sheet :title="t('picker.title', { n: skills.length })" v-model:open="open" @closed="emit('close')">
     <div class="scope-row">
       <button class="scope-tab" :class="scope === 'user' ? 'scope-tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
       <button class="scope-tab" :class="scope === 'project' ? 'scope-tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
@@ -226,9 +226,8 @@ async function apply() {
   </Sheet>
 
   <DirectoryBrowser
-    v-if="showBrowser"
+    v-model:open="showBrowser"
     :initial-path="projectRoot.trim() ? projectRoot.trim() : undefined"
     @select="onBrowsedPath"
-    @cancel="showBrowser = false"
   />
 </template>
