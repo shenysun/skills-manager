@@ -76,7 +76,7 @@ function formatSize(bytes: number): string {
     <template #head>
       <button
         v-if="file?.kind === 'markdown'"
-        class="text-btn preview-toggle"
+        class="text-btn shrink-0 whitespace-nowrap"
         @click="view = togglePreviewView(view)"
       >
         {{ view === 'rendered' ? t('preview.viewSource') : t('preview.viewRendered') }}

@@ -100,9 +100,9 @@ async function runInstall(overwrite: boolean) {
         </label>
       </div>
 
-      <div v-if="overwriteAsk" class="overwrite-ask">
+      <div v-if="overwriteAsk" class="mt-[12px] rounded-[10px] border border-line p-[12px] text-[13.5px] text-fg2">
         <p>{{ t('add.overwriteBody', { skills: overwriteAsk.join(', ') }) }}</p>
-        <div class="overwrite-actions">
+        <div class="mt-[10px] flex justify-end gap-[14px]">
           <button class="text-btn" @click="overwriteAsk = null">{{ t('remove.cancel') }}</button>
           <button class="primary-btn bg-danger" @click="runInstall(true)">{{ t('add.overwriteConfirm') }}</button>
         </div>

@@ -131,8 +131,8 @@ async function apply() {
 <template>
   <Sheet :title="t('picker.title', { n: skills.length })" v-model:open="open" @closed="emit('close')">
     <div class="scope-row">
-      <button class="scope-tab" :class="scope === 'user' ? 'scope-tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
-      <button class="scope-tab" :class="scope === 'project' ? 'scope-tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
+      <button class="tab" :class="scope === 'user' ? 'tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
+      <button class="tab" :class="scope === 'project' ? 'tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
 
     <div v-if="scope === 'project'" class="pb-[1rem]">
@@ -150,7 +150,7 @@ async function apply() {
       <input v-model="query" type="search" class="field-input" :placeholder="t('picker.searchPlaceholder')" />
     </div>
 
-    <div v-if="!loadError" class="quick-row">
+    <div v-if="!loadError" class="mb-[6px] mt-[-4px] flex gap-[14px]">
       <button class="quick-btn" @click="selection = selectAllVisible(agents, query, selection)">
         {{ t('picker.quick.selectAll') }}
       </button>
@@ -181,7 +181,7 @@ async function apply() {
       <section>
         <h3 class="agent-heading">{{ t('picker.allAgents') }}</h3>
         <div v-for="family in grouping.families" :key="family.familyKey" class="family">
-          <button class="family-all" @click="selection = toggleFamily(visible, selection, family.familyKey)">
+          <button class="py-[2px] text-[12.5px] text-fg3 hover:text-accent" @click="selection = toggleFamily(visible, selection, family.familyKey)">
             {{ familyName(family.familyKey) }} · {{ t('picker.selectAll') }}
           </button>
           <label v-for="agent in family.members" :key="agent.id" class="agent-row">
@@ -210,10 +210,10 @@ async function apply() {
       </section>
     </div>
 
-    <div class="mode-row">
-      <span class="mode-label">{{ t('picker.mode') }}</span>
-      <button class="mode-tab" :class="mode === 'symlink' ? 'mode-tab-on' : ''" @click="mode = 'symlink'">{{ t('picker.symlink') }}</button>
-      <button class="mode-tab" :class="mode === 'copy' ? 'mode-tab-on' : ''" @click="mode = 'copy'">{{ t('picker.copy') }}</button>
+    <div class="mt-[10px] flex items-baseline gap-[14px] text-[13.5px]">
+      <span class="text-fg3">{{ t('picker.mode') }}</span>
+      <button class="tab" :class="mode === 'symlink' ? 'tab-on' : ''" @click="mode = 'symlink'">{{ t('picker.symlink') }}</button>
+      <button class="tab" :class="mode === 'copy' ? 'tab-on' : ''" @click="mode = 'copy'">{{ t('picker.copy') }}</button>
     </div>
 
     <div class="sheet-foot">

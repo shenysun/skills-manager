@@ -66,8 +66,8 @@ async function apply() {
   <Sheet :title="t('undistribute.title', { skill })" v-model:open="open" @closed="emit('close')">
     <p class="picker-hint">{{ t('undistribute.hint') }}</p>
     <div class="scope-row">
-      <button class="scope-tab" :class="scope === 'user' ? 'scope-tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
-      <button class="scope-tab" :class="scope === 'project' ? 'scope-tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
+      <button class="tab" :class="scope === 'user' ? 'tab-on' : ''" @click="scope = 'user'">{{ t('picker.scopeUser') }}</button>
+      <button class="tab" :class="scope === 'project' ? 'tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
     <div v-if="scope === 'project'" class="pb-[1rem]">
       <ProjectDropdown
