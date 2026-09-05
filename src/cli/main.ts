@@ -2,6 +2,7 @@
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
+import { normalizeGitSourceUrl } from '../core/services/source-service.js';
 import { startDashboardServer } from '../dashboard/server/main.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
@@ -120,21 +121,26 @@ function parseResolve(values: string[] = []): Record<string, string> {
 program.command('edit')
   .description('Edit safe registry fields for a skill (e.g. supply the upstream source of an imported skill)')
   .argument('<skill>')
+  .option('--source-git <owner/repo|url>', 'upstream git source (owner/repo or repo URL); normalized to the canonical repo URL')
   .option('--source-url <url>', 'upstream repository URL; enables update management for imported skills')
   .option('--source-ref <ref>', 'branch or tag to track')
+  .option('--subpath <path>', 'skill path inside the source repository (with --source-git/--source-url); enables updates')
   .option('--title <title>', 'display title')
   .option('--description <description>', 'short description')
   .option('--category <category>', 'category')
   .option('--tags <tags...>', 'tags')
   .action((skill, opts, cmd) => {
     const s = services(cmd);
+    if (opts.sourceGit !== undefined && opts.sourceUrl !== undefined) throw new Error('Pass either --source-git or --source-url, not both.');
     const patch: Record<string, unknown> = {};
     if (opts.title !== undefined) patch.title = opts.title;
     if (opts.description !== undefined) patch.description = opts.description;
     if (opts.category !== undefined) patch.category = opts.category;
     if (opts.tags !== undefined) patch.tags = opts.tags;
-    if (opts.sourceUrl !== undefined || opts.sourceRef !== undefined) {
-      patch.source = { ...(opts.sourceUrl !== undefined ? { type: 'git', url: opts.sourceUrl } : {}), ...(opts.sourceRef !== undefined ? { ref: opts.sourceRef } : {}) };
+    if (opts.sourceGit !== undefined) {
+      patch.source = { type: 'git', url: normalizeGitSourceUrl(opts.sourceGit), ...(opts.subpath !== undefined ? { subpath: opts.subpath } : {}), ...(opts.sourceRef !== undefined ? { ref: opts.sourceRef } : {}) };
+    } else if (opts.sourceUrl !== undefined || opts.sourceRef !== undefined || opts.subpath !== undefined) {
+      patch.source = { ...(opts.sourceUrl !== undefined ? { type: 'git', url: opts.sourceUrl } : {}), ...(opts.subpath !== undefined ? { subpath: opts.subpath } : {}), ...(opts.sourceRef !== undefined ? { ref: opts.sourceRef } : {}) };
     }
     const result = s.registry.editSafeFields(skill, patch);
     s.activity.record({ action: 'cli-edit', summary: `Edited ${skill}`, details: patch });

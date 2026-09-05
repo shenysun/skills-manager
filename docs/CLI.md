@@ -40,6 +40,8 @@ skills-manager init --resolve my-skill=cursor --resolve other-skill=hub
 skills-manager backup list
 skills-manager backup restore my-skill
 skills-manager edit my-skill --source-url https://github.com/owner/repo
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
+skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```

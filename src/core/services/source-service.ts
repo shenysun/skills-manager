@@ -7,6 +7,20 @@ import type { GitPort } from '../ports/git.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
 
+/**
+ * Normalize a git source locator (`owner/repo` shorthand or GitHub repo URL) to the
+ * canonical repo URL — the same shapes `normalize` accepts, minus the local-path
+ * probe, so callers that mean "this is a git source" never misread a same-named
+ * local directory as the identity.
+ */
+export function normalizeGitSourceUrl(input: string): string {
+  const value = input.trim();
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) return `https://github.com/${value}.git`;
+  const githubRepo = value.match(/^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/);
+  if (githubRepo) return `https://github.com/${githubRepo[1]}/${githubRepo[2].replace(/\.git$/, '')}.git`;
+  return value;
+}
+
 export class SourceService {
   constructor(private readonly fs: FileSystemPort, private readonly git: GitPort, private readonly tempRoot = os.tmpdir()) {}
 

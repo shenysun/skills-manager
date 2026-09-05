@@ -80,14 +80,13 @@ export function validateRegistrySafePatch(patch: Partial<RegistrySafePatch>): Pa
   if ('description' in patch && patch.description !== undefined) next.description = String(patch.description).trim();
   if ('source' in patch && patch.source !== undefined) {
     const source = patch.source || {};
-    next.source = {
-      ...source,
-      url: source.url === undefined ? undefined : source.url ? String(source.url) : null,
-      subpath: source.subpath === undefined ? undefined : source.subpath ? String(source.subpath) : null,
-      ref: source.ref === undefined ? undefined : source.ref ? String(source.ref) : null,
-      upstream_commit: source.upstream_commit === undefined ? undefined : source.upstream_commit ? String(source.upstream_commit) : null,
-      baseline_hash: source.baseline_hash === undefined ? undefined : source.baseline_hash ? String(source.baseline_hash) : null,
-    };
+    const nextSource: Record<string, unknown> = { ...source };
+    // Convert only the keys the caller actually provided; untouched keys stay absent
+    // so the merge preserves what the entry already records.
+    for (const key of ['url', 'subpath', 'ref', 'upstream_commit', 'baseline_hash'] as const) {
+      if (source[key] !== undefined) nextSource[key] = source[key] ? String(source[key]) : null;
+    }
+    next.source = nextSource as RegistrySafePatch['source'];
   }
   return next;
 }
