@@ -248,7 +248,7 @@ async function onRemoveConfirm() {
 </script>
 
 <template>
-  <ToastProvider :duration="4000" disable-swipe :label="t('library.title')">
+  <ToastProvider disable-swipe :label="t('library.title')">
   <main class="mx-auto max-w-[720px] px-[24px] pb-[80px] pt-[56px]">
 
     <header class="mb-[6px] flex items-baseline gap-[12px]">

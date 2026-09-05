@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { ToastDescription, ToastRoot, ToastViewport } from 'reka-ui';
-import { DEFAULT_NOTICE_TTL_MS, type Notice } from '../domain/noticeSlot';
+import type { Notice } from '../domain/noticeSlot';
 
 defineProps<{ notice: Notice | null; raised?: boolean }>();
 </script>
 
 <template>
-  <!-- One ToastRoot only — a new notice remounts this slot instead of stacking. -->
+  <!-- One ToastRoot only — a new notice remounts this slot instead of stacking.
+       Duration 0 disables Reka's own timer: the single TTL lives in useNotice
+       (domain noticeSlot dismissAt), so exactly one clock can expire a toast. -->
   <ToastRoot
     v-if="notice"
     :key="`${notice.kind}:${notice.text}`"
     :open="true"
-    :duration="DEFAULT_NOTICE_TTL_MS"
+    :duration="0"
     type="foreground"
     as="div"
     role="status"
