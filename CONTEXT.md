@@ -19,6 +19,8 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
 - **Source-first install**: The preferred install flow: provide a source first, discover available `SKILL.md` files, then choose skills to install or update.
 - **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager web` for browsing, installing, updating, and distributing skills.
+- **Theme (dashboard pref)**: The Dashboard UI's light or dark palette. Default follows the OS `prefers-color-scheme`; a topbar toggle persists the choice and wins. Not a Settings page and not a missing feature.
+  _Avoid_: 黑白主题 as if theme were unimplemented; a third palette; putting theme on a Settings surface (cut in ADR-0005).
 - **Skill library (dashboard surface)**: The Dashboard UI's single page — hub skills as rows with in-place actions (接入 / 更新 / 删除). Ratified 2026-08-25 in [ADR-0005](docs/adr/0005-dashboard-single-surface-skill-library.md).
   _Avoid_: Overview / Sources / Registry / Activity as dashboard destinations; "primary navigation" as a dashboard concept (superseded five-surface IA of ADR-0002).
 - **Skill preview**: The Dashboard UI's **read-only** viewer for one hub skill, opened from a skill row as a wide Sheet. Head carries the name plus right-side actions (view toggle, close) — nothing else. Below the head sits a **meta zone** (amended 2026-08-27): the description on its own wrapping line (no single-line truncation), then one small summary line `来源 · 接入`. The 来源 segment renders a git source as an `owner/repo` link to the tree URL (carrying ref/subpath when present), a local source as plain text, and is omitted for imported skills with no source. The 接入 segment reads `N agents · M projects` and expands inline to a per-target breakdown (用户 / 项目 → agents; shared runtime paths listed once); omitted entirely when the skill is undistributed. Below the meta zone: file tree on the left, selected file's content on the right (`.md` rendered as HTML, source files syntax-highlighted, other files a placeholder). No mutation from the preview.
@@ -172,6 +174,8 @@ Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agen
 
 **Init conflict priority: ratified** (grill 2026-09-04). Recorded in [ADR-0009](docs/adr/0009-init-conflict-priority.md). CLI `--prefer` and the dashboard import sheet are the same per-import ordered list; `--all` is deleted.
 
+**Dashboard view stack (Reka + UnoCSS): ratified** (grill 2026-09-04). Recorded in [ADR-0010](docs/adr/0010-dashboard-reka-unocss.md). View layer rewritten; domain/API/i18n/Theme behaviour kept; visual baseline and toast semantics unchanged.
+
 ## Current product direction
 
 The project is evolving from a local skill repository into a publishable npm package that provides:
@@ -227,7 +231,7 @@ Rationale: the measured daily line is distribute / remove / install / update —
 
 All legacy hashes redirect to the single page.
 
-**Implementation posture (ratified 2026-08-25):** `dashboard-web` is **rewritten from scratch** — new code and components, no migration of old component code; behaviour follows ADR-0004 (picker, index entries) and ADR-0005 (IA). The HTTP API layer is trimmed: dead dashboard endpoints deleted, single-page endpoints kept or adjusted. Core services and CLI are untouched. Vue 3 stays; i18n (zh/en) and light/dark theme remain as small topbar toggles.
+**Implementation posture (ratified 2026-08-25; view stack amended 2026-09-04, [ADR-0010](docs/adr/0010-dashboard-reka-unocss.md)):** the 2026-08-25 rewrite remains the product IA (ADR-0004 picker, ADR-0005 single surface). A second **view-layer** rewrite replaces hand-rolled chrome with **Reka UI** primitives and **UnoCSS** (page-level; old `page.css` / `sheet.css` deleted; token variables stay; Shiki dual-theme CSS stays). `domain/`, `api/client.ts`, i18n catalogues, Fastify, core services, and CLI are not rewritten. Vue 3 stays; i18n (zh/en) and Theme remain small topbar toggles.
 
 **Visual baseline (ratified via prototype 2026-08-25; implemented by the 2026-08-25 rewrite):** the **typographic flow** variant won (prototype variant C; the three-variant file is preserved on the throwaway branch `prototype/single-surface-skill-library`). The question settled: what the single-page skill library looks like. Baseline traits, as implemented by the rewrite:
 
