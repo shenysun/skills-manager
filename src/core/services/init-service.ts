@@ -8,6 +8,7 @@ import type { DistributeService } from './distribute-service.js';
 import type { RegistryService } from './registry-service.js';
 import type { SkillHomeService } from './skill-home-service.js';
 import type { BackupService } from './backup-service.js';
+import { lockEntryToSource, type SkillLockEntry, type SkillLockService } from './skill-lock-service.js';
 
 export type InitRunRequest = {
   /** Catalog agent ids to scan; omitted = the detected set on this machine. */
@@ -67,7 +68,8 @@ type EntityGroup = InitSkillLocation[];
  * Reverse of distribute (ADR-0006): fold skills already living in detected
  * agents' global runtime directories into the hub. Content moves into hub
  * `skills/<name>/`; each origin is preserved under hub `.backups/` and becomes
- * a managed symlink back to the hub entity.
+ * a managed symlink back to the hub entity. Provenance: no guessed sources,
+ * but `npx skills` lockfile evidence is adopted when present (ADR-0011).
  */
 export class InitService {
   constructor(
@@ -78,6 +80,7 @@ export class InitService {
     private readonly distribute: DistributeService,
     private readonly catalog: CatalogService,
     private readonly backups: BackupService,
+    private readonly skillLock: SkillLockService,
   ) {}
 
   run(request: InitRunRequest = {}): InitRunResult {
@@ -85,6 +88,8 @@ export class InitService {
     const scans = this.scanGroups(agents);
     this.assertPrefer(request.prefer, scans.map((scan) => scan.runtimeDir));
     const { skills: discovered, invalid } = this.discover(scans);
+    // Import evidence is read once per run; read-only, and absent locks cost nothing.
+    const lockEntries = this.skillLock.load();
 
     // Classification is read-only, so dry-run reports the exact plan untouched.
     const imports: Array<{ skill: InitDiscoveredSkill; groups: EntityGroup[]; choice: string | undefined }> = [];
@@ -137,7 +142,7 @@ export class InitService {
     this.skillHome.ensure();
     for (const item of imports) {
       try {
-        this.importResolved(item.skill, item.groups, item.choice);
+        this.importResolved(item.skill, item.groups, item.choice, lockEntries);
         result.imported.push(item.skill.name);
       } catch (error) {
         result.failed.push({ skill: item.skill.name, reason: (error as Error).message });
@@ -151,9 +156,11 @@ export class InitService {
   /**
    * Import one skill with its conflict decision applied. `choice` is a runtime
    * dir (or any agent id sharing it) whose copy wins, or 'hub' to keep the hub
-   * copy and only back-symlink origins.
+   * copy and only back-symlink origins. Lock evidence (when the skill name
+   * matches an `npx skills` entry) upgrades the import from snapshot to
+   * update-managed in the same write (ADR-0011).
    */
-  private importResolved(skill: InitDiscoveredSkill, groups: EntityGroup[], choice: string | undefined) {
+  private importResolved(skill: InitDiscoveredSkill, groups: EntityGroup[], choice: string | undefined, lockEntries: ReadonlyMap<SkillName, SkillLockEntry>) {
     assertSafeSkillName(skill.name);
     const hubHas = this.registry.skillExists(skill.name);
     const winnerGroup = choice && choice !== 'hub' ? this.groupForChoice(groups, choice, skill.name) : hubHas ? null : groups[0];
@@ -167,6 +174,7 @@ export class InitService {
       const hubDir = this.registry.skillDir(skill.name);
       // Copy through symlinks: the hub needs the entity's contents, not a link to it.
       this.fs.copyDirectoryContents(this.entityPathOf(winnerGroup[0].path), hubDir);
+      const evidence = lockEntryToSource(lockEntries.get(skill.name));
       this.registry.ensureEntry(skill.name, {
         imported: true,
         imported_at: new Date().toISOString(),
@@ -174,6 +182,8 @@ export class InitService {
         description: skill.description,
         // Every origin's agents are this skill's desired consumers (catalog ids only).
         consumers: this.agentsForLocations(locations),
+        // Adopted evidence replaces the default source-less shape; no evidence keeps the snapshot honest.
+        ...(evidence ? { source: evidence } : {}),
       });
     }
     // Real directories are preserved as backups and vacated; symlinked entries are

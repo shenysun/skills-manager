@@ -86,6 +86,7 @@ export function validateRegistrySafePatch(patch: Partial<RegistrySafePatch>): Pa
       subpath: source.subpath === undefined ? undefined : source.subpath ? String(source.subpath) : null,
       ref: source.ref === undefined ? undefined : source.ref ? String(source.ref) : null,
       upstream_commit: source.upstream_commit === undefined ? undefined : source.upstream_commit ? String(source.upstream_commit) : null,
+      baseline_hash: source.baseline_hash === undefined ? undefined : source.baseline_hash ? String(source.baseline_hash) : null,
     };
   }
   return next;

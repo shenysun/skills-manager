@@ -4,6 +4,8 @@
 
 Accepted (2026-08-25)
 
+Amended by [ADR-0011](0011-init-adopts-lockfile-evidence.md) (2026-09-05): decision point 5's "no source" becomes "no **guessed** source — `npx skills` lockfile evidence is adopted on import".
+
 ## Context
 
 Users arrive with skills already installed in agent runtime directories (`~/.claude/skills`, `~/.cursor/skills`, …). The hub-first model (ADR-0003) had no onboarding path for them: either the hub starts empty next to a pile of unmanaged skills, or users hand-move directories. Imported skills also carry unknown provenance (hand-written vs downloaded from GitHub) — skills-manager cannot know or manage their upstream.

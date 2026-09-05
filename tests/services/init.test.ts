@@ -377,3 +377,111 @@ describe('doctor imported-staleness visibility', () => {
     expect(after.importedWithoutSource.map((item) => item.skill)).toEqual(['beta']);
   });
 });
+
+describe('init lockfile evidence adoption (ADR-0011)', () => {
+  const lockEntry = {
+    source: 'intellectronica/agent-skills',
+    sourceType: 'github',
+    sourceUrl: 'https://github.com/intellectronica/agent-skills.git',
+    skillPath: 'skills/alpha/SKILL.md',
+    skillFolderHash: '88651e5cc10e4b028798dcfa45b1c1004e93f8b2',
+    installedAt: '2026-02-02T02:58:57.599Z',
+    updatedAt: '2026-02-02T02:58:57.599Z',
+  };
+
+  function writeUserLock(skills: Record<string, unknown>, version = 3) {
+    const file = path.join(userHome, '.agents', '.skill-lock.json');
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ version, skills }));
+  }
+
+  it('inherits provenance from an npx skills lock entry: imported AND update-eligible in one step', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    writeUserLock({ alpha: lockEntry });
+    const s = services();
+
+    s.init.run();
+
+    // imported marks how it entered; source (from evidence) marks update eligibility — orthogonal.
+    expect(s.registry.getEntry('alpha')).toMatchObject({
+      imported: true,
+      source: {
+        type: 'git',
+        url: 'https://github.com/intellectronica/agent-skills.git',
+        subpath: 'skills/alpha',
+        ref: null,
+        baseline_hash: '88651e5cc10e4b028798dcfa45b1c1004e93f8b2',
+      },
+    });
+    // Evidence-backed imports drop out of the doctor staleness list — only true snapshots remain.
+    expect(s.doctor.check().importedWithoutSource).toEqual([]);
+  });
+
+  it('leaves a skill a source-less snapshot when the lock is pre-v3', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    writeUserLock({ alpha: lockEntry }, 2);
+    const s = services();
+
+    s.init.run();
+
+    expect(s.registry.getEntry('alpha')).toMatchObject({ imported: true });
+    expect(s.registry.getEntry('alpha')?.source).toMatchObject({ type: 'local', url: null });
+    expect(s.doctor.check().importedWithoutSource.map((item) => item.skill)).toEqual(['alpha']);
+  });
+
+  it('leaves a skill a source-less snapshot for source types skills-manager cannot update', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    writeUserLock({ alpha: { ...lockEntry, sourceType: 'mintlify' } });
+    const s = services();
+
+    s.init.run();
+
+    expect(s.registry.getEntry('alpha')?.source).toMatchObject({ type: 'local', url: null });
+  });
+
+  it('makes a local-source import update-eligible: the local path is its identity', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    writeUserLock({ alpha: { ...lockEntry, sourceType: 'local', sourceUrl: path.join(root, 'local-skills-repo') } });
+    const s = services();
+
+    s.init.run();
+
+    expect(s.registry.getEntry('alpha')?.source).toMatchObject({ type: 'local', url: path.join(root, 'local-skills-repo'), subpath: 'skills/alpha' });
+    // url+subpath present ⇒ update's registry scan picks the skill up; doctor's staleness list does not.
+    expect(s.update.candidatesFromRegistry().map((candidate) => candidate.skill)).toEqual(['alpha']);
+    expect(s.doctor.check().importedWithoutSource).toEqual([]);
+  });
+
+  it('reads the lock through $XDG_STATE_HOME when the environment provides one', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    const xdgLock = path.join(root, 'xdg-state', 'skills', '.skill-lock.json');
+    mkdirSync(path.dirname(xdgLock), { recursive: true });
+    writeFileSync(xdgLock, JSON.stringify({ version: 3, skills: { alpha: lockEntry } }));
+    const s = createCoreServices({
+      skillHomeRoot: home,
+      projectRoot: root,
+      fs: createNodeFileSystem(),
+      git: fakeGit,
+      processRunner: fakeRunner,
+      userHome,
+      env: { XDG_STATE_HOME: path.join(root, 'xdg-state') },
+      catalogSnapshot: fixtureSnapshot(),
+    });
+
+    s.init.run();
+
+    expect(s.registry.getEntry('alpha')?.source).toMatchObject({ type: 'git', url: lockEntry.sourceUrl });
+  });
+
+  it('never touches the lockfile it reads evidence from', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    writeUserLock({ alpha: lockEntry });
+    const lockFile = path.join(userHome, '.agents', '.skill-lock.json');
+    const before = readFileSync(lockFile, 'utf8');
+    const s = services();
+
+    s.init.run();
+
+    expect(readFileSync(lockFile, 'utf8')).toBe(before);
+  });
+});

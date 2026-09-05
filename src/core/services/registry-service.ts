@@ -112,7 +112,7 @@ export class RegistryService {
       category: 'experimental',
       tags: [],
       consumers,
-      source: { type: 'local', url: null, subpath: null, ref: null, upstream_commit: null },
+      source: { type: 'local', url: null, subpath: null, ref: null, upstream_commit: null, baseline_hash: null },
       update_policy: 'manual',
       description: '',
       ...patch,

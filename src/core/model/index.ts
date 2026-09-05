@@ -15,6 +15,8 @@ export type SkillSource = {
   subpath?: string | null;
   ref?: string | null;
   upstream_commit?: string | null;
+  /** Upstream Git tree SHA captured at install/import — the baseline update compares against (ADR-0011). */
+  baseline_hash?: string | null;
   imported_from?: string[];
 };
 
@@ -29,7 +31,7 @@ export type RegistryEntry = {
   update_policy?: string;
   description?: string;
   archived?: boolean;
-  /** True when init folded this skill in from a runtime dir; provenance unknown, updates unmanaged (ADR-0006). */
+  /** True when init folded this skill in from a runtime dir — how the skill entered, orthogonal to source/update eligibility (ADR-0006, ADR-0011). */
   imported?: boolean;
   /** ISO timestamp of the init import (present only on imported entries). */
   imported_at?: string;
@@ -137,7 +139,7 @@ export type DoctorReport = {
   warnings: string[];
   gitStatus: string;
   catalog: { source: 'injected' | 'hub' | 'bundled'; commit: string; date: string; ageDays: number };
-  /** Imported entries with no managed source: snapshots that may silently lag their unknown upstream (ADR-0006). */
+  /** Imported entries with no evidence-adopted or supplied source: true snapshots whose upstream is unknown (ADR-0006, ADR-0011). */
   importedWithoutSource: Array<{ skill: string; importedAt: string | null }>;
 };
 
