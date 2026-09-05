@@ -30,15 +30,13 @@ const { t } = useI18n();
 
 const query = computed(() => props.modelValue.trim().toLowerCase());
 
-const filteredRecent = computed(() => {
-  if (!query.value) return props.recentPaths;
-  return props.recentPaths.filter((path) => path.toLowerCase().includes(query.value));
-});
+const filterPaths = (paths: string[]) => {
+  if (!query.value) return paths;
+  return paths.filter((path) => path.toLowerCase().includes(query.value));
+};
 
-const filteredKnown = computed(() => {
-  if (!query.value) return props.knownProjects;
-  return props.knownProjects.filter((path) => path.toLowerCase().includes(query.value));
-});
+const filteredRecent = computed(() => filterPaths(props.recentPaths));
+const filteredKnown = computed(() => filterPaths(props.knownProjects));
 
 function onInput(value: string) {
   emit('update:modelValue', value);
@@ -68,7 +66,7 @@ function onSelect(value: string) {
     </ComboboxAnchor>
     <ComboboxPortal>
       <ComboboxContent
-        class="z-[99] max-h-[300px] w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-[4px] border border-line bg-bg shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+        class="z-[601] max-h-[300px] w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-[4px] border border-line bg-bg shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
         position="popper"
         :side-offset="4"
       >
