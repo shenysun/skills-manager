@@ -135,7 +135,7 @@ async function apply() {
       <button class="scope-tab" :class="scope === 'project' ? 'scope-tab-on' : ''" @click="scope = 'project'">{{ t('picker.scopeProject') }}</button>
     </div>
 
-    <div v-if="scope === 'project'" class="project-input-row">
+    <div v-if="scope === 'project'" class="pb-[1rem]">
       <ProjectDropdown
         v-model="projectRoot"
         :recent-paths="recentPaths"
@@ -232,9 +232,3 @@ async function apply() {
     @cancel="showBrowser = false"
   />
 </template>
-
-<style scoped>
-.project-input-row {
-  padding: 0 0 1rem 0;
-}
-</style>

@@ -103,12 +103,12 @@ async function runApply() {
     <p v-else-if="!preview" class="picker-hint">{{ t('init.scanning') }}</p>
     <template v-else>
       <p class="picker-hint">{{ t('init.hint') }}</p>
-      <div class="prefer-block">
+      <div class="mb-[12px]">
         <p class="picker-hint">{{ t('init.preferHint') }}</p>
         <p v-if="prefer.length === 0" class="picker-hint">{{ t('init.preferEmpty') }}</p>
-        <ol v-else class="prefer-list">
-          <li v-for="(item, index) in prefer" :key="item" class="prefer-row">
-            <span class="mono">{{ sourceLabel(item) }}</span>
+        <ol v-else class="mb-[8px] pl-[1.2rem]">
+          <li v-for="(item, index) in prefer" :key="item" class="flex items-baseline gap-[8px] text-[13px]">
+            <span class="mono mr-auto min-w-0 overflow-hidden text-ellipsis">{{ sourceLabel(item) }}</span>
             <button type="button" class="text-btn" :disabled="index === 0" @click="prefer = movePrefer(prefer, index, -1)">{{ t('init.preferUp') }}</button>
             <button type="button" class="text-btn" :disabled="index === prefer.length - 1" @click="prefer = movePrefer(prefer, index, 1)">{{ t('init.preferDown') }}</button>
             <button type="button" class="text-btn" @click="prefer = removePrefer(prefer, item)">{{ t('init.preferRemove') }}</button>
@@ -116,7 +116,7 @@ async function runApply() {
         </ol>
         <select
           v-if="remainingSources.length > 0"
-          class="init-choice"
+          class="ml-[0.5rem] max-w-[22rem] overflow-hidden align-bottom text-ellipsis"
           :value="''"
           @change="prefer = addPrefer(prefer, ($event.target as HTMLSelectElement).value)"
         >
@@ -137,7 +137,7 @@ async function runApply() {
             <em v-if="preview.skippedManaged.includes(skill.name)" class="existing-mark">{{ t('init.managedBadge') }}</em>
             <template v-if="conflictBySkill.has(skill.name)">
               <em class="existing-mark">{{ t('init.conflictBadge') }}</em>
-              <select v-model="resolve[skill.name]" class="init-choice">
+              <select v-model="resolve[skill.name]" class="ml-[0.5rem] max-w-[22rem] overflow-hidden align-bottom text-ellipsis">
                 <option :value="undefined">{{ t('init.choicePlaceholder') }}</option>
                 <option v-for="choice in choicesFor(conflictBySkill.get(skill.name)!)" :key="choice.value" :value="choice.value">
                   {{ choice.label }}
@@ -161,36 +161,3 @@ async function runApply() {
     </template>
   </Sheet>
 </template>
-
-<style scoped>
-.init-choice {
-  margin-left: 0.5rem;
-  max-width: 22rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
-}
-
-.prefer-block {
-  margin: 0 0 12px;
-}
-
-.prefer-list {
-  margin: 0 0 8px;
-  padding-left: 1.2rem;
-}
-
-.prefer-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.prefer-row .mono {
-  margin-right: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-</style>
