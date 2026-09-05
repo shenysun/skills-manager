@@ -24,6 +24,7 @@ skills-manager list [--category <c>] [--include-archived]
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source queue
 skills-manager catalog info           # catalog snapshot stamp + detected agents
+skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
 ```
 

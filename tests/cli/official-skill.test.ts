@@ -1,10 +1,9 @@
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { runCli } from './cli-runner.js';
 
-const cli = path.resolve(import.meta.dirname, '..', '..', 'dist', 'cli.js');
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');
 
 let root: string;
@@ -20,7 +19,7 @@ afterEach(() => {
 });
 
 function run(args: string[]) {
-  return spawnSync(process.execPath, [cli, '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, SKILLS_MANAGER_USER_HOME: path.join(root, 'user-home') } });
+  return runCli(home, path.join(root, 'user-home'), args);
 }
 
 describe('official skills-manager agent skill', () => {

@@ -1,10 +1,8 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-const cli = path.resolve(import.meta.dirname, '..', '..', 'dist', 'cli.js');
+import { runCli } from './cli-runner.js';
 
 let root: string;
 let home: string;
@@ -32,12 +30,8 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function baseEnv() {
-  return { ...process.env, HOME: userHome, SKILLS_MANAGER_USER_HOME: userHome, CLAUDECODE: undefined, CLAUDE_CODE: undefined, CURSOR_AGENT: undefined, CODEX_SANDBOX: undefined, CODEX_CI: undefined, CODEX_THREAD_ID: undefined, GEMINI_CLI: undefined, ANTIGRAVITY_AGENT: undefined, REPL_ID: undefined, XDG_CONFIG_HOME: undefined };
-}
-
 function run(args: string[]) {
-  return spawnSync(process.execPath, [cli, '--home', home, ...args], { encoding: 'utf8', env: baseEnv() });
+  return runCli(home, userHome, args);
 }
 
 function addRegistrySkill(name: string, entry: { imported?: boolean; archived?: boolean } = {}) {

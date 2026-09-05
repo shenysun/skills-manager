@@ -7,6 +7,14 @@ import type { GitPort } from '../ports/git.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
 
+const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
+
+/** Canonical GitHub repo URL from owner + repo (strips a redundant `.git`). */
+function githubRepoUrl(owner: string, repo: string): string {
+  return `https://github.com/${owner}/${repo.replace(/\.git$/, '')}.git`;
+}
+
 /**
  * Normalize a git source locator (`owner/repo` shorthand or GitHub repo URL) to the
  * canonical repo URL — the same shapes `normalize` accepts, minus the local-path
@@ -15,9 +23,12 @@ import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } fro
  */
 export function normalizeGitSourceUrl(input: string): string {
   const value = input.trim();
-  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) return `https://github.com/${value}.git`;
-  const githubRepo = value.match(/^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/);
-  if (githubRepo) return `https://github.com/${githubRepo[1]}/${githubRepo[2].replace(/\.git$/, '')}.git`;
+  if (OWNER_REPO_PATTERN.test(value)) {
+    const [owner, repo] = value.split('/');
+    return githubRepoUrl(owner, repo);
+  }
+  const githubRepo = value.match(GITHUB_REPO_URL_PATTERN);
+  if (githubRepo) return githubRepoUrl(githubRepo[1], githubRepo[2]);
   return value;
 }
 
@@ -29,20 +40,20 @@ export class SourceService {
     if (!input) throw new SkillsManagerError('missing_source', 'Source is required');
     if (this.fs.exists(input)) return { input, repoUrl: path.resolve(input), isLocal: true };
 
-    if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(input)) {
-      return { input, repoUrl: `https://github.com/${input}.git`, isLocal: false };
+    if (OWNER_REPO_PATTERN.test(input)) {
+      const [owner, repo] = input.split('/');
+      return { input, repoUrl: githubRepoUrl(owner, repo), isLocal: false };
     }
 
     const githubTree = input.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/(.+)$/);
     if (githubTree) {
       const [, owner, repo, treeRest] = githubTree;
-      return { input, repoUrl: `https://github.com/${owner}/${repo.replace(/\.git$/, '')}.git`, treeRest, isLocal: false };
+      return { input, repoUrl: githubRepoUrl(owner, repo), treeRest, isLocal: false };
     }
 
-    const githubRepo = input.match(/^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/);
+    const githubRepo = input.match(GITHUB_REPO_URL_PATTERN);
     if (githubRepo) {
-      const [, owner, repo] = githubRepo;
-      return { input, repoUrl: `https://github.com/${owner}/${repo.replace(/\.git$/, '')}.git`, isLocal: false };
+      return { input, repoUrl: githubRepoUrl(githubRepo[1], githubRepo[2]), isLocal: false };
     }
 
     return { input, repoUrl: input, isLocal: false };

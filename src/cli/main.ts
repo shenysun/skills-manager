@@ -124,7 +124,7 @@ program.command('edit')
   .option('--source-git <owner/repo|url>', 'upstream git source (owner/repo or repo URL); normalized to the canonical repo URL')
   .option('--source-url <url>', 'upstream repository URL; enables update management for imported skills')
   .option('--source-ref <ref>', 'branch or tag to track')
-  .option('--subpath <path>', 'skill path inside the source repository (with --source-git/--source-url); enables updates')
+  .option('--subpath <path>', 'skill path inside the source repository (requires --source-git or --source-url); enables updates')
   .option('--title <title>', 'display title')
   .option('--description <description>', 'short description')
   .option('--category <category>', 'category')
@@ -132,6 +132,7 @@ program.command('edit')
   .action((skill, opts, cmd) => {
     const s = services(cmd);
     if (opts.sourceGit !== undefined && opts.sourceUrl !== undefined) throw new Error('Pass either --source-git or --source-url, not both.');
+    if (opts.subpath !== undefined && opts.sourceGit === undefined && opts.sourceUrl === undefined) throw new Error('--subpath requires --source-git or --source-url (a source to attach the path to).');
     const patch: Record<string, unknown> = {};
     if (opts.title !== undefined) patch.title = opts.title;
     if (opts.description !== undefined) patch.description = opts.description;
