@@ -66,6 +66,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "README.md",
     "docs/CLI.md",
     "LICENSE"

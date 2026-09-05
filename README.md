@@ -21,6 +21,13 @@ skills-manager init --dry-run   # preview
 skills-manager init             # import
 ```
 
+**Want your agent to drive this CLI for you?** This repo ships an official agent skill (`skills/skills-manager/`) covering the full command surface plus the provenance-backfill workflow (adopt lockfile evidence → search & verify candidates → you approve each write, ADR-0012):
+
+```sh
+skills-manager add <this-repo-url> --skill skills-manager
+skills-manager distribute --to user --skill skills-manager
+```
+
 Or install globally:
 
 ```sh
