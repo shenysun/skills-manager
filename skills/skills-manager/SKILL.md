@@ -116,6 +116,8 @@ Two buckets: `importedWithoutSource` (came from runtime dirs, evidence missing) 
 
 ### Step 3 — Search and verify, one skill at a time
 
+When the queue is more than a handful (5+), fan the search out to parallel subagents — each takes a slice of skills through the steps below and returns structured candidates — then come back and run Step 4 yourself. Searching parallelizes; approving does not.
+
 For each pending skill:
 
 1. Read its `SKILL.md` frontmatter (`name`, `description`) from the hub — that's the query material.
@@ -125,13 +127,15 @@ For each pending skill:
    npx -y skills find "<name>"
    ```
 
-   Output lines look like `owner/repo@skillname <installs>` with a `https://skills.sh/...` link. Pass a real query word — never `--help`. If it returns nothing (or the network times out — the API is unreachable from some networks), switch to the fallback.
+   Output lines look like `owner/repo@skillname <installs>` with a `https://skills.sh/...` link. Pass a real query word — never `--help`. Treat *any* failure as "channel unavailable" and move on: empty results, a hang (cap at ~30s, don't retry), or the command itself erroring — on some npm setups `npx` chokes on this package with `Unknown command`, which has nothing to do with your query.
 3. **Fallback channel** — GitHub code search (authenticated `gh` works offline of skills.sh):
 
    ```bash
    gh api -X GET search/code -f q='filename:SKILL.md "<name>" in:file' -f per_page=10 \
      --jq '.items[] | {repo: .repository.full_name, path: .path}'
    ```
+
+   Generic names return noise; prefer a distinctive phrase from the description as the quoted term. Rate limits (429/403) are common — wait ~20s, retry once, then switch the phrase before giving up on the channel.
 4. **Verify before presenting.** For each top candidate, fetch the upstream `SKILL.md` and compare its `name`/`description` with the local copy:
 
    ```bash
@@ -142,7 +146,7 @@ For each pending skill:
 
 ### Step 4 — The user decides, one skill at a time
 
-Present exactly one question per skill (AskUserQuestion or equivalent single choice): each verified candidate (labelled with `owner/repo`, install count, and how well it matched), plus:
+Present exactly one question per skill (AskUserQuestion or equivalent single choice), batched at the platform's per-prompt cap — 4 questions per round on Claude Code, so a 17-skill queue is ~5 rounds, not 17 interruptions. Each question shows the verified candidates (labelled with `owner/repo`, install count, and how well it matched), plus:
 
 - **"Locally authored — keep as-is"**: the user wrote it; write nothing. An honest local snapshot is the correct end state — never invent an upstream.
 - **"Skip for now"**: leave it in the queue.
