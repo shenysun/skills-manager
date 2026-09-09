@@ -20,4 +20,6 @@ export interface FileSystemPort {
   move(source: string, destination: string): void;
   symlink(target: string, path: string): void;
   readlink(path: string): string;
+  /** Last-modified time in epoch ms; 0 when the path does not exist. */
+  modifiedAt(path: string): number;
 }

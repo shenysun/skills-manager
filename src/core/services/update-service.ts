@@ -68,18 +68,19 @@ export class UpdateService {
     if (candidates.length === 0) throw new SkillsManagerError('empty_update_plan', 'No skills to update');
     const installed: string[] = [];
     for (const group of this.groupCandidates([...candidates])) {
-      const sourceCheckout = this.source.checkout(group.url, group.ref);
-      for (const candidate of group.skills) {
-        const discovered = [{
-          name: candidate.skill,
-          title: candidate.title,
-          description: candidate.description,
-          subpath: candidate.subpath,
-          absoluteDir: path.join(sourceCheckout.repoDir, candidate.subpath),
-        }];
-        const plan = this.installer.planInstall(sourceCheckout, discovered, [candidate.subpath], candidate.consumers, { overwrite: true });
-        installed.push(...this.installer.installPlan(plan).installed);
-      }
+      this.source.withCheckout(group.url, group.ref, (sourceCheckout) => {
+        for (const candidate of group.skills) {
+          const discovered = [{
+            name: candidate.skill,
+            title: candidate.title,
+            description: candidate.description,
+            subpath: candidate.subpath,
+            absoluteDir: path.join(sourceCheckout.repoDir, candidate.subpath),
+          }];
+          const plan = this.installer.planInstall(sourceCheckout, discovered, [candidate.subpath], candidate.consumers, { overwrite: true });
+          installed.push(...this.installer.installPlan(plan).installed);
+        }
+      });
     }
     return { updated: installed };
   }

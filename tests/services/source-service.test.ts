@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -129,5 +129,61 @@ describe('install after a shallow clone', () => {
     expect(cloneCalls[0].options).toEqual({});
     expect(s.registry.load().skills.alpha?.source?.upstream_commit).toBe(SHA);
     expect(s.registry.load().skills.alpha?.source?.upstream_tree).toBe(TREE);
+  });
+});
+
+describe('SourceService temp lifecycle (manager-skill-first ticket 02)', () => {
+  it('withCheckout removes the git temp dir after the callback returns', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    let repoDir = '';
+    const result = s.withCheckout('https://github.com/owner/repo.git', undefined, (checkout) => {
+      repoDir = checkout.repoDir;
+      expect(createNodeFileSystem().kind(path.dirname(repoDir))).toBe('directory');
+      return 'used';
+    });
+    expect(result).toBe('used');
+    expect(createNodeFileSystem().kind(path.dirname(repoDir))).toBe('missing');
+  });
+
+  it('withCheckout removes the git temp dir even when the callback throws, and rethrows', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    let repoDir = '';
+    expect(() =>
+      s.withCheckout('https://github.com/owner/repo.git', undefined, (checkout) => {
+        repoDir = checkout.repoDir;
+        throw new Error('boom');
+      }),
+    ).toThrow('boom');
+    expect(createNodeFileSystem().kind(path.dirname(repoDir))).toBe('missing');
+  });
+
+  it('withCheckout leaves a local source directory untouched', () => {
+    const { git } = spyGit();
+    const local = path.join(root, 'local-source');
+    mkdirSync(local, { recursive: true });
+    const s = service(git);
+    s.withCheckout(local, undefined, (checkout) => {
+      expect(checkout.isLocal).toBe(true);
+    });
+    expect(createNodeFileSystem().kind(local)).toBe('directory');
+  });
+
+  it('checkout sweeps orphaned skills-source-* dirs older than 24h but keeps fresh ones', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    const tempRoot = path.join(root, 'tmp');
+    const stale = path.join(tempRoot, 'skills-source-stale');
+    const fresh = path.join(tempRoot, 'skills-source-fresh');
+    mkdirSync(stale, { recursive: true });
+    mkdirSync(fresh, { recursive: true });
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    utimesSync(stale, twoDaysAgo, twoDaysAgo);
+
+    s.checkout('https://github.com/owner/repo.git');
+
+    expect(createNodeFileSystem().kind(stale)).toBe('missing');
+    expect(createNodeFileSystem().kind(fresh)).toBe('directory');
   });
 });

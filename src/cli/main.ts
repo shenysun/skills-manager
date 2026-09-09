@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
 import { normalizeGitSourceUrl } from '../core/services/source-service.js';
 import { SkillsManagerError } from '../shared/errors.js';
+import { redactCheckout, redactDiscovered } from '../shared/redact.js';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
@@ -266,14 +267,18 @@ program.command('add')
   .option('-y, --yes', 'overwrite existing skills without prompting')
   .action((source, opts, cmd) => {
     const s = services(cmd);
-    const checkout = s.source.checkout(source);
-    const discovered = s.source.discover(checkout);
-    if (opts.list) return print({ source: checkout, discovered });
-    const selectors = opts.all ? discovered.map((skill) => skill.subpath) : (opts.skill || []);
-    if (!opts.all && selectors.length === 0) throw new Error('Use --all or --skill <name-or-subpath> to choose skills in this non-interactive CLI.');
+    if (opts.list) {
+      return s.source.withCheckout(source, undefined, (checkout) => {
+        const discovered = s.source.discover(checkout);
+        return print({ source: redactCheckout(checkout), discovered: discovered.map(redactDiscovered) });
+      });
+    }
+    if (!opts.all && (opts.skill || []).length === 0) throw new Error('Use --all or --skill <name-or-subpath> to choose skills in this non-interactive CLI.');
+    // Empty selectors mean "everything discovered" — the --all semantics.
+    const selectors = opts.all ? [] : (opts.skill || []);
     const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes) });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
-    print(result);
+    print({ ...result, plan: { ...result.plan, source: redactCheckout(result.plan.source), selected: result.plan.selected.map(redactDiscovered) } });
     remindStaleTargets(s);
   });
 

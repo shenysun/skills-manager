@@ -80,6 +80,14 @@ export class NodeFileSystem implements FileSystemPort {
     return readlinkSync(filePath);
   }
 
+  modifiedAt(filePath: string): number {
+    try {
+      return statSync(filePath).mtimeMs;
+    } catch {
+      return 0;
+    }
+  }
+
   private direntKind(entry: import('node:fs').Dirent): Exclude<FileKind, 'missing'> {
     if (entry.isSymbolicLink()) return 'symlink';
     if (entry.isDirectory()) return 'directory';

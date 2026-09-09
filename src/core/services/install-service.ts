@@ -43,11 +43,12 @@ export class InstallService {
   }
 
   installFromSourceSelection(input: { source: string; selectors: readonly string[]; consumers?: readonly string[]; overwrite?: boolean }) {
-    const sourceCheckout = this.source.checkout(input.source);
-    const discovered = this.source.discover(sourceCheckout);
-    const selectors = input.selectors.length > 0 ? input.selectors : discovered.map((skill) => skill.subpath);
-    const plan = this.planInstall(sourceCheckout, discovered, selectors, input.consumers, { overwrite: input.overwrite });
-    return this.installPlan(plan);
+    return this.source.withCheckout(input.source, undefined, (sourceCheckout) => {
+      const discovered = this.source.discover(sourceCheckout);
+      const selectors = input.selectors.length > 0 ? input.selectors : discovered.map((skill) => skill.subpath);
+      const plan = this.planInstall(sourceCheckout, discovered, selectors, input.consumers, { overwrite: input.overwrite });
+      return this.installPlan(plan);
+    });
   }
 
   private selectDiscovered(discovered: DiscoveredSkill[], selectors: readonly string[]) {

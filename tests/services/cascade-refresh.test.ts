@@ -89,6 +89,8 @@ describe('update cascade', () => {
     // Build a fake candidate and call updateCandidates directly.
     const fakeSource = {
       checkout: () => ({ repoDir: sourceRoot, repoUrl: 'local', isLocal: true, ref: null, commit: null }),
+      withCheckout: (_source: string, _ref: string | undefined, use: (checkout: unknown) => unknown) =>
+        use({ repoDir: sourceRoot, repoUrl: 'local', isLocal: true, ref: null, commit: null }),
     } as never;
     const update = new UpdateService(s.registry, fakeSource, s.install);
     update.updateCandidates([{ skill: 'alpha', url: 'local', subpath: 'skills/alpha', title: 'alpha', description: '', consumers: [] }]);

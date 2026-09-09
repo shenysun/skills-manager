@@ -8,6 +8,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { errorCode, errorMessage, SkillsManagerError } from '../../shared/errors.js';
+import { redactCheckout, redactDiscovered } from '../../shared/redact.js';
 import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
@@ -536,8 +537,8 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   app.post('/api/discover', { schema: { body: sourceBody } }, async (request) => {
     const body = request.body as { source: string };
     const services = getServices();
-    const source = services.source.checkout(body.source);
-    return data({ sourceInfo: source, discovered: services.source.discover(source), existing: services.registry.listCanonicalSkills() });
+    return services.source.withCheckout(body.source, undefined, (source) =>
+      data({ sourceInfo: redactCheckout(source), discovered: services.source.discover(source).map(redactDiscovered), existing: services.registry.listCanonicalSkills() }));
   });
 
   // Reverse import (ADR-0006 / ADR-0009): dashboard prefer + resolve are the

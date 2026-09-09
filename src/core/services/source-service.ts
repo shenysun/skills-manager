@@ -84,6 +84,7 @@ export class SourceService {
       return { ...normalized, repoDir: normalized.repoUrl, commit };
     }
 
+    this.sweepStaleCheckouts();
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
     const repoDir = path.join(this.tempRoot, `skills-source-${randomUUID()}`, 'repo');
     this.fs.makeDirectory(path.dirname(repoDir));
@@ -91,6 +92,46 @@ export class SourceService {
     this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
     const commit = this.git.revParseHead(repoDir);
     return { ...normalized, ...tree, repoDir, commit };
+  }
+
+  /**
+   * Checkout scoped to a callback: the temp clone is removed when the callback
+   * returns or throws (local sources pass through untouched). Callers that
+   * hold a checkout beyond their turn must clean up with `release` instead —
+   * before this, every checkout leaked its `skills-source-*` dir (ticket
+   * manager-skill-first/02).
+   */
+  withCheckout<T>(source: string, forcedRef: string | undefined, use: (checkout: SourceCheckout) => T): T {
+    const checkout = this.checkout(source, forcedRef);
+    try {
+      return use(checkout);
+    } finally {
+      this.release(checkout);
+    }
+  }
+
+  /** Drop a checkout's temp clone; a no-op for local sources. */
+  release(checkout: SourceCheckout): void {
+    if (checkout.isLocal) return;
+    const tempDir = path.dirname(checkout.repoDir);
+    assertPathInside(tempDir, this.tempRoot);
+    this.fs.removeTree(tempDir);
+  }
+
+  /**
+   * Remove `skills-source-*` dirs abandoned by earlier runs (crashes, and any
+   * predating the withCheckout lifecycle). The 24h age floor keeps concurrent
+   * processes' active checkouts safe.
+   */
+  private sweepStaleCheckouts(): void {
+    if (this.fs.kind(this.tempRoot) !== 'directory') return;
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const entry of this.fs.readDirectory(this.tempRoot)) {
+      if (!entry.name.startsWith('skills-source-')) continue;
+      const dir = path.join(this.tempRoot, entry.name);
+      const modified = this.fs.modifiedAt(dir);
+      if (modified > 0 && modified < cutoff) this.fs.removeTree(dir);
+    }
   }
 
   /**
