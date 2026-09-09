@@ -15,6 +15,8 @@ export interface GitPort {
   /** Shallow-clone `repoUrl` into `destination`, leaving HEAD on `options.ref` when given. */
   clone(repoUrl: string, destination: string, options?: GitCloneOptions): void;
   revParseHead(repoDir: string): string;
+  /** Tree SHA of `subpath` at HEAD (`HEAD:<subpath>^{tree}`); works on a shallow clone (ADR-0013). */
+  revParseTree(repoDir: string, subpath: string): string;
   listRemoteHeads(repoUrl: string): string[];
   statusShort(cwd: string): string;
   log(cwd: string, maxCount: number): GitLogEntry[];

@@ -15,6 +15,12 @@ export type SkillSource = {
   subpath?: string | null;
   ref?: string | null;
   upstream_commit?: string | null;
+  /**
+   * Tree SHA of the skill's own sub-directory in the upstream repo — the source
+   * anchor "has update" keys on; root-anchored skills record the commit SHA
+   * instead (ADR-0013). Missing/null = local source or not yet calibrated.
+   */
+  upstream_tree?: string | null;
   /** Upstream Git tree SHA captured at install/import — the baseline update compares against (ADR-0011). */
   baseline_hash?: string | null;
   imported_from?: string[];

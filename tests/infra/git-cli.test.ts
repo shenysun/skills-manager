@@ -153,3 +153,11 @@ describe('GitCli transport retry (HTTP/1.1 once, ticket 02 / ADR-0013)', () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe('GitCli.revParseTree (source anchor, ADR-0013)', () => {
+  it('resolves the sub-directory tree SHA at HEAD — available on a shallow clone', () => {
+    const { commands, cli } = recordingCli();
+    cli.revParseTree('/tmp/repo', 'skills/alpha');
+    expect(commands).toEqual(['git -C /tmp/repo rev-parse HEAD:skills/alpha^{tree}']);
+  });
+});

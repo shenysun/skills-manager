@@ -9,6 +9,7 @@ import { createNodeFileSystem } from '../../src/infra/index.js';
 import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
 
 const SHA = 'fedcba9876543210fedcba9876543210fedcba98';
+const TREE = '0123456789abcdef0123456789abcdef01234567';
 
 let root: string;
 
@@ -29,6 +30,7 @@ function spyGit(commit = SHA) {
       cloneCalls.push({ repoUrl, destination, options });
     },
     revParseHead: () => commit,
+    revParseTree: () => TREE,
     listRemoteHeads: () => ['develop', 'main'],
     statusShort: () => '',
     log: () => [],
@@ -102,6 +104,7 @@ describe('install after a shallow clone', () => {
         cpSync(upstream, destination, { recursive: true });
       },
       revParseHead: () => SHA,
+      revParseTree: () => TREE,
       listRemoteHeads: () => [],
       statusShort: () => '',
       log: () => [],
@@ -125,5 +128,6 @@ describe('install after a shallow clone', () => {
     expect(cloneCalls).toHaveLength(1);
     expect(cloneCalls[0].options).toEqual({});
     expect(s.registry.load().skills.alpha?.source?.upstream_commit).toBe(SHA);
+    expect(s.registry.load().skills.alpha?.source?.upstream_tree).toBe(TREE);
   });
 });
