@@ -3,13 +3,38 @@ import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
 import { normalizeGitSourceUrl } from '../core/services/source-service.js';
+import { SkillsManagerError } from '../shared/errors.js';
+import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
 
-function services(cmd: Command) {
+function services(cmd: Command, options: { bootstrap?: boolean } = {}) {
   const opts = (cmd.optsWithGlobals() as { home?: string });
-  return createRuntimeServices({ home: opts.home }, projectRoot);
+  const runtime = createRuntimeServices({ home: opts.home, ensureDefaultHub: Boolean(options.bootstrap) }, projectRoot);
+  if (!options.bootstrap && !runtime.resolution.exists) {
+    throw new SkillsManagerError(
+      'no_skill_home',
+      `No skill home at ${runtime.resolution.root} yet. Run \`npx skills-manager-cli\` first — it creates the hub and installs the manager skill. (Or point --home at an existing hub.)`,
+    );
+  }
+  selfCheckManagerSkill(runtime);
+  return runtime;
+}
+
+/**
+ * Every CLI run keeps the hub's manager skill in step with the bundled copy
+ * (ADR-0014) — refresh silently when we still own it, never touch a
+ * user-modified copy, and never let this break the actual command. Notices go
+ * to stderr so stdout stays parseable JSON.
+ */
+function selfCheckManagerSkill(s: ReturnType<typeof createRuntimeServices>) {
+  try {
+    const result = s.managerSkill.selfCheck(managerSkillBundle());
+    if (result?.status === 'refreshed') console.error(`Refreshed the manager skill to v${pkg.version} to match this CLI version.`);
+  } catch {
+    /* the manager skill must never break an unrelated command */
+  }
 }
 
 function print(value: unknown) {
@@ -25,6 +50,22 @@ program
   .option('--home <path>', 'skill home path; overrides SKILL_HOME and cwd detection')
   .showHelpAfterError();
 
+// Bootstrap is the product's front door (ADR-0014): the no-arg run and the
+// named command share one handler. `--agent`/`--force` live on the named
+// command only — the no-arg path is the interactive/default experience.
+program.command('bootstrap')
+  .description('One-time setup: create the hub, install the manager skill, mount it to your agents (the default when no subcommand is given)')
+  .option('-a, --agent <id...>', 'catalog agent ids to mount to; skips the interactive picker')
+  .option('--force', 'replace an unmanaged skills-manager directory at a runtime path')
+  .action(runBootstrap);
+program.argument('[stray...]');
+program.action((stray: string[] | undefined, opts, cmd) => {
+  // A typo'd subcommand must not silently run bootstrap: with a program-level
+  // action, commander hands it over as an operand instead of erroring.
+  if (stray && stray.length > 0) throw new Error(`unknown command '${stray[0]}'. Run 'skills-manager --help' for the command list.`);
+  return runBootstrap(opts, cmd);
+});
+
 const webCommand = (cmd: Command, description: string) =>
   cmd
     .description(description)
@@ -33,6 +74,15 @@ const webCommand = (cmd: Command, description: string) =>
     .option('--no-open', 'do not open a browser')
     .action(async (opts, self) => {
       const globalOpts = (self.optsWithGlobals() as { home?: string });
+      // Single entry point (ADR-0014): the dashboard never creates the hub — bootstrap does.
+      const probe = createRuntimeServices({ home: globalOpts.home }, projectRoot);
+      if (!probe.resolution.exists) {
+        throw new SkillsManagerError(
+          'no_skill_home',
+          `No skill home at ${probe.resolution.root} yet. Run \`npx skills-manager-cli\` first — it creates the hub and installs the manager skill.`,
+        );
+      }
+      selfCheckManagerSkill(probe);
       // Lazy: fastify/shiki/markdown load only for the dashboard command, not on every CLI invocation.
       const { startDashboardServer } = await import('../dashboard/server/main.js');
       return startDashboardServer({ home: globalOpts.home, port: Number(opts.port), host: opts.host, open: opts.open, projectRoot });

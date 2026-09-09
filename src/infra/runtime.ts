@@ -13,6 +13,8 @@ export type RuntimeOptions = {
   env?: Record<string, string | undefined>;
   userHome?: string;
   catalogSnapshot?: CatalogSnapshot;
+  /** Ensure the default hub when missing (bootstrap only, ADR-0014). An explicit home is always ensured. */
+  ensureDefaultHub?: boolean;
 };
 
 export function projectRootFromImportMeta(metaUrl: string) {
@@ -22,12 +24,12 @@ export function projectRootFromImportMeta(metaUrl: string) {
 export function createRuntimeServices(options: RuntimeOptions = {}, projectRoot = process.cwd()) {
   const fs = new NodeFileSystem();
   const resolver = new SkillHomeResolver(fs);
-  const resolution = resolver.resolve({ explicitHome: options.home, cwd: options.cwd || process.cwd(), env: options.env || process.env });
+  const resolution = resolver.resolve({ explicitHome: options.home, cwd: options.cwd || process.cwd(), env: options.env || process.env, createDefault: Boolean(options.ensureDefaultHub) });
   const git = new GitCli();
   const processRunner = new ShellRunner();
   const env = options.env || process.env;
   const userHome = options.userHome || env.SKILLS_MANAGER_USER_HOME;
   const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome, env: options.env, catalogSnapshot: options.catalogSnapshot });
-  services.skillHome.ensure();
+  if (options.ensureDefaultHub) services.skillHome.ensure();
   return { ...services, resolution } satisfies ReturnType<typeof createCoreServices> & { resolution: SkillHomeResolution };
 }
