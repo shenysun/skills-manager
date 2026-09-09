@@ -3,7 +3,6 @@ import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
 import { normalizeGitSourceUrl } from '../core/services/source-service.js';
-import { startDashboardServer } from '../dashboard/server/main.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
@@ -32,8 +31,10 @@ const webCommand = (cmd: Command, description: string) =>
     .option('-p, --port <port>', 'port', '4777')
     .option('--host <host>', 'host', '127.0.0.1')
     .option('--no-open', 'do not open a browser')
-    .action((opts, self) => {
+    .action(async (opts, self) => {
       const globalOpts = (self.optsWithGlobals() as { home?: string });
+      // Lazy: fastify/shiki/markdown load only for the dashboard command, not on every CLI invocation.
+      const { startDashboardServer } = await import('../dashboard/server/main.js');
       return startDashboardServer({ home: globalOpts.home, port: Number(opts.port), host: opts.host, open: opts.open, projectRoot });
     });
 
