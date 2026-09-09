@@ -40,9 +40,9 @@ describe('edit full git source', () => {
     const result = run(['edit', 'alpha', '--source-git', 'vercel-labs/skills', '--subpath', 'skills/find-skills']);
     expect(result.status).toBe(0);
     const edited = JSON.parse(result.stdout).source;
-    // add writes exactly type/url/subpath/ref/upstream_commit (baseline_hash is init-adoption-only, ADR-0011);
+    // add writes exactly type/url/subpath/ref/upstream_commit/upstream_tree (the anchor, ADR-0013; baseline_hash is init-adoption-only, ADR-0011);
     // edit must land in the same shape so update treats both identically.
-    expect(Object.keys(edited).sort()).toEqual(['ref', 'subpath', 'type', 'upstream_commit', 'url']);
+    expect(Object.keys(edited).sort()).toEqual(['ref', 'subpath', 'type', 'upstream_commit', 'upstream_tree', 'url']);
   });
 
   it('records --source-ref alongside --source-git', () => {
