@@ -15,7 +15,9 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 - **Agent family**: The set of catalog agents sharing one physical runtime directory (e.g. the ~30 agents on `~/.agents/skills`). Selection is always by agent id; a family is never a selection unit — it exists only as picker select-all convenience and badge grouping.
 - **Runtime skill directory**: The folder an agent actually loads (`~/.claude/skills`, `~/.cursor/skills`, project `.agents/skills`, …). Several agents can share one directory. A distribute apply writes each distinct path **once**.
 - **Consumer** (legacy word): Prefer **Agent**. Old registry tags `agents`/`claude` are not the catalog.
-- **Registry**: `registry.yaml`, the metadata source for skill paths, categories, consumers (desired/default consumer tags), source repositories, refs, and upstream commits.
+- **Registry**: `registry.yaml`, the metadata source for skill paths, categories, consumers (desired/default consumer tags), source repositories, refs, upstream commits (provenance record), and **source anchors** (the update-decision key — see **Source anchor**).
+- **Source anchor**: The git **tree SHA of the skill's own subdirectory** in the upstream repo (registry `upstream_tree`) — the sole key for "has update" decisions. Deliberately not the repo-level commit SHA: an upstream commit that touches files outside the subdirectory must not light up the update action. Legacy entries are calibrated by the first GitHub API check (detect-and-calibrate; no migration command). Ratified 2026-09-08 in [ADR-0013](docs/adr/0013-tree-sha-anchor-shallow-clone.md).
+  _Avoid_: Treating `upstream_commit` as the update key (it stays a provenance record); "has update" from any repo-level change; a dedicated anchor-backfill migration command.
 - **Source**: A local path, Git URL, GitHub repository, or GitHub tree URL from which skills can be discovered and installed.
 - **Source-first install**: The preferred install flow: provide a source first, discover available `SKILL.md` files, then choose skills to install or update.
 - **Dashboard UI**: The local Vue/Fastify dashboard launched with `skills-manager web` for browsing, installing, updating, and distributing skills.
@@ -180,6 +182,8 @@ Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agen
 **Init lockfile evidence adoption: ratified** (grill 2026-09-05). Recorded in [ADR-0011](docs/adr/0011-init-adopts-lockfile-evidence.md); amends ADR-0006 point 5. Init inherits provenance from the `npx skills` global lockfile (git/local sources only, `skillFolderHash` → `baselineHash`); no-evidence imports stay snapshots with manual `edit --source-url`; the lockfile itself is never touched.
 
 **Provenance backfill (agent-assisted, user-approved): ratified** (2026-09-05). Recorded in [ADR-0012](docs/adr/0012-provenance-backfill-agent-assisted.md). Three layers: `provenance adopt` (legacy-evidence backfill, shipped with the `provenance` command group), agent-session search+verify (dual channel: `npx skills find` / GitHub code search), user-approved writes via `edit --source-git … --subpath …`. Ships together with the official `skills-manager` agent skill covering the whole CLI surface.
+
+**Tree-SHA source anchor + shallow clone + API update checks: ratified** (grill 2026-09-08). Recorded in [ADR-0013](docs/adr/0013-tree-sha-anchor-shallow-clone.md). Update decisions key on the skill subdirectory's tree SHA (registry `upstream_tree`, calibrated on first check); git fetches are `--depth 1` (branch/tag via `--branch`, bare SHA via init+fetch); GitHub update checks go through the Trees API (gh CLI first, anonymous fallback, in-memory TTL cache); detection failures surface in `dashboard.log` plus a per-row 检测失败 mark instead of silent null; clone failures retry once in-process over HTTP/1.1. Research basis: `docs/research/npx-skills-download-strategy.md`.
 
 ## Current product direction
 
