@@ -29,6 +29,10 @@ export class GitCli implements GitPort {
     return this.runner.runOrThrow('git', ['-C', repoDir, 'rev-parse', 'HEAD']);
   }
 
+  revParseTree(repoDir: string, subpath: string): string {
+    return this.runner.runOrThrow('git', ['-C', repoDir, 'rev-parse', `HEAD:${subpath}^{tree}`]);
+  }
+
   listRemoteHeads(repoUrl: string): string[] {
     const output = this.runner.runOrThrow('git', ['ls-remote', '--heads', repoUrl]);
     return output.split('\n')

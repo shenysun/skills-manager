@@ -75,6 +75,7 @@ export class InstallService {
         subpath: skill.subpath,
         ref: source.ref || null,
         upstream_commit: source.commit,
+        upstream_tree: this.source.upstreamTree(source, skill.subpath),
       },
       description: skill.description,
     });

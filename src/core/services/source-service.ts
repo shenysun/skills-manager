@@ -77,6 +77,19 @@ export class SourceService {
     return { ...normalized, ...tree, repoDir, commit };
   }
 
+  /**
+   * Source anchor for update decisions (ADR-0013): the tree SHA of the skill's
+   * own sub-directory, resolved in the checked-out clone — so a checkout and its
+   * anchors are captured in one consistent state. Local sources carry no git
+   * anchor (null); a skill anchored at the repo root records the commit SHA,
+   * matching what the GitHub Trees API reports for the root.
+   */
+  upstreamTree(checkout: SourceCheckout, subpath: string): string | null {
+    if (checkout.isLocal) return null;
+    if (!subpath) return checkout.commit;
+    return this.git.revParseTree(checkout.repoDir, subpath);
+  }
+
   discover(source: SourceCheckout): DiscoveredSkill[] {
     const baseDir = source.baseSubpath ? path.join(source.repoDir, source.baseSubpath) : source.repoDir;
     if (this.fs.kind(baseDir) !== 'directory') throw new SkillsManagerError('source_path_missing', `Discovery path does not exist: ${baseDir}`);

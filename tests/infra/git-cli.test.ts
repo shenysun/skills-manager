@@ -68,3 +68,11 @@ describe('GitCli.clone (shallow transport, ADR-0013)', () => {
     expect(fetch.commands).toContain(`git -C /tmp/repo fetch --depth=5 origin ${SHA}`);
   });
 });
+
+describe('GitCli.revParseTree (source anchor, ADR-0013)', () => {
+  it('resolves the sub-directory tree SHA at HEAD — available on a shallow clone', () => {
+    const { commands, cli } = recordingCli();
+    cli.revParseTree('/tmp/repo', 'skills/alpha');
+    expect(commands).toEqual(['git -C /tmp/repo rev-parse HEAD:skills/alpha^{tree}']);
+  });
+});
