@@ -30,6 +30,8 @@ const statusText = computed(() => {
   switch (status.value.kind) {
     case 'warning':
       return props.skill.warning === 'outdated-copy' ? t('status.warningOutdated') : t('status.warningBroken');
+    case 'detectionFailed':
+      return t('status.detectionFailed');
     case 'updatable':
       return t('status.updatable');
     case 'distributed':
@@ -42,6 +44,8 @@ const statusText = computed(() => {
 const statusColor = computed(() => {
   switch (status.value.kind) {
     case 'warning':
+      return 'text-warn';
+    case 'detectionFailed':
       return 'text-warn';
     case 'updatable':
       return 'text-accent font-semibold';
@@ -98,6 +102,7 @@ async function onRefresh() {
         <span
           class="ml-auto whitespace-nowrap text-[12.5px]"
           :class="[statusColor, menuOpen ? 'hidden' : 'group-hover:hidden']"
+          :title="status.kind === 'detectionFailed' ? t('status.detectionFailedHint') : undefined"
         >
           {{ statusText }}
         </span>
