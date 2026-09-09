@@ -71,8 +71,8 @@ export class SourceService {
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
     const repoDir = path.join(this.tempRoot, `skills-source-${randomUUID()}`, 'repo');
     this.fs.makeDirectory(path.dirname(repoDir));
-    this.git.clone(normalized.repoUrl, repoDir);
-    if (tree.ref) this.git.checkout(repoDir, tree.ref);
+    // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
+    this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
     const commit = this.git.revParseHead(repoDir);
     return { ...normalized, ...tree, repoDir, commit };
   }
