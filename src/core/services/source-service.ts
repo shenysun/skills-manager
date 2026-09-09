@@ -32,6 +32,22 @@ export function normalizeGitSourceUrl(input: string): string {
   return value;
 }
 
+/**
+ * Parse a GitHub repo locator — `owner/repo` shorthand or a github.com repo
+ * URL — into its owner/repo pair. Returns null for anything else (non-GitHub
+ * URLs included). The single place that decides "what is a GitHub source".
+ */
+export function parseGitHubRepoRef(input: string): { owner: string; repo: string } | null {
+  const value = input.trim();
+  if (OWNER_REPO_PATTERN.test(value)) {
+    const [owner, repo] = value.split('/');
+    return { owner, repo: repo.replace(/\.git$/, '') };
+  }
+  const githubRepo = value.match(GITHUB_REPO_URL_PATTERN);
+  if (githubRepo) return { owner: githubRepo[1], repo: githubRepo[2].replace(/\.git$/, '') };
+  return null;
+}
+
 export class SourceService {
   constructor(private readonly fs: FileSystemPort, private readonly git: GitPort, private readonly tempRoot = os.tmpdir()) {}
 
@@ -71,10 +87,23 @@ export class SourceService {
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
     const repoDir = path.join(this.tempRoot, `skills-source-${randomUUID()}`, 'repo');
     this.fs.makeDirectory(path.dirname(repoDir));
-    this.git.clone(normalized.repoUrl, repoDir);
-    if (tree.ref) this.git.checkout(repoDir, tree.ref);
+    // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
+    this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
     const commit = this.git.revParseHead(repoDir);
     return { ...normalized, ...tree, repoDir, commit };
+  }
+
+  /**
+   * Source anchor for update decisions (ADR-0013): the tree SHA of the skill's
+   * own sub-directory, resolved in the checked-out clone — so a checkout and its
+   * anchors are captured in one consistent state. Local sources carry no git
+   * anchor (null); a skill anchored at the repo root records the commit SHA,
+   * matching what the GitHub Trees API reports for the root.
+   */
+  upstreamTree(checkout: SourceCheckout, subpath: string): string | null {
+    if (checkout.isLocal) return null;
+    if (!subpath) return checkout.commit;
+    return this.git.revParseTree(checkout.repoDir, subpath);
   }
 
   discover(source: SourceCheckout): DiscoveredSkill[] {

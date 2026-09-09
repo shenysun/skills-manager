@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-09 (tree-SHA update pipeline)
+
+- **更新锚点改用 skill 子目录 tree SHA**（ADR-0013）：registry 条目 `source` 新增 `upstream_tree`，`upstream_commit` 保留作溯源记录。「可更新」只在 skill 内容真变时成立——上游改 README、改别的 skill 不再点亮更新按钮；GitHub Trees API 与本地浅克隆对同一子目录解析出相同 tree SHA，两侧锚点天然对齐。
+- **git 传输统一浅克隆**：安装/更新对 git 源一律 `--depth 1`（branch/tag 经 `--branch`，裸 commit SHA 走 init + `fetch --depth 1`），不再拉完整历史，大仓库（awesome-copilot 类）在不稳网络下的传输量与被掐断概率骤降。
+- **clone 网络类失败自动以 HTTP/1.1 重试一次**：`curl 92`（HTTP/2 stream 未闭合）/ `curl 56`（connection reset）类失败通过进程内 `GIT_CONFIG_COUNT` 环境变量注入重试，不改用户全局 git 配置。
+- **GitHub 源更新检测走 Trees API**（dashboard `/api/state`）：按源归并（同 repo 同 ref 一次调用）、gh CLI 登录态优先（5000 req/h）、无 gh 匿名兜底（60 req/h）、内存 TTL 缓存——刷新页面命中缓存 10ms 级返回，不再逐 skill ls-remote 15 秒转圈。
+- **检测即校准**：存量条目首次被 API 检测覆盖时自动补齐 `upstream_tree`（幂等低频写回），无需迁移命令；校准本身不点亮更新。
+- **检测失败显式可见**：skill 行新增 `detection` 状态（`ok` / `failed` / `skipped`），失败行显示「检测失败」角标（区别于「无更新」），每次失败向 `<home>/.skills/dashboard.log` 追加一条带时间戳与原因的 JSON 行；单源失败不阻塞其余行与接口数据。
+
 ## 2026-08-26 (copy-mode auto-refresh)
 
 - **Copy 模式自动刷新**（ADR-0008）：hub 技能内容变化后，`copy` 目标按 fingerprint 判定为过期并被整树刷新；symlink 目标直连技能库实时内容，永不判定过期（`entryOutdated` 对 symlink 短路）。刷新是原子算子 `refreshStaleEntry`：单条失败记录在索引条目 `error: { code, message, at }` 上，不阻断兄弟目标，下次成功即清除。

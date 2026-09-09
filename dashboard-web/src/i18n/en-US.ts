@@ -11,6 +11,8 @@ export default {
     updatable: 'Update available',
     warningBroken: '⚠ broken link',
     warningOutdated: '⚠ outdated copy',
+    detectionFailed: 'detection failed',
+    detectionFailedHint: 'Update detection did not complete — not the same as "no update"; see the hub .skills/dashboard.log',
     agents: '{n} agents',
     projects: '{n} projects',
     unlinked: 'not distributed',

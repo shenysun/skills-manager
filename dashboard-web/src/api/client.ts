@@ -9,6 +9,10 @@ export type SkillRowState = {
   /** Registry source for the 来源 segment; null for imported skills with no provenance (ADR-0006). */
   source: SkillSourceInfo | null;
   hasUpdate: boolean;
+  /** Detection outcome for this row: 'ok' — hasUpdate is a real diff; 'failed' —
+   *  detection did not complete, hasUpdate is meaningless (hub dashboard.log has
+   *  the trace); 'skipped' — the row was not part of this detection round. */
+  detection: 'ok' | 'failed' | 'skipped';
   warning: 'broken-link' | 'outdated-copy' | null;
   /** Number of stale copy targets for this skill (ADR-0008). Always 0 for symlink-only skills. */
   staleCount: number;
