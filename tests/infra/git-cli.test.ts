@@ -198,7 +198,8 @@ describe('GitCli.revParseTree (source anchor, ADR-0013)', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'rev-parse-tree-'));
     try {
       const source = path.join(root, 'source');
-      const git = (args: string[]) => execFileSync('git', args, { cwd: source });
+      // Identity is injected per command: a bare CI runner has no global git ident.
+      const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.com', ...args], { cwd: source });
       mkdirSync(path.join(source, 'skills', 'alpha'), { recursive: true });
       writeFileSync(path.join(source, 'skills', 'alpha', 'SKILL.md'), '---\nname: alpha\n---\n');
       git(['init']);
