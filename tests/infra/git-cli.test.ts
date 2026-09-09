@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GitCli } from '../../src/infra/git-cli.js';
 
@@ -155,9 +159,26 @@ describe('GitCli transport retry (HTTP/1.1 once, ticket 02 / ADR-0013)', () => {
 });
 
 describe('GitCli.revParseTree (source anchor, ADR-0013)', () => {
-  it('resolves the sub-directory tree SHA at HEAD — available on a shallow clone', () => {
-    const { commands, cli } = recordingCli();
-    cli.revParseTree('/tmp/repo', 'skills/alpha');
-    expect(commands).toEqual(['git -C /tmp/repo rev-parse HEAD:skills/alpha^{tree}']);
+  it('resolves the sub-directory tree SHA at HEAD — against a real shallow clone', () => {
+    // Real git, not a recording fake: git's revision parser rejects
+    // `HEAD:<path>^{tree}` (the `^{tree}` is swallowed into the path), which a
+    // command-shape assertion cannot see — this bug shipped because of one.
+    const root = mkdtempSync(path.join(tmpdir(), 'rev-parse-tree-'));
+    try {
+      const source = path.join(root, 'source');
+      const git = (args: string[]) => execFileSync('git', args, { cwd: source });
+      mkdirSync(path.join(source, 'skills', 'alpha'), { recursive: true });
+      writeFileSync(path.join(source, 'skills', 'alpha', 'SKILL.md'), '---\nname: alpha\n---\n');
+      git(['init']);
+      git(['add', '.']);
+      git(['commit', '-m', 'init']);
+      const cloneDir = path.join(root, 'clone');
+      new GitCli().clone(source, cloneDir);
+      const treeSha = new GitCli().revParseTree(cloneDir, 'skills/alpha');
+      expect(treeSha).toMatch(/^[0-9a-f]{40}$/);
+      expect(treeSha).toBe(execFileSync('git', ['-C', source, 'rev-parse', 'HEAD:skills/alpha'], { encoding: 'utf8' }).trim());
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

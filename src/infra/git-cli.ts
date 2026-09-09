@@ -50,8 +50,11 @@ export class GitCli implements GitPort {
     return this.runner.runOrThrow('git', ['-C', repoDir, 'rev-parse', 'HEAD']);
   }
 
+  /** `HEAD:<dir>` already resolves to the directory's tree object — git's
+   *  revision parser rejects a `^{tree}` suffix after the `:<path>` arm
+   *  (`path 'x^{tree}' does not exist`), it must not be appended here. */
   revParseTree(repoDir: string, subpath: string): string {
-    return this.runner.runOrThrow('git', ['-C', repoDir, 'rev-parse', `HEAD:${subpath}^{tree}`]);
+    return this.runner.runOrThrow('git', ['-C', repoDir, 'rev-parse', `HEAD:${subpath}`]);
   }
 
   listRemoteHeads(repoUrl: string): string[] {
