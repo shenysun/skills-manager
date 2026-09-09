@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GitCli } from '../../src/infra/git-cli.js';
+import { CommandTimeoutError, ShellRunner } from '../../src/infra/shell-runner.js';
 
 const SHA = '0123456789abcdef0123456789abcdef01234567';
 const URL = 'https://github.com/owner/repo.git';
@@ -18,7 +19,7 @@ function recordingCli() {
     run: record,
     runOrThrow: (command: string, args: string[]) => String(record(command, args).stdout.trim()),
   } as never;
-  return { commands, cli: new GitCli(runner) };
+  return { commands, cli: new GitCli(runner, () => 1_000_000, {}) };
 }
 
 const HTTP1_ENV = {
@@ -27,10 +28,16 @@ const HTTP1_ENV = {
   GIT_CONFIG_VALUE_0: 'HTTP/1.1',
 };
 
-type RunnerCall = { command: string; args: string[]; options?: { env?: Record<string, string> } };
+type RunnerCall = {
+  command: string;
+  args: string[];
+  options?: { env?: Record<string, string>; timeoutMs?: number };
+};
+
+type Clock = () => number;
 
 /** Runner fake whose n-th `runOrThrow` throws the n-th scripted failure (undefined = success). */
-function scriptedCli(failures: ReadonlyArray<unknown>) {
+function scriptedCli(failures: ReadonlyArray<unknown>, clock: Clock = () => 1_000_000, env: Record<string, string> = {}) {
   const calls: RunnerCall[] = [];
   const runner = {
     run: (command: string, args: string[], options?: { cwd?: string }) => {
@@ -44,7 +51,7 @@ function scriptedCli(failures: ReadonlyArray<unknown>) {
       return '';
     },
   };
-  return { calls, cli: new GitCli(runner as never) };
+  return { calls, cli: new GitCli(runner as never, clock, env) };
 }
 
 const CURL_92 = new Error(
@@ -147,7 +154,8 @@ describe('GitCli transport retry (HTTP/1.1 once, ticket 02 / ADR-0013)', () => {
     cli.clone(URL, '/tmp/repo');
 
     expect(calls).toHaveLength(2);
-    expect(calls[0].options).toBeUndefined();
+    expect(calls[0].options?.env).toBeUndefined();
+    expect(calls[0].options?.timeoutMs).toBe(300_000);
     expect(calls[1].args).toEqual(calls[0].args);
     expect(calls[1].options?.env).toEqual(HTTP1_ENV);
   });
@@ -187,6 +195,108 @@ describe('GitCli transport retry (HTTP/1.1 once, ticket 02 / ADR-0013)', () => {
     const { calls, cli } = scriptedCli([CURL_92]);
     expect(() => cli.clone(URL, '/tmp/repo', { ref: SHA })).toThrow(CURL_92);
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe('GitCli transport timeout (ticket 08)', () => {
+  const TIMEOUT = new CommandTimeoutError('git', ['clone', URL, '/tmp/repo'], 300_000);
+
+  it('gives clone the default 5-minute budget', () => {
+    const { calls, cli } = scriptedCli([]);
+    cli.clone(URL, '/tmp/repo');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].options?.timeoutMs).toBe(300_000);
+  });
+
+  it('honors SKILLS_MANAGER_CLONE_TIMEOUT_MS when set to a positive integer', () => {
+    const { calls, cli } = scriptedCli([], () => 1_000_000, { SKILLS_MANAGER_CLONE_TIMEOUT_MS: '1500' });
+    cli.clone(URL, '/tmp/repo');
+    expect(calls[0].options?.timeoutMs).toBe(1500);
+  });
+
+  it('falls back to the default budget for an invalid override', () => {
+    for (const invalid of ['abc', '0', '-5', '']) {
+      const { calls, cli } = scriptedCli([], () => 1_000_000, { SKILLS_MANAGER_CLONE_TIMEOUT_MS: invalid });
+      cli.clone(URL, '/tmp/repo');
+      expect(calls[0].options?.timeoutMs, `value ${JSON.stringify(invalid)}`).toBe(300_000);
+    }
+  });
+
+  it('does not retry a timeout and rethrows with guidance to raise the budget or use a local path', () => {
+    const { calls, cli } = scriptedCli([TIMEOUT]);
+    let thrown: unknown;
+    try {
+      cli.clone(URL, '/tmp/repo');
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(calls).toHaveLength(1);
+    expect((thrown as Error).message).toContain('SKILLS_MANAGER_CLONE_TIMEOUT_MS');
+    expect((thrown as Error).message).toContain('local path');
+  });
+
+  it('hands the HTTP/1.1 retry the budget remaining after the first attempt', () => {
+    // Scripted clock: deadline is taken at T0, the first attempt spends nothing
+    // of the wall clock yet, then 60s elapse before the retry — it must see
+    // 300000 - 60000, not a fresh full budget.
+    const times = [1_000_000, 1_000_000, 1_060_000];
+    let tick = 0;
+    const clock = () => times[Math.min(tick++, times.length - 1)];
+    const { calls, cli } = scriptedCli([CURL_92], clock);
+    cli.clone(URL, '/tmp/repo');
+
+    expect(calls[0].options?.timeoutMs).toBe(300_000);
+    expect(calls[1].options?.timeoutMs).toBe(240_000);
+  });
+
+  it('carries the budget through ls-remote disambiguation and the bare-SHA fetch, but not checkout', () => {
+    const commands: string[] = [];
+    const opts: Array<{ timeoutMs?: number }> = [];
+    const runner = {
+      run: () => ({ status: 0, stdout: '', stderr: '' }),
+      runOrThrow: (command: string, args: string[], options?: { timeoutMs?: number }) => {
+        commands.push([command, ...args].join(' '));
+        opts.push(options ?? {});
+        return '';
+      },
+    };
+    new GitCli(runner as never, () => 1_000_000, {}).clone(URL, '/tmp/repo', { ref: 'd8e341c' });
+
+    expect(commands).toEqual([
+      `git ls-remote ${URL} d8e341c`,
+      'git init /tmp/repo',
+      `git -C /tmp/repo remote add origin ${URL}`,
+      'git -C /tmp/repo fetch --depth=1 origin d8e341c',
+      'git -C /tmp/repo checkout d8e341c',
+    ]);
+    expect(opts[0].timeoutMs).toBe(300_000);
+    expect(opts[3].timeoutMs).toBe(300_000);
+    expect(opts[4].timeoutMs).toBeUndefined();
+  });
+});
+
+describe('GitCli clone timeout against real git (ticket 08)', () => {
+  it('aborts a real clone once the budget is exhausted and reports the guidance', () => {
+    // Real git + a 1ms budget: process spawn alone exceeds it, so the clone
+    // must be killed and surfaced as the guided transport-timeout error —
+    // proving the timeout option survives all the way to a real transport.
+    const root = mkdtempSync(path.join(tmpdir(), 'clone-timeout-'));
+    try {
+      const source = path.join(root, 'source');
+      // Identity is injected per command: a bare CI runner has no global git ident.
+      const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.com', ...args], { cwd: source });
+      mkdirSync(path.join(source, 'skills'), { recursive: true });
+      writeFileSync(path.join(source, 'skills', 'SKILL.md'), '---\nname: alpha\n---\n');
+      git(['init']);
+      git(['add', '.']);
+      git(['commit', '-m', 'init']);
+
+      const cli = new GitCli(new ShellRunner(), Date.now, { SKILLS_MANAGER_CLONE_TIMEOUT_MS: '1' });
+      expect(() => cli.clone(source, path.join(root, 'clone'))).toThrow(/SKILLS_MANAGER_CLONE_TIMEOUT_MS/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
