@@ -11,6 +11,8 @@ import { errorCode, errorMessage, SkillsManagerError } from '../../shared/errors
 import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
+import { GitHubApiClient } from '../../infra/github-api-client.js';
+import { GitHubApiError, type GitHubApiPort, type RepoTree } from '../../core/ports/github-api.js';
 import { previewFileEntries, previewSkillDir, readSkillFile } from './skill-file.js';
 
 const execFileAsync = promisify(execFile);
@@ -22,6 +24,8 @@ export type DashboardServerOptions = RuntimeOptions & {
   projectRoot?: string;
   /** Pre-built core services for tests; production wires `createRuntimeServices` instead. */
   services?: ReturnType<typeof createRuntimeServices>;
+  /** GitHub Trees API port for update detection; tests inject a fake, production gets one long-lived client. */
+  githubApi?: GitHubApiPort;
 };
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -142,6 +146,12 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   const REMOTE_HEAD_TTL_MS = 5 * 60 * 1000;
   const remoteHeads = new Map<string, { sha: string | null; fetchedAt: number }>();
 
+  // One client per app (not per request): it owns the gh-CLI probe verdict and
+  // the per-owner/repo@ref TTL cache, so a refreshed page hits memory, not the
+  // API. getServices() rebuilds services every request — the GitHub client must
+  // not live there (ADR-0013 detection pipeline).
+  const githubApi = options.githubApi ?? new GitHubApiClient();
+
   async function remoteHeadSha(url: string, ref: string | null | undefined): Promise<string | null> {
     const key = `${url}|${ref || ''}`;
     const cached = remoteHeads.get(key);
@@ -183,27 +193,122 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     return `sha256:${hash.digest('hex')}`;
   }
 
+  /** ADR-0013 detection dispatch: GitHub URLs (https repo URL or owner/repo
+   *  shorthand) go through the Trees API; everything else stays on the legacy
+   *  per-skill ls-remote path. Registry sources are normalized to
+   *  `https://github.com/owner/repo.git` at install time, the shorthand arm
+   *  covers hand-edited registries. */
+  function parseGitHubRepo(url: string): { owner: string; repo: string } | null {
+    const value = url.trim();
+    const https = value.match(/^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/);
+    if (https) return { owner: https[1], repo: https[2].replace(/\.git$/, '') };
+    if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
+      const [owner, repo] = value.split('/');
+      return { owner, repo };
+    }
+    return null;
+  }
+
+  type GitHubDetectionGroup = {
+    owner: string;
+    repo: string;
+    ref: string;
+    skills: Array<{ name: string; subpath: string; anchoredTree: string | null }>;
+  };
+
+  /** Detection-as-calibration (ADR-0013): an uncalibrated entry (`upstream_tree`
+   *  null) adopts the tree SHA this detection just observed. Idempotent and
+   *  low-write by construction — calibrated entries never re-enter this path,
+   *  so repeated refreshes only read. */
+  function calibrateUpstreamTree(services: ReturnType<typeof getServices>, skill: string, treeSha: string) {
+    services.registry.editSafeFields(skill, { source: { upstream_tree: treeSha } });
+  }
+
+  // Ticket 06 replacement point: a detection failure becomes an explicit
+  // "detection failed" row state plus a dashboard.log entry. Until then the
+  // error must not vanish — it lands on the console with the failing source.
+  function reportDetectionFailure(group: GitHubDetectionGroup, error: unknown) {
+    const detail = error instanceof GitHubApiError ? `${error.kind}: ${error.message}` : String(error);
+    console.error(`[dashboard] update detection failed for ${group.owner}/${group.repo}@${group.ref} (${detail})`);
+  }
+
+  /** Applies one fetched repo tree to the group's skills: uncalibrated entries
+   *  adopt the observed SHA (no update flagged on first calibration), anchored
+   *  entries compare — only a real content change lights hasUpdate. */
+  function applyRepoTree(
+    services: ReturnType<typeof getServices>,
+    group: GitHubDetectionGroup,
+    tree: RepoTree,
+    updatable: Map<string, boolean>,
+  ) {
+    for (const member of group.skills) {
+      // Root-anchored skills compare the commit SHA (GitHub's recursive tree
+      // has no root entry); sub-directory skills look up their own tree SHA.
+      // A sub-directory the upstream no longer has cannot be judged — stay
+      // unlit rather than guessing (candidates today require a subpath, so the
+      // root arm mirrors SourceService.upstreamTree's semantics defensively).
+      const upstreamTree = member.subpath ? tree.trees[member.subpath] : tree.commitSha;
+      if (upstreamTree === undefined) continue;
+      if (member.anchoredTree === null) {
+        calibrateUpstreamTree(services, member.name, upstreamTree);
+        updatable.set(member.name, false);
+        continue;
+      }
+      updatable.set(member.name, upstreamTree !== member.anchoredTree);
+    }
+  }
+
   async function detectUpdates(
     services: ReturnType<typeof getServices>,
     skills: ReturnType<typeof services.registry.listSkills>,
   ): Promise<Map<string, boolean>> {
     const candidates = new Set(services.update.plan().candidates.map((candidate) => candidate.skill));
     const updatable = new Map<string, boolean>();
-    await Promise.all(
-      skills.map(async (skill) => {
-        const source = skill.source;
-        if (!candidates.has(skill.name) || !source.url || !source.subpath) return;
-        if (source.type === 'local') {
-          const sourceHash = hashTree(path.resolve(source.url, source.subpath));
-          if (sourceHash === null) return;
-          updatable.set(skill.name, sourceHash !== services.distribute.fingerprint(skill.name));
-          return;
-        }
-        const remote = await remoteHeadSha(source.url, source.ref);
+    const githubGroups = new Map<string, GitHubDetectionGroup>();
+    const remoteHeadChecks: Array<Promise<void>> = [];
+    for (const skill of skills) {
+      const source = skill.source;
+      if (!candidates.has(skill.name) || !source.url || !source.subpath) continue;
+      if (source.type === 'local') {
+        const sourceHash = hashTree(path.resolve(source.url, source.subpath));
+        if (sourceHash === null) continue;
+        updatable.set(skill.name, sourceHash !== services.distribute.fingerprint(skill.name));
+        continue;
+      }
+      const github = parseGitHubRepo(source.url);
+      if (github) {
+        // Per-source fan-in (ADR-0013): one fetchRepoTree per owner/repo@ref,
+        // shared by every skill of that source — 60 skills / 23 repos stay
+        // within rate limits even on the anonymous tier.
+        const ref = source.ref || 'HEAD';
+        const key = `${github.owner}/${github.repo}@${ref}`;
+        const group = githubGroups.get(key) ?? { ...github, ref, skills: [] };
+        group.skills.push({ name: skill.name, subpath: source.subpath, anchoredTree: source.upstream_tree ?? null });
+        githubGroups.set(key, group);
+        continue;
+      }
+      const url = source.url;
+      const ref = source.ref;
+      remoteHeadChecks.push((async () => {
+        const remote = await remoteHeadSha(url, ref);
         if (remote === null || !source.upstream_commit) return;
         updatable.set(skill.name, remote !== source.upstream_commit);
+      })());
+    }
+    await Promise.all([
+      ...remoteHeadChecks,
+      ...[...githubGroups.values()].map(async (group) => {
+        try {
+          const tree = await githubApi.fetchRepoTree(group.owner, group.repo, group.ref);
+          applyRepoTree(services, group, tree, updatable);
+        } catch (error) {
+          // Transitional (ticket 05): detection failures keep the row unlit and
+          // the rest of the payload intact; ticket 06 replaces this catch with
+          // an explicit detection-failed state and dashboard.log recording.
+          reportDetectionFailure(group, error);
+        }
       }),
-    );
+    ]);
     return updatable;
   }
 
