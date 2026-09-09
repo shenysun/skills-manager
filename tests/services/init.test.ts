@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -483,5 +483,34 @@ describe('init lockfile evidence adoption (ADR-0011)', () => {
     s.init.run();
 
     expect(readFileSync(lockFile, 'utf8')).toBe(before);
+  });
+});
+
+describe('init batch semantics (one user operation = one restore point)', () => {
+  it('imports many skills with a single distribute restore point', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    makeRuntimeSkill('.cursor/skills', 'bravo');
+    makeRuntimeSkill('.codex/skills', 'charlie');
+    const s = services();
+
+    const result = s.init.run();
+
+    expect(result.imported.sort()).toEqual(['alpha', 'bravo', 'charlie']);
+    // One init run is one apply-sized user operation: exactly one restore point
+    // snapshot under .skills/distribute-backups/, not one per imported skill.
+    const backupsRoot = path.join(home, '.skills', 'distribute-backups');
+    const snapshotDirs = existsSync(backupsRoot)
+      ? readdirSync(backupsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).flatMap((entry) => readdirSync(path.join(backupsRoot, entry.name)))
+      : [];
+    expect(snapshotDirs).toHaveLength(1);
+    // Every origin still lands as a managed entry in the single user record.
+    const record = s.distribute.listIndex().find((item) => item.kind === 'user');
+    expect(record?.entries.map((entry) => entry.skill).sort()).toEqual(['alpha', 'bravo', 'charlie']);
+    // And every origin is a live symlink back to the hub entity.
+    for (const [dir, name] of [['.claude/skills', 'alpha'], ['.cursor/skills', 'bravo'], ['.codex/skills', 'charlie']] as const) {
+      const origin = path.join(userHome, dir, name);
+      expect(lstatSync(origin).isSymbolicLink()).toBe(true);
+      expect(readlinkSync(origin)).toBe(path.join(home, 'skills', name));
+    }
   });
 });

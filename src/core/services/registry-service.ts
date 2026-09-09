@@ -76,12 +76,20 @@ export class RegistryService {
   }
 
   ensureEntry(skill: SkillName, patch: Partial<RegistryEntry> = {}) {
-    assertSafeSkillName(skill);
+    return this.ensureEntries([{ skill, patch }])[0];
+  }
+
+  /** Batch ensure: one registry load + one save for N entries, instead of N full-file round trips. */
+  ensureEntries(items: ReadonlyArray<{ skill: SkillName; patch: Partial<RegistryEntry> }>) {
+    for (const item of items) assertSafeSkillName(item.skill);
     const registry = this.load();
     registry.skills ||= {};
-    registry.skills[skill] = this.defaultEntry(skill, { ...(registry.skills[skill] || {}), ...patch });
-    this.save(registry);
-    return registry.skills[skill];
+    const skills = { ...registry.skills };
+    for (const item of items) {
+      skills[item.skill] = this.defaultEntry(item.skill, { ...(skills[item.skill] || {}), ...item.patch });
+    }
+    this.save({ skills });
+    return items.map((item) => skills[item.skill]);
   }
 
   removeEntry(skill: SkillName) {

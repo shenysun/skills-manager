@@ -1,10 +1,10 @@
 import path from 'node:path';
-import type { SkillHome, SkillName } from '../model/index.js';
+import type { RegistryEntry, SkillHome, SkillName } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
 import type { CatalogService } from './catalog-service.js';
-import type { DistributeService } from './distribute-service.js';
+import type { DistributeRequest, DistributeService } from './distribute-service.js';
 import type { RegistryService } from './registry-service.js';
 import type { SkillHomeService } from './skill-home-service.js';
 import type { BackupService } from './backup-service.js';
@@ -59,6 +59,14 @@ export type InitRunResult = {
 type ScanGroup = {
   runtimeDir: string;
   agents: string[];
+};
+
+/** One staged skill awaiting the batch commit: content already moved, writes pending. */
+type StagedImport = {
+  skill: SkillName;
+  /** Registry patch when a runtime copy won; null when the hub copy is kept (registry untouched). */
+  registryPatch: { skill: SkillName; patch: Partial<RegistryEntry> } | null;
+  applyRequest: DistributeRequest;
 };
 
 /** Locations whose paths resolve to the same physical directory — one origin, not a clash. */
@@ -140,13 +148,30 @@ export class InitService {
     }
 
     this.skillHome.ensure();
+    // Phase 1 — stage per skill: content moves into the hub (isolated failures
+    // never abort the batch). Phase 2 — commit as one user operation: one
+    // registry write, one restore point, one index write.
+    const staged: StagedImport[] = [];
     for (const item of imports) {
       try {
-        this.importResolved(item.skill, item.groups, item.choice, lockEntries);
-        result.imported.push(item.skill.name);
+        staged.push(this.stageImport(item.skill, item.groups, item.choice, lockEntries));
       } catch (error) {
         result.failed.push({ skill: item.skill.name, reason: (error as Error).message });
         result.choices = Object.fromEntries(Object.entries(result.choices).filter(([name]) => name !== item.skill.name));
+      }
+    }
+    if (staged.length > 0) {
+      const registryPatches = staged.flatMap((item) => (item.registryPatch ? [item.registryPatch] : []));
+      if (registryPatches.length > 0) this.registry.ensureEntries(registryPatches);
+      const batch = this.distribute.applyMany(staged.map((item) => item.applyRequest));
+      for (const outcome of batch.applies) {
+        const skill = outcome.request.skills[0];
+        if (!outcome.error) {
+          result.imported.push(skill);
+          continue;
+        }
+        result.failed.push({ skill, reason: outcome.error.message });
+        result.choices = Object.fromEntries(Object.entries(result.choices).filter(([name]) => name !== skill));
       }
     }
     this.backups.prune();
@@ -154,18 +179,21 @@ export class InitService {
   }
 
   /**
-   * Import one skill with its conflict decision applied. `choice` is a runtime
-   * dir (or any agent id sharing it) whose copy wins, or 'hub' to keep the hub
-   * copy and only back-symlink origins. Lock evidence (when the skill name
-   * matches an `npx skills` entry) upgrades the import from snapshot to
-   * update-managed in the same write (ADR-0011).
+   * Stage one skill's import with its conflict decision applied: content
+   * moves into the hub now; the registry write and the back-symlinking are
+   * returned for the batch commit. `choice` is a runtime dir (or any agent id
+   * sharing it) whose copy wins, or 'hub' to keep the hub copy and only
+   * back-symlink origins. Lock evidence (when the skill name matches an `npx
+   * skills` entry) upgrades the import from snapshot to update-managed in the
+   * same write (ADR-0011).
    */
-  private importResolved(skill: InitDiscoveredSkill, groups: EntityGroup[], choice: string | undefined, lockEntries: ReadonlyMap<SkillName, SkillLockEntry>) {
+  private stageImport(skill: InitDiscoveredSkill, groups: EntityGroup[], choice: string | undefined, lockEntries: ReadonlyMap<SkillName, SkillLockEntry>): StagedImport {
     assertSafeSkillName(skill.name);
     const hubHas = this.registry.skillExists(skill.name);
     const winnerGroup = choice && choice !== 'hub' ? this.groupForChoice(groups, choice, skill.name) : hubHas ? null : groups[0];
     const locations = groups.flat();
 
+    let registryPatch: StagedImport['registryPatch'] = null;
     if (winnerGroup) {
       if (hubHas) {
         // The runtime copy wins: preserve the hub entity before it is replaced.
@@ -175,16 +203,19 @@ export class InitService {
       // Copy through symlinks: the hub needs the entity's contents, not a link to it.
       this.fs.copyDirectoryContents(this.entityPathOf(winnerGroup[0].path), hubDir);
       const evidence = lockEntryToSource(lockEntries.get(skill.name));
-      this.registry.ensureEntry(skill.name, {
-        imported: true,
-        imported_at: new Date().toISOString(),
-        title: skill.title,
-        description: skill.description,
-        // Every origin's agents are this skill's desired consumers (catalog ids only).
-        consumers: this.agentsForLocations(locations),
-        // Adopted evidence replaces the default source-less shape; no evidence keeps the snapshot honest.
-        ...(evidence ? { source: evidence } : {}),
-      });
+      registryPatch = {
+        skill: skill.name,
+        patch: {
+          imported: true,
+          imported_at: new Date().toISOString(),
+          title: skill.title,
+          description: skill.description,
+          // Every origin's agents are this skill's desired consumers (catalog ids only).
+          consumers: this.agentsForLocations(locations),
+          // Adopted evidence replaces the default source-less shape; no evidence keeps the snapshot honest.
+          ...(evidence ? { source: evidence } : {}),
+        },
+      };
     }
     // Real directories are preserved as backups and vacated; symlinked entries are
     // simply removed — distribute lays a managed symlink down in every origin's place.
@@ -192,7 +223,8 @@ export class InitService {
       if (this.fs.kind(location.path) === 'symlink') this.fs.removeFileOrSymlink(location.path);
       else this.fs.move(location.path, this.backupDirFor(skill.name));
     }
-    this.distribute.apply({ to: 'user', skills: [skill.name], agents: this.agentsForLocations(locations), mode: 'symlink' });
+    const agents = this.agentsForLocations(locations);
+    return { skill: skill.name, registryPatch, applyRequest: { to: 'user', skills: [skill.name], agents, mode: 'symlink' } };
   }
 
   private assertPrefer(prefer: readonly string[] | undefined, scannedDirs: readonly string[]) {
