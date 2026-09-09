@@ -1,5 +1,6 @@
 import type { GitCloneOptions, GitLogEntry, GitPort } from '../core/ports/git.js';
 import { ShellRunner } from './shell-runner.js';
+import { HTTP1_RETRY_ENV, isRetryableTransportFailure } from './git-transport-retry.js';
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHALLOW_DEPTH = 1;
@@ -14,15 +15,35 @@ export class GitCli implements GitPort {
       return;
     }
     const args = ['clone', `--depth=${depth}`, ...(options.ref ? ['--branch', options.ref] : []), repoUrl, destination];
-    this.runner.runOrThrow('git', args);
+    this.runTransport('git', args);
   }
 
   /** `git clone` cannot target a bare SHA — init + fetch the commit shallow, then check it out (ADR-0013). */
   private fetchShallowCommit(repoUrl: string, destination: string, sha: string, depth: number): void {
     this.runner.runOrThrow('git', ['init', destination]);
     this.runner.runOrThrow('git', ['-C', destination, 'remote', 'add', 'origin', repoUrl]);
-    this.runner.runOrThrow('git', ['-C', destination, 'fetch', `--depth=${depth}`, 'origin', sha]);
+    this.runTransport('git', ['-C', destination, 'fetch', `--depth=${depth}`, 'origin', sha]);
     this.runner.runOrThrow('git', ['-C', destination, 'checkout', sha]);
+  }
+
+  /**
+   * Transport commands retry exactly once over HTTP/1.1 when the failure is
+   * network-class (ADR-0013); a failed retry rethrows the original error.
+   */
+  private runTransport(command: string, args: string[]): void {
+    let networkFailure: unknown;
+    try {
+      this.runner.runOrThrow(command, args);
+      return;
+    } catch (error) {
+      if (!isRetryableTransportFailure(error)) throw error;
+      networkFailure = error;
+    }
+    try {
+      this.runner.runOrThrow(command, args, { env: { ...HTTP1_RETRY_ENV } });
+    } catch {
+      throw networkFailure;
+    }
   }
 
   revParseHead(repoDir: string): string {

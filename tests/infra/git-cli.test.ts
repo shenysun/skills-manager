@@ -17,6 +17,42 @@ function recordingCli() {
   return { commands, cli: new GitCli(runner) };
 }
 
+const HTTP1_ENV = {
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'http.version',
+  GIT_CONFIG_VALUE_0: 'HTTP/1.1',
+};
+
+type RunnerCall = { command: string; args: string[]; options?: { env?: Record<string, string> } };
+
+/** Runner fake whose n-th `runOrThrow` throws the n-th scripted failure (undefined = success). */
+function scriptedCli(failures: ReadonlyArray<unknown>) {
+  const calls: RunnerCall[] = [];
+  const runner = {
+    run: (command: string, args: string[], options?: { cwd?: string }) => {
+      calls.push({ command, args, options });
+      return { status: 0, stdout: '', stderr: '' };
+    },
+    runOrThrow: (command: string, args: string[], options?: { cwd?: string; env?: Record<string, string> }) => {
+      calls.push({ command, args, options });
+      const failure = failures[calls.length - 1];
+      if (failure !== undefined) throw failure;
+      return '';
+    },
+  };
+  return { calls, cli: new GitCli(runner as never) };
+}
+
+const CURL_92 = new Error(
+  `Command failed: git clone --depth=1 ${URL} /tmp/repo\nfatal: unable to access '${URL}/': curl 92 HTTP/2 stream 0 was not closed cleanly: BEFORE_STREAM (err 99)`,
+);
+const CURL_56 = new Error(
+  `Command failed: git -C /tmp/repo fetch --depth=1 origin ${SHA}\nerror: RPC failed; curl 56 Recv failure: Connection reset by peer`,
+);
+const REPOSITORY_NOT_FOUND = new Error(
+  `Command failed: git clone --depth=1 ${URL} /tmp/repo\nERROR: Repository not found.\nfatal: Could not read from remote repository.`,
+);
+
 describe('GitCli.clone (shallow transport, ADR-0013)', () => {
   it('clones the default branch with depth 1 when no ref is given', () => {
     const { commands, cli } = recordingCli();
@@ -66,5 +102,54 @@ describe('GitCli.clone (shallow transport, ADR-0013)', () => {
     const fetch = recordingCli();
     fetch.cli.clone(URL, '/tmp/repo', { ref: SHA, depth: 5 });
     expect(fetch.commands).toContain(`git -C /tmp/repo fetch --depth=5 origin ${SHA}`);
+  });
+});
+
+describe('GitCli transport retry (HTTP/1.1 once, ticket 02 / ADR-0013)', () => {
+  it('retries a network-class clone failure exactly once with the HTTP/1.1 env injected', () => {
+    const { calls, cli } = scriptedCli([CURL_92]);
+    cli.clone(URL, '/tmp/repo');
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].options).toBeUndefined();
+    expect(calls[1].args).toEqual(calls[0].args);
+    expect(calls[1].options?.env).toEqual(HTTP1_ENV);
+  });
+
+  it('rethrows the original error when the HTTP/1.1 retry fails too', () => {
+    const { calls, cli } = scriptedCli([CURL_92, CURL_56]);
+    let thrown: unknown;
+    try {
+      cli.clone(URL, '/tmp/repo');
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(calls).toHaveLength(2);
+    expect(thrown).toBe(CURL_92);
+  });
+
+  it('does not retry deterministic failures such as repository-not-found', () => {
+    const { calls, cli } = scriptedCli([REPOSITORY_NOT_FOUND]);
+    expect(() => cli.clone(URL, '/tmp/repo')).toThrow(REPOSITORY_NOT_FOUND);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('retries only the fetch leg of the bare-SHA path and leaves checkout untouched', () => {
+    const { calls, cli } = scriptedCli([undefined, undefined, CURL_92]);
+    cli.clone(URL, '/tmp/repo', { ref: SHA });
+
+    expect(calls).toHaveLength(5);
+    expect(calls[2].args).toEqual(['-C', '/tmp/repo', 'fetch', '--depth=1', 'origin', SHA]);
+    expect(calls[3].args).toEqual(calls[2].args);
+    expect(calls[3].options?.env).toEqual(HTTP1_ENV);
+    expect(calls[4].args).toEqual(['-C', '/tmp/repo', 'checkout', SHA]);
+    expect(calls[4].options).toBeUndefined();
+  });
+
+  it('never retries local commands (init) even if their failure wording looks network-like', () => {
+    const { calls, cli } = scriptedCli([CURL_92]);
+    expect(() => cli.clone(URL, '/tmp/repo', { ref: SHA })).toThrow(CURL_92);
+    expect(calls).toHaveLength(1);
   });
 });

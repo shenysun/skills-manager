@@ -4,6 +4,12 @@ export type ProcessRunResult = {
   stderr: string;
 };
 
+export type ProcessRunOptions = {
+  cwd?: string;
+  /** Extra environment variables merged over the process environment (PATH etc. stay intact). */
+  env?: Record<string, string>;
+};
+
 export interface ProcessRunnerPort {
-  run(command: string, args: string[], options?: { cwd?: string }): ProcessRunResult;
+  run(command: string, args: string[], options?: ProcessRunOptions): ProcessRunResult;
 }
