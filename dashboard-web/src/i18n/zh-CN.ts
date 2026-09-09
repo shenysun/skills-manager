@@ -11,6 +11,8 @@ export default {
     updatable: '可更新',
     warningBroken: '⚠ 接入已断开',
     warningOutdated: '⚠ 副本过期',
+    detectionFailed: '检测失败',
+    detectionFailedHint: '更新检测没有完成,与「无更新」不同;失败原因见 hub 的 .skills/dashboard.log',
     agents: '{n} agents',
     projects: '{n} projects',
     unlinked: '未接入',

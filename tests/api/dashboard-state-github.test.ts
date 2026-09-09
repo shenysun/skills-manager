@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import YAML from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createDashboardApp } from '../../src/dashboard/server/main.js';
+import { createDashboardApp, type RemoteHeadResolver } from '../../src/dashboard/server/main.js';
 import { GitHubApiError, type GitHubApiPort, type RepoTree } from '../../src/core/ports/github-api.js';
 import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
 
@@ -37,6 +37,9 @@ let sourceRoot: string;
 let app: ReturnType<typeof createDashboardApp>;
 let calls: RecordedCall[];
 let responder: (call: RecordedCall) => RepoTree | GitHubApiError;
+/** What the injected remote-head resolver answers this test: a SHA, null (ref
+ *  resolved no head), or an Error it throws — the ls-remote transport outcome. */
+let remoteHeadOutcome: string | null | Error;
 
 beforeEach(async () => {
   root = mkdtempSync(path.join(tmpdir(), 'state-github-'));
@@ -49,8 +52,13 @@ beforeEach(async () => {
   }
   mkdirSync(path.join(userHome, '.claude'), { recursive: true });
   responder = () => repoTree('c0', {});
+  remoteHeadOutcome = 'r0';
   const fake = recordingGitHubApi((call) => responder(call));
   calls = fake.calls;
+  const remoteHead: RemoteHeadResolver = async () => {
+    if (remoteHeadOutcome instanceof Error) throw remoteHeadOutcome;
+    return remoteHeadOutcome;
+  };
   app = createDashboardApp({
     home,
     cwd: root,
@@ -62,6 +70,7 @@ beforeEach(async () => {
     open: false,
     projectRoot: path.resolve(import.meta.dirname, '..', '..'),
     githubApi: fake.port,
+    remoteHead,
   });
   await app.ready();
   const install = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['skills/alpha', 'skills/beta'], overwrite: true } });
@@ -96,6 +105,16 @@ function setGitSource(skill: string, source: Record<string, unknown>) {
 
 function rowOf(state: Awaited<ReturnType<typeof getState>>, name: string) {
   return state.skills.find((skill: { name: string }) => skill.name === name);
+}
+
+function dashboardLogPath() {
+  return path.join(home, '.skills', 'dashboard.log');
+}
+
+/** Parsed lines of the hub dashboard log, empty when the file does not exist yet. */
+function readDetectionLog(): Array<Record<string, unknown>> {
+  if (!existsSync(dashboardLogPath())) return [];
+  return readFileSync(dashboardLogPath(), 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line));
 }
 
 describe('GET /api/state GitHub update detection (ADR-0013: tree SHA anchor + per-source fan-in)', () => {
@@ -166,23 +185,109 @@ describe('GET /api/state GitHub update detection (ADR-0013: tree SHA anchor + pe
   });
 
   it('keeps non-GitHub git URLs off the Trees API (ls-remote path, legacy semantics)', async () => {
-    setGitSource('alpha', { type: 'git', url: 'https://gitlab.com/acme/skills.git', subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: 't-alpha' });
+    setGitSource('alpha', { type: 'git', url: 'https://gitlab.com/acme/skills.git', subpath: 'skills/alpha', ref: null, upstream_commit: 'r0', upstream_tree: 't-alpha' });
+    remoteHeadOutcome = 'r0';
     const state = await getState();
     expect(calls).toEqual([]);
-    // Unreachable non-GitHub remote stays quiet rather than crying wolf — the pre-ADR-0013 behaviour.
+    expect(rowOf(state, 'alpha').detection).toBe('ok');
     expect(rowOf(state, 'alpha').hasUpdate).toBe(false);
     expect(state.updateCount).toBe(0);
   });
 
-  it('keeps the rest of the payload when the GitHub API fails (transitional handling; ticket 06 adds the explicit state)', async () => {
+  it('keeps the rest of the payload when the GitHub API fails, marking the rows detection failed', async () => {
     setGitSource('alpha', { type: 'git', url: REPO_URL, subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: null });
     responder = () => new GitHubApiError('network', 'acme', 'skills', 'HEAD', 'api.github.com unreachable');
     const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('failed');
     expect(rowOf(state, 'alpha').hasUpdate).toBe(false);
     expect(state.updateCount).toBe(0);
     expect(rowOf(state, 'alpha').name).toBe('alpha');
     expect(state.skills).toHaveLength(2);
     // A failed detection must not calibrate either — no tree SHA was observed.
     expect(readRegistry().skills.alpha.source?.upstream_tree ?? null).toBeNull();
+  });
+});
+
+describe('GET /api/state detection failure visibility (ticket 06: explicit state + hub dashboard.log)', () => {
+  it('marks a successful comparison as ok — hasUpdate is a real diff again', async () => {
+    setGitSource('alpha', { type: 'git', url: REPO_URL, subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: 't-alpha' });
+    responder = () => repoTree('c1', { 'skills/alpha': 't-new' });
+    const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('ok');
+    expect(rowOf(state, 'alpha').hasUpdate).toBe(true);
+    expect(readDetectionLog()).toEqual([]);
+  });
+
+  it('fails one source without touching the rest: other rows stay ok with every field intact', async () => {
+    setGitSource('alpha', { type: 'git', url: REPO_URL, subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: null });
+    setGitSource('beta', { type: 'git', url: 'https://github.com/acme/other.git', subpath: 'skills/beta', ref: null, upstream_commit: 'c0', upstream_tree: 't-beta' });
+    responder = ({ repo }) => (repo === 'skills'
+      ? new GitHubApiError('rate_limited', 'acme', 'skills', 'HEAD', 'anonymous quota exhausted')
+      : repoTree('c0', { 'skills/beta': 't-beta' }));
+    const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('failed');
+    expect(rowOf(state, 'alpha').hasUpdate).toBe(false);
+    expect(rowOf(state, 'beta').detection).toBe('ok');
+    expect(rowOf(state, 'beta').hasUpdate).toBe(false);
+    // The untouched row still carries its full payload.
+    expect(rowOf(state, 'beta')).toMatchObject({ name: 'beta', category: expect.any(String), description: 'beta', staleCount: 0, warning: null });
+    expect(state.updateCount).toBe(0);
+  });
+
+  it('appends exactly one JSON line per failing GitHub source: timestamp, source, member skills, reason', async () => {
+    setGitSource('alpha', { type: 'git', url: REPO_URL, subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: 't-alpha' });
+    setGitSource('beta', { type: 'git', url: REPO_URL, subpath: 'skills/beta', ref: null, upstream_commit: 'c0', upstream_tree: 't-beta' });
+    responder = () => new GitHubApiError('timeout', 'acme', 'skills', 'HEAD', 'gh api timed out');
+    const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('failed');
+    expect(rowOf(state, 'beta').detection).toBe('failed');
+    const entries = readDetectionLog();
+    expect(entries).toHaveLength(1);
+    expect(Object.keys(entries[0]).sort()).toEqual(['error', 'skills', 'source', 'timestamp']);
+    expect(() => new Date(entries[0].timestamp as string).toISOString()).not.toThrow();
+    expect(entries[0].source).toBe('acme/skills@HEAD');
+    expect(entries[0].skills).toEqual(['alpha', 'beta']);
+    expect(entries[0].error).toEqual({ kind: 'timeout', message: 'gh api timed out' });
+  });
+
+  it('surfaces a non-GitHub ls-remote transport failure as an explicit failed row with a logged reason', async () => {
+    setGitSource('alpha', { type: 'git', url: 'https://gitlab.com/acme/skills.git', subpath: 'skills/alpha', ref: 'main', upstream_commit: 'c0', upstream_tree: 't-alpha' });
+    remoteHeadOutcome = new Error('curl 56 connection reset');
+    const state = await getState();
+    expect(calls).toEqual([]);
+    expect(rowOf(state, 'alpha').detection).toBe('failed');
+    expect(rowOf(state, 'alpha').hasUpdate).toBe(false);
+    const entries = readDetectionLog();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].source).toBe('https://gitlab.com/acme/skills.git@main');
+    expect(entries[0].skills).toEqual(['alpha']);
+    expect(entries[0].error).toEqual({ kind: 'ls_remote', message: 'curl 56 connection reset' });
+  });
+
+  it('treats an ls-remote that resolves no head as a failure, not a quiet "no update"', async () => {
+    setGitSource('alpha', { type: 'git', url: 'https://gitlab.com/acme/skills.git', subpath: 'skills/alpha', ref: 'gone-branch', upstream_commit: 'c0', upstream_tree: 't-alpha' });
+    remoteHeadOutcome = null;
+    const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('failed');
+    expect(readDetectionLog()).toHaveLength(1);
+    expect((readDetectionLog()[0].error as { kind: string }).kind).toBe('ls_remote');
+  });
+
+  it('reports skipped when a non-GitHub entry has no upstream commit to compare against', async () => {
+    setGitSource('alpha', { type: 'git', url: 'https://gitlab.com/acme/skills.git', subpath: 'skills/alpha', ref: null });
+    remoteHeadOutcome = 'r0';
+    const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('skipped');
+    expect(rowOf(state, 'alpha').hasUpdate).toBe(false);
+    expect(readDetectionLog()).toEqual([]);
+  });
+
+  it('lights hasUpdate on the ls-remote path when the remote commit really moved', async () => {
+    setGitSource('alpha', { type: 'git', url: 'https://gitlab.com/acme/skills.git', subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: 't-alpha' });
+    remoteHeadOutcome = 'c1';
+    const state = await getState();
+    expect(rowOf(state, 'alpha').detection).toBe('ok');
+    expect(rowOf(state, 'alpha').hasUpdate).toBe(true);
+    expect(state.updateCount).toBe(1);
   });
 });

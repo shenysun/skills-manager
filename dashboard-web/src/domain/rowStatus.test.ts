@@ -7,17 +7,24 @@ const projects = (...roots: string[]): DistributionTarget[] =>
 
 const row = (overrides: Partial<Parameters<typeof deriveRowStatus>[0]> = {}) => ({
   hasUpdate: false,
+  detection: 'ok' as const,
   warning: null,
   distributedAgents: [],
   distribution: [],
   ...overrides,
 });
 
-describe('deriveRowStatus (four single-page row states)', () => {
+describe('deriveRowStatus (single-page row states)', () => {
   it('warns first: a health warning outranks everything else', () => {
     expect(deriveRowStatus(row({ warning: 'Outdated copy: /x', hasUpdate: true, distributedAgents: ['zed'] }))).toEqual({
       kind: 'warning',
     });
+  });
+
+  it('shows detection failed below a warning but above every not-updated state', () => {
+    expect(deriveRowStatus(row({ detection: 'failed', distributedAgents: ['zed'] }))).toEqual({ kind: 'detectionFailed' });
+    expect(deriveRowStatus(row({ warning: 'broken-link', detection: 'failed' }))).toEqual({ kind: 'warning' });
+    expect(deriveRowStatus(row())).toEqual({ kind: 'unlinked' });
   });
 
   it('marks an updatable skill when healthy', () => {
