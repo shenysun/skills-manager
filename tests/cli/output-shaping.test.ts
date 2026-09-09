@@ -66,3 +66,38 @@ describe('catalog info detected detail (manager-skill-first ticket 04)', () => {
     expect(claude.runtimeDir).toBe(path.join(userHome, '.claude', 'skills'));
   });
 });
+
+describe('update --check (manager-skill-first ticket 03)', () => {
+  it('reports a local-source skill as stale after its source changes, fresh otherwise', () => {
+    // Local sources hash the source tree against the hub fingerprint — no
+    // network, which is exactly why this walkthrough stays hermetic.
+    const source = path.join(root, 'source2');
+    mkdirSync(path.join(source, 'skills', 'watched'), { recursive: true });
+    writeFileSync(path.join(source, 'skills', 'watched', 'SKILL.md'), '---\nname: watched\ndescription: v1\n---\n# v1\n');
+    run(['add', source, '--skill', 'watched', '--yes']);
+
+    const fresh = json(run(['update', '--check']));
+    expect(fresh.checked).toBeGreaterThan(0);
+    expect(fresh.stale.map((row: { skill: string }) => row.skill)).not.toContain('watched');
+    expect(fresh.upToDate).toContain('watched');
+
+    writeFileSync(path.join(source, 'skills', 'watched', 'SKILL.md'), '---\nname: watched\ndescription: v2\n---\n# v2\n');
+    const stale = json(run(['update', '--check']));
+    expect(stale.stale.map((row: { skill: string }) => row.skill)).toContain('watched');
+  });
+
+  it('gives each failed row a pointer to the detection log', () => {
+    // A local source whose directory vanished fails detection and must point
+    // the conversation at the log instead of failing silently.
+    const source = path.join(root, 'source3');
+    mkdirSync(path.join(source, 'skills', 'ghost'), { recursive: true });
+    writeFileSync(path.join(source, 'skills', 'ghost', 'SKILL.md'), '---\nname: ghost\n---\n# g\n');
+    run(['add', source, '--skill', 'ghost', '--yes']);
+    rmSync(source, { recursive: true, force: true });
+
+    const result = json(run(['update', '--check']));
+    const ghost = result.failed.find((row: { skill: string }) => row.skill === 'ghost');
+    expect(ghost).toBeDefined();
+    expect(ghost.log).toContain('dashboard.log');
+  });
+});

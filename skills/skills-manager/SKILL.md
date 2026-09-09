@@ -10,7 +10,7 @@ The user's skills live in a single **hub** (`~/.skills-manager` by default; over
 Key vocabulary you will need when reading output:
 
 - **Source**: where a skill came from — `{type: git|local, url, subpath, ref, …}` on the registry entry. A skill with a `url` (+ `subpath`) is **updatable`; without one it is a *snapshot*.
-- **Update detection**: the dashboard's 可更新 check. GitHub sources compare the skill sub-directory's tree SHA (`source.upstream_tree`) against the GitHub Trees API — one call per repo (shared by all its skills), TTL-cached, through the logged-in `gh` CLI when present (5000 req/h) or anonymous HTTPS otherwise (60 req/h). A row reading **检测失败 / detection failed** means the check did not complete — that is *not* "no update"; every failure appends a JSON line to `<home>/.skills/dashboard.log`.
+- **Update detection**: the freshness engine behind `update --check` and the dashboard's 可更新 check. GitHub sources compare the skill sub-directory's tree SHA (`source.upstream_tree`) against the GitHub Trees API — one call per repo (shared by all its skills), TTL-cached, through the logged-in `gh` CLI when present (5000 req/h) or anonymous HTTPS otherwise (60 req/h). A row reading **检测失败 / detection failed** means the check did not complete — that is *not* "no update"; every failure appends a JSON line to `<home>/.skills/dashboard.log`.
 - **`imported: true`**: how the skill *entered* the hub (via `init`), orthogonal to whether it has a source.
 - **Detected agents**: the agent set `npx skills` would target on this machine, resolved locally from the bundled catalog snapshot.
 
@@ -81,14 +81,15 @@ Omitting `--agent` targets the **detected set** — which can be dozens of agent
 ### Update from sources
 
 ```bash
-skills-manager update --plan                      # no args = plan (also this)
+skills-manager update --check                     # freshness detection: stale / upToDate / failed / skipped
+skills-manager update --plan                      # candidates only (url + subpath) — no freshness check
 skills-manager update --skill <name>
 skills-manager update --source <key>              # one repo group from the plan
 ```
 
 Only skills with `source.url` **and** `source.subpath` are candidates — which is why backfill (below) always writes both.
 
-`--plan` lists candidates only — it does **not** check upstream. "Is anything actually new" is answered by the dashboard's 可更新 detection, not by plan output; don't present a plan entry as "has an update".
+`--check` answers "is anything actually new": it compares each candidate's anchored tree SHA against the GitHub Trees API (one call per repo, through the logged-in `gh` when present), so present its `stale` list as the real update set. `failed` rows mean the check did not complete — each row carries the log path (`<home>/.skills/dashboard.log`) with the timestamped cause; usual suspects are network flaps and, without a logged-in `gh`, the 60 req/h anonymous API limit. `--plan` lists candidates without checking — don't present a plan entry as "has an update".
 
 Git installs and updates are shallow (`--depth 1`); a network-class clone failure (HTTP/2 stream reset and friends) is retried once over HTTP/1.1 automatically. Detection anchors on the skill sub-directory's tree SHA, so an unrelated upstream commit (a README bump) does not flag an update. When the dashboard shows 检测失败 (detection failed), read `<home>/.skills/dashboard.log` for the timestamped cause — usual suspects are network flaps and, without a logged-in `gh`, the 60 req/h anonymous API limit.
 

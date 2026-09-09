@@ -5,6 +5,10 @@ import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runti
 import { normalizeGitSourceUrl } from '../core/services/source-service.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
+import { NodeFileSystem } from '../infra/fs-skill-home.js';
+import { GitHubApiClient } from '../infra/github-api-client.js';
+import { DetectionService } from '../core/services/detection-service.js';
+import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
@@ -301,9 +305,29 @@ program.command('update')
   .description('Update skills from registry sources')
   .option('-s, --skill <skill...>', 'skill(s) to update')
   .option('--source <key>', 'source group key from updates plan')
-  .option('--plan', 'print update plan')
-  .action((opts, cmd) => {
+  .option('--plan', 'print update plan (candidates only)')
+  .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill')
+  .action(async (opts, cmd) => {
     const s = services(cmd);
+    if (opts.check) {
+      const detection = new DetectionService({ githubApi: new GitHubApiClient(), fs: new NodeFileSystem() });
+      const listed = s.registry.listSkills({ includeArchived: false });
+      const outcomes = await detection.detect(s, listed);
+      const detectionLog = path.join(s.resolution.root, '.skills', 'dashboard.log');
+      const stale: Array<{ skill: string; url: string }> = [];
+      const failed: Array<{ skill: string; log: string }> = [];
+      const upToDate: string[] = [];
+      const skipped: string[] = [];
+      for (const skill of listed) {
+        const outcome = outcomes.get(skill.name);
+        if (!outcome) continue;
+        if (outcome.detection === 'failed') failed.push({ skill: skill.name, log: detectionLog });
+        else if (outcome.detection === 'skipped') skipped.push(skill.name);
+        else if (outcome.hasUpdate) stale.push({ skill: skill.name, url: skill.source.url ?? '' });
+        else upToDate.push(skill.name);
+      }
+      return print({ checked: stale.length + failed.length + upToDate.length + skipped.length, stale, upToDate, failed, skipped });
+    }
     if (opts.plan || (!opts.skill && !opts.source)) return print(s.update.plan());
     const result = opts.source ? s.update.updateSource(opts.source) : s.update.updateSkills(opts.skill);
     s.activity.record({ action: 'cli-update', summary: `Updated ${result.updated.join(', ')}`, details: result });

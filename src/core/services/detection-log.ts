@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { FileSystemPort } from '../../core/ports/filesystem.js';
+import type { FileSystemPort } from '../ports/filesystem.js';
 
 export type DetectionFailureEntry = {
   /** Source identity: `owner/repo@ref`, a git URL (with `@ref` when pinned), or a local path. */
