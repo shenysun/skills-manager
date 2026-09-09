@@ -187,3 +187,58 @@ describe('SourceService temp lifecycle (manager-skill-first ticket 02)', () => {
     expect(createNodeFileSystem().kind(fresh)).toBe('directory');
   });
 });
+
+describe('checkout failure hygiene (adversary H1/H2/M2)', () => {
+  it('cleans the temp dir and strips its path from the error when clone fails (H1/M2)', () => {
+    let cloneDestination = '';
+    const git: GitPort = {
+      clone: (_url, destination) => {
+        cloneDestination = destination;
+        throw new Error(`Command failed: git clone --depth=1 https://github.com/owner/repo.git ${destination}\nfatal: repository not found`);
+      },
+      revParseHead: () => SHA,
+      revParseTree: () => TREE,
+      listRemoteHeads: () => [],
+      statusShort: () => '',
+      log: () => [],
+    };
+    const s = service(git);
+    let thrown: Error | undefined;
+    try {
+      s.withCheckout('https://github.com/owner/repo.git', undefined, () => 'unused');
+    } catch (error) {
+      thrown = error as Error;
+    }
+    // The clone itself failed — temp cleaned (M2) and the machine-local clone
+    // path never crosses into the conversation layer (H1).
+    expect(thrown?.message).not.toContain(cloneDestination);
+    expect(thrown?.message).toContain('<temp-checkout>');
+    expect(thrown?.message).toMatch(/fatal: repository not found/);
+    expect(createNodeFileSystem().kind(path.dirname(cloneDestination))).toBe('missing');
+  });
+
+  it('sweep skips entries it cannot delete instead of failing checkout (H2)', () => {
+    const realFs = createNodeFileSystem();
+    const tempRoot = path.join(root, 'tmp');
+    const poisoned = path.join(tempRoot, 'skills-source-poison');
+    mkdirSync(poisoned, { recursive: true });
+    utimesSync(poisoned, new Date(Date.now() - 48 * 3600_000), new Date(Date.now() - 48 * 3600_000));
+    // Proxy (not spread): NodeFileSystem methods live on the prototype.
+    const fs: typeof realFs = new Proxy(realFs, {
+      get(target, prop, receiver) {
+        if (prop === 'removeTree') {
+          return (p: string) => {
+            if (p === poisoned) throw new Error('EPERM, Operation not permitted');
+            return target.removeTree(p);
+          };
+        }
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const { git } = spyGit();
+    const s = new SourceService(fs, git, tempRoot);
+    // Must not throw despite the undeletable stale entry.
+    s.checkout('https://github.com/owner/repo.git');
+  });
+});

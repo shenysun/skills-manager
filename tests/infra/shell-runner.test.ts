@@ -51,3 +51,22 @@ describe('ShellRunner timeout (ticket 08)', () => {
     expect(result.stdout.trim()).toBe('done');
   });
 });
+
+describe('ShellRunner kill-source discrimination (adversary M1/L10)', () => {
+  it('reports an external signal kill as a signal failure, not a timeout', () => {
+    const runner = new ShellRunner();
+    let thrown: unknown;
+    try {
+      runner.runOrThrow(process.execPath, ['-e', 'process.kill(process.pid, "SIGKILL")']);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).not.toBeInstanceOf(CommandTimeoutError);
+    expect((thrown as Error).message).toContain('SIGKILL');
+  });
+
+  it('explains a missing command instead of an empty failure (ENOENT)', () => {
+    const runner = new ShellRunner();
+    expect(() => runner.runOrThrow('definitely-not-a-command-xyz', [])).toThrow(/not a command|ENOENT|spawn/i);
+  });
+});

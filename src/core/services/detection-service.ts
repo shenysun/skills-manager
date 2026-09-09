@@ -6,6 +6,7 @@ import { GitHubApiError, type GitHubApiPort, type RepoTree } from '../ports/gith
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { parseGitHubRepoRef } from './source-service.js';
 import { appendDetectionFailure } from './detection-log.js';
+export { detectionLogPath } from './detection-log.js';
 
 const execFileAsync = promisify(execFileCb);
 

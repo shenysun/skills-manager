@@ -40,7 +40,7 @@ describe('list --brief (manager-skill-first ticket 04)', () => {
     expect(result.status, result.stderr).toBe(0);
     const rows = json(result);
     expect(rows).toHaveLength(1);
-    expect(Object.keys(rows[0]).sort()).toEqual(['category', 'name', 'title', 'updatable']);
+    expect(Object.keys(rows[0]).sort()).toEqual(['archived', 'category', 'name', 'title', 'updatable']);
     expect(rows[0]).toMatchObject({ name: 'alpha', title: 'Alpha' });
     expect(JSON.stringify(rows)).not.toContain('very long description');
   });
@@ -95,9 +95,35 @@ describe('update --check (manager-skill-first ticket 03)', () => {
     run(['add', source, '--skill', 'ghost', '--yes']);
     rmSync(source, { recursive: true, force: true });
 
-    const result = json(run(['update', '--check']));
+    const raw = run(['update', '--check']);
+    const result = json(raw);
     const ghost = result.failed.find((row: { skill: string }) => row.skill === 'ghost');
     expect(ghost).toBeDefined();
     expect(ghost.log).toContain('dashboard.log');
+    // A failed check is a failed check: scripts must see it in the exit code (M6).
+    expect(raw.status, 'failed detection must exit non-zero').toBe(1);
+  });
+});
+
+describe('update --check buckets and exit code (adversary M4/M6/L6)', () => {
+  it('counts source-less skills as skipped instead of dropping them silently (M4)', () => {
+    const source = path.join(root, 'source4');
+    mkdirSync(path.join(source, 'skills', 'sourced'), { recursive: true });
+    writeFileSync(path.join(source, 'skills', 'sourced', 'SKILL.md'), '---\nname: sourced\n---\n# s\n');
+    run(['add', source, '--skill', 'sourced', '--yes']);
+    // Plant a source-less registry entity (an imported snapshot shape).
+    const bare = path.join(home, 'skills', 'snapshot');
+    mkdirSync(bare, { recursive: true });
+    writeFileSync(path.join(bare, 'SKILL.md'), '---\nname: snapshot\ndescription: x\n---\n# s\n');
+    run(['edit', 'snapshot', '--title', 'Snapshot']);
+
+    const result = json(run(['update', '--check']));
+    expect(result.skipped).toContain('snapshot');
+    expect(result.checked).toBe(result.stale.length + result.upToDate.length + result.failed.length + result.skipped.length);
+  });
+
+  it('marks --brief rows with their archived flag (L6)', () => {
+    const rows = json(run(['list', '--brief', '--include-archived']));
+    expect(rows.every((row: { archived: unknown }) => typeof row.archived === 'boolean')).toBe(true);
   });
 });

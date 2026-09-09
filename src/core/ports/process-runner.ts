@@ -2,8 +2,10 @@ export type ProcessRunResult = {
   status: number | null;
   stdout: string;
   stderr: string;
-  /** Signal that killed the process when it never exited on its own (spawnSync timeout). */
+  /** Signal that killed the process when it never exited on its own (spawnSync timeout or an external kill). */
   signal?: string;
+  /** Spawn-level failure (ENOENT when the binary is missing, ETIMEDOUT on a spawnSync timeout) — kept so callers can tell kill sources apart. */
+  spawnError?: { code: string | undefined; message: string };
 };
 
 export type ProcessRunOptions = {

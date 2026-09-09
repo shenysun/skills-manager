@@ -48,6 +48,17 @@ export function parseGitHubRepoRef(input: string): { owner: string; repo: string
   return null;
 }
 
+/** Swap the temp checkout path out of an error message before it reaches the
+ *  conversation layer (adversary H1): the diagnostic value lives in git's
+ *  stderr, not in the machine-local clone destination. */
+function redactCheckoutPath(error: unknown, repoDir: string): unknown {
+  if (error instanceof Error) {
+    const message = error.message.split(repoDir).join('<temp-checkout>');
+    if (message !== error.message) return new Error(message);
+  }
+  return error;
+}
+
 export class SourceService {
   constructor(private readonly fs: FileSystemPort, private readonly git: GitPort, private readonly tempRoot = os.tmpdir()) {}
 
@@ -88,23 +99,37 @@ export class SourceService {
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
     const repoDir = path.join(this.tempRoot, `skills-source-${randomUUID()}`, 'repo');
     this.fs.makeDirectory(path.dirname(repoDir));
-    // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
-    this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
-    const commit = this.git.revParseHead(repoDir);
-    return { ...normalized, ...tree, repoDir, commit };
+    try {
+      // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
+      this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
+      const commit = this.git.revParseHead(repoDir);
+      return { ...normalized, ...tree, repoDir, commit };
+    } catch (error) {
+      // The clone never became usable — clean the half-built temp now (adversary M2),
+      // redact its path from the message (H1), rethrow.
+      this.fs.removeTree(path.dirname(repoDir));
+      throw redactCheckoutPath(error, repoDir);
+    }
   }
 
   /**
    * Checkout scoped to a callback: the temp clone is removed when the callback
-   * returns or throws (local sources pass through untouched). Callers that
-   * hold a checkout beyond their turn must clean up with `release` instead —
-   * before this, every checkout leaked its `skills-source-*` dir (ticket
+   * returns or throws (local sources pass through untouched). Errors crossing
+   * out have the checkout path redacted (adversary H1). Callers that hold a
+   * checkout beyond their turn must clean up with `release` instead — before
+   * this, every checkout leaked its `skills-source-*` dir (ticket
    * manager-skill-first/02).
+   *
+   * The callback must be synchronous: an async callback's finally fires when
+   * the promise is *created*, deleting the tree under the awaiting work
+   * (adversary L4). The type cannot forbid it — the discipline is documented.
    */
   withCheckout<T>(source: string, forcedRef: string | undefined, use: (checkout: SourceCheckout) => T): T {
     const checkout = this.checkout(source, forcedRef);
     try {
       return use(checkout);
+    } catch (error) {
+      throw redactCheckoutPath(error, checkout.repoDir);
     } finally {
       this.release(checkout);
     }
@@ -121,7 +146,9 @@ export class SourceService {
   /**
    * Remove `skills-source-*` dirs abandoned by earlier runs (crashes, and any
    * predating the withCheckout lifecycle). The 24h age floor keeps concurrent
-   * processes' active checkouts safe.
+   * processes' active checkouts safe. An undeletable entry (foreign owner,
+   * locked flags) is skipped, never fatal (adversary H2) — one poisoned dir
+   * must not take down every git-source command on the machine.
    */
   private sweepStaleCheckouts(): void {
     if (this.fs.kind(this.tempRoot) !== 'directory') return;
@@ -130,7 +157,13 @@ export class SourceService {
       if (!entry.name.startsWith('skills-source-')) continue;
       const dir = path.join(this.tempRoot, entry.name);
       const modified = this.fs.modifiedAt(dir);
-      if (modified > 0 && modified < cutoff) this.fs.removeTree(dir);
+      if (modified > 0 && modified < cutoff) {
+        try {
+          this.fs.removeTree(dir);
+        } catch {
+          /* next run sweeps again once the entry becomes deletable */
+        }
+      }
     }
   }
 

@@ -7,7 +7,7 @@ import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
 import { NodeFileSystem } from '../infra/fs-skill-home.js';
 import { GitHubApiClient } from '../infra/github-api-client.js';
-import { DetectionService } from '../core/services/detection-service.js';
+import { DetectionService, detectionLogPath } from '../core/services/detection-service.js';
 import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 
@@ -274,6 +274,7 @@ program.command('list')
       title: row.title,
       category: row.category,
       updatable: Boolean(row.source?.url && row.source?.subpath),
+      archived: Boolean(row.archived),
     })));
   });
 
@@ -306,27 +307,32 @@ program.command('update')
   .option('-s, --skill <skill...>', 'skill(s) to update')
   .option('--source <key>', 'source group key from updates plan')
   .option('--plan', 'print update plan (candidates only)')
-  .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill')
+  .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill (uncalibrated entries adopt their observed anchor, ADR-0013)')
   .action(async (opts, cmd) => {
     const s = services(cmd);
     if (opts.check) {
       const detection = new DetectionService({ githubApi: new GitHubApiClient(), fs: new NodeFileSystem() });
       const listed = s.registry.listSkills({ includeArchived: false });
       const outcomes = await detection.detect(s, listed);
-      const detectionLog = path.join(s.resolution.root, '.skills', 'dashboard.log');
+      const detectionLog = detectionLogPath(s.resolution.root);
       const stale: Array<{ skill: string; url: string }> = [];
       const failed: Array<{ skill: string; log: string }> = [];
       const upToDate: string[] = [];
       const skipped: string[] = [];
       for (const skill of listed) {
         const outcome = outcomes.get(skill.name);
-        if (!outcome) continue;
+        // No outcome = not part of this round (source-less rows and friends):
+        // counted as skipped, same wording the dashboard uses — never dropped
+        // silently (adversary M4).
+        if (!outcome || outcome.detection === 'skipped') { skipped.push(skill.name); continue; }
         if (outcome.detection === 'failed') failed.push({ skill: skill.name, log: detectionLog });
-        else if (outcome.detection === 'skipped') skipped.push(skill.name);
         else if (outcome.hasUpdate) stale.push({ skill: skill.name, url: skill.source.url ?? '' });
         else upToDate.push(skill.name);
       }
-      return print({ checked: stale.length + failed.length + upToDate.length + skipped.length, stale, upToDate, failed, skipped });
+      print({ checked: stale.length + failed.length + upToDate.length + skipped.length, stale, upToDate, failed, skipped });
+      // A failed check is a failed check — scripts read the exit code (adversary M6).
+      if (failed.length > 0) process.exitCode = 1;
+      return;
     }
     if (opts.plan || (!opts.skill && !opts.source)) return print(s.update.plan());
     const result = opts.source ? s.update.updateSource(opts.source) : s.update.updateSkills(opts.skill);

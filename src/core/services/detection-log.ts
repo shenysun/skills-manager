@@ -15,6 +15,12 @@ export type DetectionFailureEntry = {
  *  line per detection failure. Append-only, low-frequency, never rotated and
  *  never read back — it exists so "the web update never finished" has a trace.
  *  A logging failure must not break /api/state: it lands on stderr instead. */
+
+/** The single place that knows the log's path inside a hub root. */
+export function detectionLogPath(homeRoot: string): string {
+  return path.join(homeRoot, '.skills', 'dashboard.log');
+}
+
 export function appendDetectionFailure(fs: FileSystemPort, homeRoot: string, entry: DetectionFailureEntry): void {
   const line = JSON.stringify({
     timestamp: new Date().toISOString(),
@@ -23,7 +29,7 @@ export function appendDetectionFailure(fs: FileSystemPort, homeRoot: string, ent
     error: { kind: entry.kind, message: entry.message },
   });
   try {
-    fs.appendText(path.join(homeRoot, '.skills', 'dashboard.log'), `${line}\n`);
+    fs.appendText(detectionLogPath(homeRoot), `${line}\n`);
   } catch (error) {
     console.error(`[dashboard] failed to append detection log for ${entry.source}: ${error instanceof Error ? error.message : String(error)}`);
   }

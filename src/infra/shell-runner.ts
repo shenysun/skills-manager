@@ -28,13 +28,25 @@ export class ShellRunner implements ProcessRunnerPort {
       stdout: result.stdout || '',
       stderr: result.stderr || '',
       ...(result.signal ? { signal: result.signal } : {}),
+      ...(result.error ? { spawnError: { code: (result.error as NodeJS.ErrnoException).code, message: result.error.message } } : {}),
     };
   }
 
   runOrThrow(command: string, args: string[], options: ProcessRunOptions = {}) {
     const result = this.run(command, args, options);
-    if (result.status === null && result.signal) throw new CommandTimeoutError(command, args, options.timeoutMs ?? 0);
-    if (result.status !== 0) throw new Error(`Command failed: ${command} ${args.join(' ')}\n${result.stderr || result.stdout}`);
+    if (result.status === null && result.signal) {
+      // Only a spawnSync timeout (ETIMEDOUT) is a real budget kill; any other
+      // signal death — OOM killer, external kill — must not be sold as one
+      // (adversary M1).
+      if (result.spawnError?.code === 'ETIMEDOUT') {
+        throw new CommandTimeoutError(command, args, options.timeoutMs ?? 0);
+      }
+      throw new Error(`Command killed by signal ${result.signal}: ${command} ${args.join(' ')}`);
+    }
+    if (result.status !== 0) {
+      const cause = result.stderr || result.stdout || (result.spawnError ? `${result.spawnError.code ?? ''} ${result.spawnError.message}` : '');
+      throw new Error(`Command failed: ${command} ${args.join(' ')}\n${cause}`);
+    }
     return result.stdout.trim();
   }
 }

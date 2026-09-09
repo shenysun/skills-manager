@@ -67,7 +67,7 @@ export class GitCli implements GitPort {
         timeoutMs: this.remainingMs(deadline),
       });
     } catch (error) {
-      if (error instanceof CommandTimeoutError) throw this.transportTimeout(error);
+      if (error instanceof CommandTimeoutError) throw this.transportTimeout(error, networkFailure);
       throw networkFailure;
     }
   }
@@ -77,17 +77,24 @@ export class GitCli implements GitPort {
     return Math.max(1, deadline - this.clock());
   }
 
-  private transportTimeout(error: CommandTimeoutError): Error {
+  /** The retry's own timeout keeps the original network failure in the message —
+   *  "timed out after 1ms" alone would hide why the first attempt died (adversary L1). */
+  private transportTimeout(error: CommandTimeoutError, cause?: unknown): Error {
+    const causeLine = cause instanceof Error
+      ? `Original failure before the budget ran out: ${cause.message.split('\n')[0]}\n`
+      : '';
     return new Error(
-      `${error.message}\n` +
+      `${error.message}\n${causeLine}` +
         'The git transport stalled. Raise SKILLS_MANAGER_CLONE_TIMEOUT_MS (milliseconds) ' +
         'or clone the repository manually and pass the local path instead.',
     );
   }
 
+  /** Strict digit-string parsing: Number("1.0") is the integer 1, which would
+   *  accept a 1ms budget through the back door (adversary L2). */
   private cloneTimeoutMs(): number {
-    const raw = Number(this.env.SKILLS_MANAGER_CLONE_TIMEOUT_MS);
-    return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_CLONE_TIMEOUT_MS;
+    const raw = this.env.SKILLS_MANAGER_CLONE_TIMEOUT_MS;
+    return typeof raw === 'string' && /^\d+$/.test(raw) && Number(raw) > 0 ? Number(raw) : DEFAULT_CLONE_TIMEOUT_MS;
   }
 
   revParseHead(repoDir: string): string {
