@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-10 (manager-skill-first)
+
+- **manager skill 成为产品正门**（ADR-0014）：`npx skills-manager-cli` 不带子命令即 bootstrap——建 hub → 从 npm 包内副本种 manager skill（以发布 tag `v<version>` 作为 source 戳，tree-SHA 更新检测照常可用）→ 挂载（symlink）到你选择的 agent → 打印起始提示词（「帮我看看我的 skills：有哪些、装到哪些 agent 了、有没有能更新的」）。幂等；**永不导入**——导入存量 runtime skills 是装完后通过 manager skill 在对话里完成的动作，bootstrap 只提示发现数量。
+- **挂载选择**：TTY 下对检测到的 agent 弹多选（默认全勾，↑↓/space/a/enter；`--agent` 跳过提问），非 TTY 挂到全部检测到的 agent；一个都没检测到时照样建 hub + 种 skill 并提示之后怎么挂。CLI 的唯一交互时刻，其余命令保持纯 flag 非交互。
+- **`ManagerSkillService` 自检刷新**：registry 条目新增种子指纹 `source.baseline_hash`——CLI 每次运行对比包内副本与 hub 副本，仍然归我们管（baseline 匹配）且不是降级（`compareDateVersions` 按段比较日期版本）时静默刷新；用户改过或从别处装的副本视为外来物，不碰。刷新提示走 stderr，stdout 保持纯 JSON 可解析。
+- **单一 hub 入口**：隐式建 hub 收敛为 bootstrap 独有——`web` 及其他命令在默认 hub（`~/.skills-manager`）缺失时报友好错误并指引 bootstrap，不再静默创建；显式 `--home` / `SKILL_HOME` 仍是操作者声明，照旧确保。
+- **防吞拼错的子命令**：注册 no-arg action 后 commander 会把未知子命令当参数传进来，已显式报 `unknown command` 而不是静默跑 bootstrap。
+- **SKILL.md 增加 First-run / 空库引导节**：第一次对话先看状态、只提一个动作、等确认；并修正「CLI 非交互」表述（bootstrap 多选是唯一例外）。
+- **文档 skill-first 重写**（README / GETTING_STARTED / CLI，双语）：hero 一条 npx 命令 + 提示词；工作原理图（agent ⇄ manager skill ⇄ hub ⇄ runtime）；web 降级为可选段（不再建 hub）；删除 GitHub `add` 两步装 manager skill 的指引；`npm i -g` 缩为尾注。
+- 测试 +18：服务级（种子/幂等/刷新/外来物保护/防降级/版本比较/缺副本报错）与 CLI 级（bootstrap 全链路、幂等重跑、检测挂载 symlink、报告而不导入、no-arg 默认 hub、单入口守卫 list+web、`--force` 替换外来 runtime 副本）。
+
 ## 2026-09-09 (init 批量化 + CLI 懒加载)
 
 - **init 导入消除 O(N²)**（用户反馈「初始化特别慢」修复）：诊断确认非 Node.js 性能（CPU profile：V8/GC 仅 ~1.4%），根因是 init 对每个 skill 单独调一次 `distribute.apply`——每次 restore-point 快照为当时已导入的全部 entry 重建 symlink（实测 400 位置导入 15.8s，hub 残留 150 个快照目录、11,175 个 symlink 且永久累积）；同时每 skill 全量读写 registry.yaml 与 distributions.jsonl，字节量随 N 平方增长。
