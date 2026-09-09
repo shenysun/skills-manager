@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-09 (init 批量化 + CLI 懒加载)
+
+- **init 导入消除 O(N²)**（用户反馈「初始化特别慢」修复）：诊断确认非 Node.js 性能（CPU profile：V8/GC 仅 ~1.4%），根因是 init 对每个 skill 单独调一次 `distribute.apply`——每次 restore-point 快照为当时已导入的全部 entry 重建 symlink（实测 400 位置导入 15.8s，hub 残留 150 个快照目录、11,175 个 symlink 且永久累积）；同时每 skill 全量读写 registry.yaml 与 distributions.jsonl，字节量随 N 平方增长。
+- **`DistributeService.applyMany`**：批内一次 restore point、一次 index 读、一次 index 写；per-request 校验与失败隔离（一个坏请求不炸整批）。`apply` 变单请求包装，签名与抛错契约不变，全部现有调用方零改动。restore point 保留最新 5 个（原无限累积）。
+- **`RegistryService.ensureEntries` + `InitService` 两阶段**：N 条目共享一次 registry load/save；init 拆为「内容搬移（per-skill 隔离）→ 一次批量提交」，失败语义不变（`failed` 数组、`choices` 剔除）。批量导入只产生一个「init 前状态」restore point，rollback 语义更完整。
+- **CLI 懒加载 dashboard 依赖**：`web` 命令 action 内动态 import fastify/shiki/markdown-it，其余命令零加载。
+- **效果**：init apply（4 目录 × 100 skills）15.84s → 0.64s（24.7×，边际 ~1.5ms/位置，线性）；`--version` 0.63s → 0.07s、`list` 0.39s → 0.05s（每条命令免 ~0.6s 依赖加载税）；web bundle 456KB → 387KB。运行时实测 bun 与 node 打平——剩余成本为 fs syscall 与依赖加载，换运行时无收益。
+
 ## 2026-09-09 (tree-SHA update pipeline)
 
 - **更新锚点改用 skill 子目录 tree SHA**（ADR-0013）：registry 条目 `source` 新增 `upstream_tree`，`upstream_commit` 保留作溯源记录。「可更新」只在 skill 内容真变时成立——上游改 README、改别的 skill 不再点亮更新按钮；GitHub Trees API 与本地浅克隆对同一子目录解析出相同 tree SHA，两侧锚点天然对齐。
