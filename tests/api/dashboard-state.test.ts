@@ -4,7 +4,16 @@ import path from 'node:path';
 import YAML from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDashboardApp } from '../../src/dashboard/server/main.js';
+import type { GitHubApiPort } from '../../src/core/ports/github-api.js';
 import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
+
+// Offline GitHub fake: this suite exercises local-source semantics; without it
+// the git-source row cases would reach api.github.com for real.
+const offlineGitHubApi: GitHubApiPort = {
+  async fetchRepoTree() {
+    return Object.freeze({ commitSha: 'offline', trees: Object.freeze({}) });
+  },
+};
 
 let root: string;
 let home: string;
@@ -30,6 +39,7 @@ beforeEach(async () => {
     host: '127.0.0.1',
     open: false,
     projectRoot: path.resolve(import.meta.dirname, '..', '..'),
+    githubApi: offlineGitHubApi,
   });
   await app.ready();
   const install = await app.inject({ method: 'POST', url: '/api/install', payload: { source: sourceRoot, subpaths: ['alpha'], overwrite: true } });
