@@ -13,6 +13,7 @@ import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
 import { GitHubApiClient } from '../../infra/github-api-client.js';
 import { GitHubApiError, type GitHubApiPort, type RepoTree } from '../../core/ports/github-api.js';
+import { parseGitHubRepoRef } from '../../core/services/source-service.js';
 import { appendDetectionFailure } from './detection-log.js';
 import { previewFileEntries, previewSkillDir, readSkillFile } from './skill-file.js';
 
@@ -213,20 +214,11 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   }
 
   /** ADR-0013 detection dispatch: GitHub URLs (https repo URL or owner/repo
-   *  shorthand) go through the Trees API; everything else stays on the legacy
-   *  per-skill ls-remote path. Registry sources are normalized to
-   *  `https://github.com/owner/repo.git` at install time, the shorthand arm
-   *  covers hand-edited registries. */
-  function parseGitHubRepo(url: string): { owner: string; repo: string } | null {
-    const value = url.trim();
-    const https = value.match(/^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/);
-    if (https) return { owner: https[1], repo: https[2].replace(/\.git$/, '') };
-    if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
-      const [owner, repo] = value.split('/');
-      return { owner, repo };
-    }
-    return null;
-  }
+   *  shorthand, via the shared `parseGitHubRepoRef` — the single place that
+   *  decides "what is a GitHub source") go through the Trees API; everything
+   *  else stays on the legacy per-skill ls-remote path. Registry sources are
+   *  normalized to `https://github.com/owner/repo.git` at install time, the
+   *  shorthand arm covers hand-edited registries. */
 
   type GitHubDetectionGroup = {
     owner: string;
@@ -313,7 +305,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
         }
         continue;
       }
-      const github = parseGitHubRepo(source.url);
+      const github = parseGitHubRepoRef(source.url);
       if (github) {
         // Per-source fan-in (ADR-0013): one fetchRepoTree per owner/repo@ref,
         // shared by every skill of that source — 60 skills / 23 repos stay

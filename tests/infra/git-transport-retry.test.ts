@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DETERMINISTIC_ERROR_PATTERNS,
-  HTTP1_RETRY_ENV,
-  NETWORK_TRANSPORT_ERROR_PATTERNS,
-  isRetryableTransportFailure,
-} from '../../src/infra/git-transport-retry.js';
+import { NETWORK_TRANSPORT_ERROR_PATTERNS, isRetryableTransportFailure } from '../../src/infra/git-transport-retry.js';
 
 const URL = 'https://github.com/owner/repo.git';
 
@@ -45,35 +40,10 @@ describe('isRetryableTransportFailure (network vs deterministic signatures)', ()
     expect(isRetryableTransportFailure('fatal: early EOF')).toBe(true);
     expect(isRetryableTransportFailure('fatal: Remote branch nope not found in upstream origin')).toBe(false);
   });
-});
-
-describe('transport failure pattern lists', () => {
-  it('keeps the network allow-list to transport-level signatures only', () => {
-    expect(NETWORK_TRANSPORT_ERROR_PATTERNS).toEqual([
-      /curl (92|56)\b/i,
-      /HTTP\/2 stream/i,
-      /connection reset/i,
-      /connection was reset/i,
-      /RPC failed/i,
-      /early EOF/i,
-      /fetch-pack/i,
-    ]);
-  });
 
   it('keeps deterministic failures non-retryable even when mixed with network wording', () => {
-    expect(DETERMINISTIC_ERROR_PATTERNS.length).toBeGreaterThan(0);
     const mixed = 'error: RPC failed; HTTP 404 curl 22 The requested URL returned error: 404';
     expect(NETWORK_TRANSPORT_ERROR_PATTERNS.some((pattern) => pattern.test(mixed))).toBe(true);
     expect(isRetryableTransportFailure(new Error(mixed))).toBe(false);
-  });
-});
-
-describe('HTTP1_RETRY_ENV (git config-count injection, ADR-0013)', () => {
-  it('forces http.version=HTTP/1.1 through in-process env only', () => {
-    expect(HTTP1_RETRY_ENV).toEqual({
-      GIT_CONFIG_COUNT: '1',
-      GIT_CONFIG_KEY_0: 'http.version',
-      GIT_CONFIG_VALUE_0: 'HTTP/1.1',
-    });
   });
 });

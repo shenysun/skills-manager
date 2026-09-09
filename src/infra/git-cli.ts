@@ -2,7 +2,9 @@ import type { GitCloneOptions, GitLogEntry, GitPort } from '../core/ports/git.js
 import { ShellRunner } from './shell-runner.js';
 import { HTTP1_RETRY_ENV, isRetryableTransportFailure } from './git-transport-retry.js';
 
-const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
+const FULL_COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
+/** Git's own abbreviation floor: `git checkout` prints short SHAs at 7+ chars. */
+const ABBREVIATED_SHA_PATTERN = /^[0-9a-f]{7,39}$/i;
 const SHALLOW_DEPTH = 1;
 
 export class GitCli implements GitPort {
@@ -10,12 +12,21 @@ export class GitCli implements GitPort {
 
   clone(repoUrl: string, destination: string, options: GitCloneOptions = {}): void {
     const depth = options.depth ?? SHALLOW_DEPTH;
-    if (options.ref && COMMIT_SHA_PATTERN.test(options.ref)) {
+    if (options.ref && this.isBareCommitRef(repoUrl, options.ref)) {
       this.fetchShallowCommit(repoUrl, destination, options.ref, depth);
       return;
     }
     const args = ['clone', `--depth=${depth}`, ...(options.ref ? ['--branch', options.ref] : []), repoUrl, destination];
     this.runTransport('git', args);
+  }
+
+  /** A bare commit SHA cannot go through `--branch` — but a 7-39 hex string may
+   *  also be a hex-shaped ref (a date tag like `20260909`). Resolve it the way
+   *  `git checkout` does: a remote ref of that name wins over the SHA reading. */
+  private isBareCommitRef(repoUrl: string, ref: string): boolean {
+    if (FULL_COMMIT_SHA_PATTERN.test(ref)) return true;
+    if (!ABBREVIATED_SHA_PATTERN.test(ref)) return false;
+    return this.runner.runOrThrow('git', ['ls-remote', repoUrl, ref]).trim() === '';
   }
 
   /** `git clone` cannot target a bare SHA — init + fetch the commit shallow, then check it out (ADR-0013). */

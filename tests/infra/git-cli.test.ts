@@ -98,6 +98,38 @@ describe('GitCli.clone (shallow transport, ADR-0013)', () => {
     expect(commands).toContain(`git -C /tmp/repo fetch --depth=1 origin ${SHA.toUpperCase()}`);
   });
 
+  it('disambiguates an abbreviated hex ref via ls-remote and fetches it as a SHA when no remote ref matches', () => {
+    const { commands, cli } = recordingCli();
+    cli.clone(URL, '/tmp/repo', { ref: 'd8e341c' });
+    expect(commands).toEqual([
+      `git ls-remote ${URL} d8e341c`,
+      'git init /tmp/repo',
+      `git -C /tmp/repo remote add origin ${URL}`,
+      'git -C /tmp/repo fetch --depth=1 origin d8e341c',
+      'git -C /tmp/repo checkout d8e341c',
+    ]);
+  });
+
+  it('keeps a hex-shaped ref that exists remotely (e.g. a date tag) on the --branch path', () => {
+    const commands: string[] = [];
+    const runner = {
+      run: (command: string, args: string[]) => {
+        commands.push([command, ...args].join(' '));
+        return { status: 0, stdout: '', stderr: '' };
+      },
+      runOrThrow: (command: string, args: string[]) => {
+        commands.push([command, ...args].join(' '));
+        if (args[0] === 'ls-remote') return `${SHA}\trefs/tags/20260909`;
+        return '';
+      },
+    };
+    new GitCli(runner as never).clone(URL, '/tmp/repo', { ref: '20260909' });
+    expect(commands).toEqual([
+      `git ls-remote ${URL} 20260909`,
+      `git clone --depth=1 --branch 20260909 ${URL} /tmp/repo`,
+    ]);
+  });
+
   it('honors an explicit depth on both the clone and the SHA fetch', () => {
     const clone = recordingCli();
     clone.cli.clone(URL, '/tmp/repo', { depth: 3 });

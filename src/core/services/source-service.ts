@@ -32,6 +32,22 @@ export function normalizeGitSourceUrl(input: string): string {
   return value;
 }
 
+/**
+ * Parse a GitHub repo locator — `owner/repo` shorthand or a github.com repo
+ * URL — into its owner/repo pair. Returns null for anything else (non-GitHub
+ * URLs included). The single place that decides "what is a GitHub source".
+ */
+export function parseGitHubRepoRef(input: string): { owner: string; repo: string } | null {
+  const value = input.trim();
+  if (OWNER_REPO_PATTERN.test(value)) {
+    const [owner, repo] = value.split('/');
+    return { owner, repo: repo.replace(/\.git$/, '') };
+  }
+  const githubRepo = value.match(GITHUB_REPO_URL_PATTERN);
+  if (githubRepo) return { owner: githubRepo[1], repo: githubRepo[2].replace(/\.git$/, '') };
+  return null;
+}
+
 export class SourceService {
   constructor(private readonly fs: FileSystemPort, private readonly git: GitPort, private readonly tempRoot = os.tmpdir()) {}
 
