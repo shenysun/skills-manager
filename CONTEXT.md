@@ -6,6 +6,10 @@ This repo is the canonical local source of truth for agent/Claude/Codex skills a
 
 - **Skill**: A directory containing a `SKILL.md` file and optional supporting files.
 - **Canonical skill**: The maintained copy under hub `skills/<skill-name>/` — the only content tree for that skill identity.
+- **Manager skill**: The product's own agent skill (`skills-manager`) — the primary management entry, agent-agnostic. The **bootstrap installs it and nothing else**; every later management action (import, install, distribute, update, provenance) happens **through it in agent conversation**.
+  _Avoid_: "official skill" as a second name; treating it as an ordinary skill the user must add from a source; auto-mounting it onto more agents during later distributes without an explicit request; "library skill" as a second name for **Canonical skill**.
+- **Bootstrap**: The one-time, idempotent no-arg `npx skills-manager-cli` setup: ensure hub, seed the manager skill from the bundled copy, mount it to chosen agents, print the starter prompt. It imports nothing and is the **only** entry that creates the hub implicitly.
+  _Avoid_: Bootstrap importing existing skills; any other command (e.g. `web`) creating the hub as a side effect.
 - **Agent**: An id from the **vercel-labs/skills agent table** (the only catalog): e.g. `claude-code`, `cursor`, `codex`. Each row has a project path and a global path. Skills-manager does not invent a parallel list of consumers.
   _Avoid_: A closed set of two consumers named `agents` and `claude`; calling the shared `.agents/skills/` bucket “the Agents product”.
 - **Detected agent**: An agent the **`npx skills` CLI would target with no `-a`** on this machine. Skills-manager uses that same determination; it does not invent a second heuristic. The determination runs **locally against the catalog snapshot** — same rule, same data, refreshed together.
@@ -185,12 +189,14 @@ Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agen
 
 **Tree-SHA source anchor + shallow clone + API update checks: ratified** (grill 2026-09-08). Recorded in [ADR-0013](docs/adr/0013-tree-sha-anchor-shallow-clone.md). Update decisions key on the skill subdirectory's tree SHA (registry `upstream_tree`, calibrated on first check); git fetches are `--depth 1` (branch/tag via `--branch`, bare SHA via init+fetch); GitHub update checks go through the Trees API (gh CLI first, anonymous fallback, in-memory TTL cache); detection failures surface in `dashboard.log` plus a per-row 检测失败 mark instead of silent null; clone failures retry once in-process over HTTP/1.1. Research basis: `docs/research/npx-skills-download-strategy.md`.
 
+**Manager-skill-first onboarding: ratified** (grill 2026-09-09). Recorded in [ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md). No-arg `npx skills-manager-cli` bootstraps (hub + manager skill seeded from the bundled copy + mount + starter prompt; imports nothing); every later management action happens through the manager skill in agent conversation, which invokes `npx skills-manager-cli <cmd>`; the manager skill self-refreshes from the bundled copy on CLI runs (unless locally modified); `web` is demoted and loses its hub-creation side effect; no auto-mount of the manager skill beyond bootstrap.
+
 ## Current product direction
 
-The project is evolving from a local skill repository into a publishable npm package that provides:
+The project is evolving from a local skill repository into a publishable npm package whose **primary interface is the manager skill** (ADR-0014): a no-arg npx bootstrap installs it, and management happens in agent conversation, on top of:
 
-- a `skills-manager` CLI,
-- a local web dashboard UI,
+- the `skills-manager` CLI — the engine the manager skill drives,
+- a local web dashboard UI — optional visualization, no longer the hero entry,
 - source-first discovery and install/update flows,
 - registry-driven update flows by skill, batch selection, or source repository,
 - multi-language UI support.
