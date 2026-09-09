@@ -19,6 +19,7 @@
     "dev:web": "vite --config dashboard-web/vite.config.ts",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "catalog:extract": "tsx scripts/extract-agent-catalog.ts",
     "release": "node scripts/release.mjs"
@@ -53,6 +54,7 @@
     "@types/node": "^26.1.2",
     "@unocss/reset": "^66.10.0",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vitest/coverage-v8": "^4.1.11",
     "reka-ui": "^2.10.4",
     "tsx": "^4.23.7",
     "typescript": "^7.0.2",

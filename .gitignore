@@ -11,3 +11,4 @@ dist/
 .scratch/
 *.tgz
 my-skill-home/
+coverage/
