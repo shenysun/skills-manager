@@ -14,7 +14,7 @@ Key vocabulary you will need when reading output:
 - **`imported: true`**: how the skill *entered* the hub (via `init`), orthogonal to whether it has a source.
 - **Detected agents**: the agent set `npx skills` would target on this machine, resolved locally from the bundled catalog snapshot.
 
-The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. All commands print JSON (except a few human summaries) — parse stdout.
+The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. Commands print JSON — except `status` (a human-readable summary) and `--help`. Parse stdout; don't guess the shape.
 
 ## First run / empty hub
 
@@ -63,6 +63,8 @@ skills-manager backup restore <skill>             # undo one import
 
 Import never guesses provenance, but it *adopts evidence*: entries in the `npx skills` lockfile (`~/.agents/.skill-lock.json`) with matching names become real sources automatically (ADR-0011).
 
+When the dry-run reports conflicts (`kind: "multi-runtime"`), walk the user through the decision rather than quoting flag docs: for each side show the agent id, runtime dir, and its SKILL.md description (read both copies yourself), ask which one to trust, then map the answer to `--prefer <runtime-dir>` (priority for the whole run) or `--resolve <skill>=<choice>` (one skill).
+
 ### Distribute / undistribute
 
 ```bash
@@ -73,7 +75,7 @@ skills-manager redistribute --refresh             # re-sync stale copy targets
 skills-manager distribute rollback --to user
 ```
 
-Omitting `--agent` targets the detected set. User scope defaults to symlink, project scope to copy.
+Omitting `--agent` targets the **detected set** — which can be dozens of agents on a busy machine. Check `catalog info` first and name agents explicitly unless the user truly means "everywhere". User scope defaults to symlink, project scope to copy.
 
 ### Update from sources
 
@@ -84,6 +86,8 @@ skills-manager update --source <key>              # one repo group from the plan
 ```
 
 Only skills with `source.url` **and** `source.subpath` are candidates — which is why backfill (below) always writes both.
+
+`--plan` lists candidates only — it does **not** check upstream. "Is anything actually new" is answered by the dashboard's 可更新 detection, not by plan output; don't present a plan entry as "has an update".
 
 Git installs and updates are shallow (`--depth 1`); a network-class clone failure (HTTP/2 stream reset and friends) is retried once over HTTP/1.1 automatically. Detection anchors on the skill sub-directory's tree SHA, so an unrelated upstream commit (a README bump) does not flag an update. When the dashboard shows 检测失败 (detection failed), read `<home>/.skills/dashboard.log` for the timestamped cause — usual suspects are network flaps and, without a logged-in `gh`, the 60 req/h anonymous API limit.
 
