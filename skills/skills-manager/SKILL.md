@@ -14,7 +14,19 @@ Key vocabulary you will need when reading output:
 - **`imported: true`**: how the skill *entered* the hub (via `init`), orthogonal to whether it has a source.
 - **Detected agents**: the agent set `npx skills` would target on this machine, resolved locally from the bundled catalog snapshot.
 
-The CLI is non-interactive; every choice is a flag. All commands print JSON (except a few human summaries) — parse stdout.
+The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. All commands print JSON (except a few human summaries) — parse stdout.
+
+## First run / empty hub
+
+When the user's first message is a broad ask (“帮我看看我的 skills” / "what skills do I have"), or the hub turns out to be empty, do not assume any setup exists — orient first, then propose exactly one action:
+
+1. `skills-manager list` — see what the hub holds. Empty output means a fresh bootstrap; say so plainly.
+2. Based on what exists, offer **one** next step and wait:
+   - Skills already live in runtime dirs (`~/.claude/skills`, …) → `skills-manager init --dry-run`, report the plan, import on the user's confirmation.
+   - Nothing anywhere → offer to install from a source the user names (`skills-manager add owner/repo --list` first).
+3. This skill itself should be mounted wherever the user works: if `skills-manager doctor` shows it missing for an agent they use, offer `skills-manager distribute --to user --skill skills-manager --agent <id>`.
+
+Keep the first turn short: report state, propose one action, wait. Deeper workflows (like provenance backfill below) come when the user asks for them.
 
 ## Commands by task
 
@@ -93,6 +105,7 @@ skills-manager archive <skill>                    # keep content, hide from list
 skills-manager rebuild-collections
 skills-manager migrate-consumers                  # one-shot legacy-tag migration
 skills-manager migrate-views                      # leftover hub views → runtimes (legacy)
+skills-manager bootstrap [--agent <id...>] [--force]  # (re)mount this skill onto agents
 skills-manager web [-p 4777]                      # local dashboard
 ```
 
