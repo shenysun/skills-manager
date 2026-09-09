@@ -74,11 +74,12 @@ describe('GET /api/state (single-page slim contract)', () => {
     expect(Object.keys(body.data).sort()).toEqual(['activity', 'knownProjects', 'skills', 'updateCount']);
   });
 
-  it('describes every skill in one row with the ten single-page fields', async () => {
+  it('describes every skill in one row with the single-page fields', async () => {
     const state = await getState();
     expect(state.skills).toHaveLength(1);
     const alpha = state.skills[0];
-    expect(Object.keys(alpha).sort()).toEqual(['category', 'description', 'distributedAgents', 'distribution', 'hasUpdate', 'name', 'source', 'staleCount', 'warning']);
+    expect(Object.keys(alpha).sort()).toEqual(['category', 'description', 'detection', 'distributedAgents', 'distribution', 'hasUpdate', 'name', 'source', 'staleCount', 'warning']);
+    expect(alpha.detection).toBe('ok');
     expect(alpha.name).toBe('alpha');
     expect(alpha.description).toBe('api');
     expect(alpha.source).toEqual({ type: 'local', url: sourceRoot, subpath: 'skills/alpha', ref: null });
@@ -131,6 +132,25 @@ describe('GET /api/state (single-page slim contract)', () => {
     const state = await getState();
     expect(state.skills[0].hasUpdate).toBe(false);
     expect(state.updateCount).toBe(0);
+  });
+
+  it('reports a vanished local source as detection failed, with a dashboard.log trace and the rest of the row intact', async () => {
+    rmSync(sourceRoot, { recursive: true, force: true });
+    const state = await getState();
+    const alpha = state.skills[0];
+    expect(alpha.detection).toBe('failed');
+    expect(alpha.hasUpdate).toBe(false);
+    expect(alpha.name).toBe('alpha');
+    expect(alpha.description).toBe('api');
+    expect(alpha.source).toEqual({ type: 'local', url: sourceRoot, subpath: 'skills/alpha', ref: null });
+    const logLines = readFileSync(path.join(home, '.skills', 'dashboard.log'), 'utf8').split('\n').filter(Boolean);
+    expect(logLines).toHaveLength(1);
+    const entry = JSON.parse(logLines[0]);
+    expect(Object.keys(entry).sort()).toEqual(['error', 'skills', 'source', 'timestamp']);
+    expect(entry.source).toBe(sourceRoot);
+    expect(entry.skills).toEqual(['alpha']);
+    expect(entry.error.kind).toBe('local');
+    expect(entry.error.message).toContain('missing');
   });
 
   it('derives distributedAgents from the hub index logical layer, not registry consumers tags', async () => {
