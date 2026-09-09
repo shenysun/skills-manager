@@ -249,14 +249,29 @@ catalog.command('info')
   .description('Show the current catalog snapshot stamp and detected agents')
   .action((_opts, cmd) => {
     const s = services(cmd);
-    print({ snapshot: s.catalog.snapshotInfo(), detected: s.catalog.detected() });
+    // Detected agents carry their runtime dir: a bare id list gives a
+    // conversation nothing to choose by (ticket manager-skill-first/04).
+    const detected = s.catalog.detected().map((id) => ({ id, runtimeDir: s.catalog.resolveGlobalDir(id) }));
+    print({ snapshot: s.catalog.snapshotInfo(), detected });
   });
 
 program.command('list')
   .description('List installed skills')
   .option('--category <category>', 'filter category')
   .option('--include-archived', 'include archived entries')
-  .action((opts, cmd) => print(services(cmd).registry.listSkills({ category: opts.category, includeArchived: opts.includeArchived })));
+  .option('--brief', 'compact rows (name, title, category, updatable) — for conversation-sized output')
+  .action((opts, cmd) => {
+    const rows = services(cmd).registry.listSkills({ category: opts.category, includeArchived: opts.includeArchived });
+    if (!opts.brief) return print(rows);
+    // Full rows carry complete descriptions and consumer lists — tens of KB on
+    // a real hub. The brief form answers "what do I have" without them.
+    return print(rows.map((row) => ({
+      name: row.name,
+      title: row.title,
+      category: row.category,
+      updatable: Boolean(row.source?.url && row.source?.subpath),
+    })));
+  });
 
 program.command('add')
   .description('Discover from a source, then install selected skills')

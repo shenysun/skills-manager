@@ -286,7 +286,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
     services: ReturnType<typeof getServices>,
     skills: ReturnType<typeof services.registry.listSkills>,
   ): Promise<Map<string, DetectionOutcome>> {
-    const candidates = new Set(services.update.plan().candidates.map((candidate) => candidate.skill));
+    const candidates = new Set(services.update.plan().groups.flatMap((group) => group.skills.map((skill) => skill.skill)));
     const outcomes = new Map<string, DetectionOutcome>();
     const homeRoot = services.resolution.root;
     const githubGroups = new Map<string, GitHubDetectionGroup>();

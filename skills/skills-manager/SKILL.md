@@ -34,9 +34,10 @@ Keep the first turn short: report state, propose one action, wait. Deeper workfl
 
 ```bash
 skills-manager list [--category <c>] [--include-archived]
+skills-manager list --brief           # compact rows — use this in conversation first; full rows are tens of KB
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source queue
-skills-manager catalog info           # catalog snapshot stamp + detected agents
+skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
 ```
@@ -63,7 +64,7 @@ skills-manager backup restore <skill>             # undo one import
 
 Import never guesses provenance, but it *adopts evidence*: entries in the `npx skills` lockfile (`~/.agents/.skill-lock.json`) with matching names become real sources automatically (ADR-0011).
 
-When the dry-run reports conflicts (`kind: "multi-runtime"`), walk the user through the decision rather than quoting flag docs: for each side show the agent id, runtime dir, and its SKILL.md description (read both copies yourself), ask which one to trust, then map the answer to `--prefer <runtime-dir>` (priority for the whole run) or `--resolve <skill>=<choice>` (one skill).
+When the dry-run reports conflicts (`kind: "multi-runtime"`), walk the user through the decision rather than quoting flag docs: each location already carries its agent ids, runtime dir, and its own description — present the sides, ask which one to trust, then map the answer to `--prefer <runtime-dir>` (priority for the whole run) or `--resolve <skill>=<choice>` (one skill). A dry-run's `plannedImports` names what *would* import.
 
 ### Distribute / undistribute
 

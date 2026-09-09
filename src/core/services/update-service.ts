@@ -32,7 +32,7 @@ export class UpdateService {
 
   plan(): UpdatePlan {
     const candidates = this.candidatesFromRegistry();
-    return { candidates, groups: this.groupCandidates(candidates) };
+    return { groups: this.groupCandidates(candidates) };
   }
 
   groupCandidates(candidates: UpdateCandidate[]): SourceUpdateGroup[] {

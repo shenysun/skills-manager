@@ -61,8 +61,8 @@ describe('edit full git source', () => {
     run(['edit', 'alpha', '--source-git', 'vercel-labs/skills', '--subpath', 'skills/find-skills']);
     const plan = run(['update', '--plan']);
     expect(plan.status).toBe(0);
-    const candidates = JSON.parse(plan.stdout).candidates;
-    expect(candidates).toEqual(expect.arrayContaining([expect.objectContaining({ skill: 'alpha', url: 'https://github.com/vercel-labs/skills.git', subpath: 'skills/find-skills' })]));
+    const skills = JSON.parse(plan.stdout).groups.flatMap((group: { skills: unknown[] }) => group.skills);
+    expect(skills).toEqual(expect.arrayContaining([expect.objectContaining({ skill: 'alpha', url: 'https://github.com/vercel-labs/skills.git', subpath: 'skills/find-skills' })]));
   });
 
   it('persists the source to registry.yaml (not just stdout)', () => {

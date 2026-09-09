@@ -514,3 +514,30 @@ describe('init batch semantics (one user operation = one restore point)', () => 
     }
   });
 });
+
+describe('init conversational output (manager-skill-first ticket 04)', () => {
+  it('dry-run labels the plan as plannedImports so a conversation cannot misread it', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    const s = services();
+
+    const preview = s.init.run({ dryRun: true });
+
+    expect(preview.dryRun).toBe(true);
+    expect(preview.plannedImports).toEqual(['alpha']);
+    // The legacy field stays for existing consumers (dashboard InitSheet).
+    expect(preview.imported).toEqual(['alpha']);
+  });
+
+  it('conflict locations carry each side description for a conversational ruling', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha', `---\nname: alpha\ndescription: claude side\n---\n# a\n`);
+    makeRuntimeSkill('.cursor/skills', 'alpha', `---\nname: alpha\ndescription: cursor side\n---\n# a\n`);
+    const s = services();
+
+    const report = s.init.run();
+
+    expect(report.conflicts).toHaveLength(1);
+    const descriptions = report.conflicts[0].locations.map((location) => location.description);
+    expect(descriptions).toContain('claude side');
+    expect(descriptions).toContain('cursor side');
+  });
+});

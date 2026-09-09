@@ -122,7 +122,9 @@ export type SourceUpdateGroup = {
 };
 
 export type UpdatePlan = {
-  candidates: UpdateCandidate[];
+  /** Grouped only — a flat candidate list duplicated every entry beside its
+   *  group and doubled the output a conversation has to read (ticket
+   *  manager-skill-first/04). Flatten with groups.flatMap(g => g.skills). */
   groups: SourceUpdateGroup[];
 };
 

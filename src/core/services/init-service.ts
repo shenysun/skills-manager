@@ -26,6 +26,8 @@ export type InitSkillLocation = {
   runtimeDir: string;
   /** The physical skill directory inside the agent's global runtime dir. */
   path: string;
+  /** That copy's own description, for content-based conflict rulings (ticket manager-skill-first/04). */
+  description: string;
 };
 
 export type InitDiscoveredSkill = {
@@ -48,6 +50,8 @@ export type InitRunResult = {
   scanned: Array<{ agentId: string; runtimeDir: string }>;
   discovered: InitDiscoveredSkill[];
   imported: SkillName[];
+  /** Dry-run only: the same plan as `imported`, named for what it is (ticket manager-skill-first/04). */
+  plannedImports?: SkillName[];
   /** Winner for each imported skill: `hub` or the winning runtime dir. */
   choices: Record<string, string>;
   /** Origins already symlinked to the hub — nothing to do. */
@@ -144,6 +148,10 @@ export class InitService {
     }
     if (request.dryRun) {
       result.imported = imports.map((item) => item.skill.name);
+      // Conversational clarity (ticket manager-skill-first/04): `imported` reads
+      // as "done" even under dryRun — plannedImports states the plan without
+      // requiring the reader to cross-check the dryRun flag.
+      result.plannedImports = [...result.imported];
       return result;
     }
 
@@ -390,7 +398,7 @@ export class InitService {
           invalid.push({ skill: entry.name, reason: (error as Error).message });
           continue;
         }
-        const location: InitSkillLocation = { agentIds: group.agents, runtimeDir: group.runtimeDir, path: skillDir };
+        const location: InitSkillLocation = { agentIds: group.agents, runtimeDir: group.runtimeDir, path: skillDir, description };
         const existing = byName.get(name);
         if (existing) byName.set(name, { ...existing, locations: [...existing.locations, location] });
         else byName.set(name, { name, title, description, locations: [location] });
