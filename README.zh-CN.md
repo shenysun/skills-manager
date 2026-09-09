@@ -2,62 +2,43 @@
 
 [English](README.md) | **简体中文**
 
-`skills-manager-cli` 是一个本地优先的 CLI 与网页控制台，基于注册表驱动的技能库（skill home）管理 agent、Claude、Codex 的技能。
+在**对话里**管理你的 agent skills：一条 `npx` 命令装上 manager skill，之后一切都直接吩咐你的 agent——安装、导入、分发、更新、补齐来源。任何会加载 skills 的 agent 都能用（Claude Code、Codex、Cursor、…）。
 
 ## 快速开始
 
-**无需任何安装** —— 直接运行：
-
 ```sh
-npx skills-manager-cli web
+npx skills-manager-cli
 ```
 
-首次运行时会自动创建并初始化 `~/.skills-manager/`。
+这就是全部的安装步骤。bootstrap 会创建技能库（`~/.skills-manager`），从包内副本把 **manager skill** 种进库，并（以软链接）挂载到它检测到的 agent——展示一次多选让你确认清单。
 
-**已经在 `~/.claude/skills` 或其他 agent 运行时目录里有技能了？** 用 `skills-manager init` 一键收纳 —— 内容移入技能库，原位置变成软链接（会先备份）：
+然后回到你的 agent，说：
 
-```sh
-skills-manager init --dry-run   # 预览
-skills-manager init             # 导入
+> **帮我看看我的 skills：有哪些、装到哪些 agent 了、有没有能更新的**
+
+**`~/.claude/skills` 等运行时目录里已经有 skills 了？** 不必在安装时迁移——直接吩咐：
+
+> 帮我把现有的 skills 导入 skills-manager 并整理好来源
+
+内容会移入库中，原位置变成软链接（先备份）。想先自己预览？`skills-manager init --dry-run`。
+
+## 工作原理
+
+```text
+~/.skills-manager                        ← 技能库：唯一的内容权威
+     skills/<name>/  ·  registry.yaml
+          │
+          │  分发（软链接 / 拷贝）
+          ▼
+~/.claude/skills   ~/.cursor/skills   …  ← agent 运行时目录
+          ▲
+          │  通过 `npx skills-manager-cli …` 驱动
+   你的 agent  ⇄  manager skill
 ```
 
-**想让 agent 直接替你操作这个 CLI？** 本仓库自带一个官方 agent skill（`skills/skills-manager/`），覆盖全部命令，并内置「来源补齐」工作流（采纳锁文件证据 → 搜索并验证候选 → 你逐条拍板写入，ADR-0012）：
-
-```sh
-skills-manager add <本仓库地址> --skill skills-manager
-skills-manager distribute --to user --skill skills-manager
-```
-
-或者全局安装：
-
-```sh
-npm install -g skills-manager-cli
-# 或
-pnpm add -g skills-manager-cli
-skills-manager web
-```
-
-👉 **[查看入门指南](docs/GETTING_STARTED.zh-CN.md)** 了解详细用法与常见任务。
-
-## 安装与运行
-
-免安装直接使用：
-
-```sh
-npx skills-manager-cli web
-```
-
-或从已发布的包/本地打包的 tarball 全局安装：
-
-```sh
-npm install -g skills-manager-cli
-# 或
-pnpm add -g skills-manager-cli
-skills-manager web
-skills-manager doctor
-```
-
-`web` 默认自动打开本地 Vue/Fastify 控制台。加 `--no-open` 可保持浏览器关闭。
+- **manager skill** 是主界面（[ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)）：npx bootstrap 只装它、别的什么都不做；之后所有管理动作都通过它在 agent 对话里完成。还没装任何 agent？bootstrap 照样建好技能库，并告诉你之后怎么挂载。
+- 它自己保持最新：CLI 每次运行都会对比包内副本与库内副本并静默刷新——除非你自己改过库内副本，那就是你的了，不再碰它。
+- 底层的 CLI 是纯粹的引擎（JSON 输出、非交互 flag）——见 [CLI 参考](docs/CLI.zh-CN.md)。
 
 ## 技能库（skill home）结构
 
@@ -74,14 +55,15 @@ skills-manager doctor
 1. `--home <path>`
 2. `SKILL_HOME`
 3. 当前目录（当它已经是一个技能库时）
-4. `~/.skills-manager`（自动初始化）
+4. `~/.skills-manager` —— 仅由 bootstrap 创建；其他命令只会提示你先跑 bootstrap，不再隐式创建
 
 ## 常用命令
 
 ```sh
-skills-manager web --home ~/.skills-manager
-skills-manager doctor --home ~/.skills-manager
-skills-manager list --home ~/.skills-manager
+npx skills-manager-cli                            # bootstrap（不带子命令时的默认行为）
+skills-manager bootstrap --agent claude-code      # 脚本化 bootstrap / 之后再挂载
+skills-manager doctor
+skills-manager list
 skills-manager add owner/repo --all --yes
 skills-manager distribute --to user --skill my-skill --agent claude-code
 skills-manager update --plan
@@ -99,6 +81,22 @@ skills-manager archive old-skill
 
 来源（source）支持 GitHub 简写（`owner/repo`）、Git URL、GitHub tree URL 或本地路径。
 
+## 可选：全局安装与 dashboard
+
+想直接敲裸命令？全局安装：
+
+```sh
+npm install -g skills-manager-cli   # 或 pnpm add -g skills-manager-cli
+```
+
+想要可视化界面？本地 dashboard 是对话之外的可选替代：
+
+```sh
+skills-manager web          # http://127.0.0.1:4777，--no-open 不自动开浏览器
+```
+
+它在单页里提供同一个技能库：浏览、安装、更新、分发。它不会创建技能库——请先跑 bootstrap。
+
 ## 开发
 
 ```sh
@@ -109,6 +107,6 @@ pnpm test
 
 ## 文档
 
-- **[入门指南](docs/GETTING_STARTED.zh-CN.md)** —— 安装、首次启动、常见任务
+- **[入门指南](docs/GETTING_STARTED.zh-CN.md)** —— 首次运行、导入现有技能、常见任务
 - **[CLI 参考](docs/CLI.zh-CN.md)** —— 完整命令参考与进阶用法
 - **[架构](CONTEXT.md)** —— 项目结构与设计决策（英文）

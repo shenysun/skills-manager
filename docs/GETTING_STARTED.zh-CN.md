@@ -6,31 +6,29 @@
 
 ## 安装
 
-### 方式一：免安装直接使用（推荐）
+### 方式一：bootstrap（推荐）
 
 ```bash
-npx skills-manager-cli web
+npx skills-manager-cli
 ```
 
-### 方式二：全局安装
+这一条命令会创建 `~/.skills-manager/`、从包内副本装上 **manager skill**、并把它挂载到检测到的 agent —— 之后一切管理都在你的 agent 对话里完成（[ADR-0014](adr/0014-manager-skill-first-bootstrap.md)）。
+
+### 方式二：全局安装 CLI（可选）
 
 ```bash
 npm install -g skills-manager-cli
 # 或
 pnpm add -g skills-manager-cli
-skills-manager web
 ```
 
-## 首次启动
+## 你的第一次对话
 
-首次运行任意命令时，Skills Manager 会自动初始化你的**技能库（skill home）** —— 一个存放所有技能的本地目录。
+bootstrap 是唯一会创建**技能库（skill home）**的步骤 —— 一个存放所有技能的本地目录。它跑完后，回到你的 agent 说：
 
-```bash
-# 会自动创建并初始化 ~/.skills-manager/
-skills-manager web
-```
+> 帮我看看我的 skills：有哪些、装到哪些 agent 了、有没有能更新的
 
-浏览器会自动打开 `http://localhost:4777`，即可开始管理技能。
+manager skill 会汇报技能库现状和自然的下一步（导入现有技能、安装新技能）。它在底层驱动 CLI（`npx skills-manager-cli …`）；你几乎不需要自己敲命令。
 
 ### 默认位置
 
@@ -39,7 +37,7 @@ Skills Manager 按以下顺序查找技能库：
 1. `--home <path>` —— 显式指定的路径
 2. `SKILL_HOME` —— 环境变量
 3. 当前目录 —— 当它已包含 `skills/` 和 `registry.yaml` 时
-4. `~/.skills-manager/` —— 默认位置（自动创建）
+4. `~/.skills-manager/` —— 默认位置（仅由 bootstrap 创建；其他命令会提示你先跑它）
 
 ### 技能库结构
 
@@ -145,14 +143,7 @@ skills-manager provenance adopt          # 补采锁文件证据
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 ```
 
-证据自动采纳；任何靠**搜索**得来的候选，都必须经你逐条拍板才会写入（ADR-0012）。官方 agent skill 把整个流程自动化：装好之后直接对 agent 说「补齐所有来源」，它会补采证据、搜索技能生态（skills.sh / GitHub）、对照本地内容验证候选、再请你逐条选择：
-
-```bash
-skills-manager add <本仓库地址> --skill skills-manager
-skills-manager distribute --to user --skill skills-manager
-```
-
-这个 skill 还按任务分类为你的 agent 讲解了全部 CLI 命令。
+证据自动采纳；任何靠**搜索**得来的候选，都必须经你逐条拍板才会写入（ADR-0012）。**manager skill**（bootstrap 已装好）把整个流程自动化：直接对 agent 说「补齐所有来源」，它会补采证据、搜索技能生态（skills.sh / GitHub）、对照本地内容验证候选、再请你逐条选择。它还按任务分类为你的 agent 讲解了全部 CLI 命令。
 
 ### 打开控制台
 
@@ -192,20 +183,23 @@ skills-manager doctor --home ~/my-skills
 
 ### 添加你的第一个技能
 
-1. 打开控制台：`skills-manager web`
-2. 点击右上角的「＋ 添加」
-3. 输入 GitHub 仓库（如 `owner/repo`）或本地路径
-4. 点击「发现」查看可用技能
-5. 选择技能并点击「安装」
+直接吩咐你的 agent —— 比如「从 github.com/owner/repo 装几个 skills，先列出来给我选」。想用 CLI？
+
+```bash
+skills-manager add owner/repo --list          # 先发现
+skills-manager add owner/repo --skill my-skill
+```
+
+想要可视化流程？`skills-manager web` →「＋ 添加」打开同一个来源优先向导。
 
 ### 分发技能到 agent
 
-技能安装完成后：
+吩咐你的 agent（「把 my-skill 接入到 cursor 和 zed」），或用控制台：
 
-1. 在控制台：点击某个技能的「分发」
+1. 在控制台：点击某个技能的「接入」
 2. 选择 agent（Claude Code、Cursor、Zed 等）
 3. 选择分发模式：「symlink」（用户范围）或「copy」（项目）
-4. 点击「分发」
+4. 点击「接入」
 
 ### 更新技能
 
@@ -248,6 +242,8 @@ skills-manager add --help
 ## 故障排查
 
 ### 控制台启动失败
+
+如果提示 `No skill home … yet`，先运行 `npx skills-manager-cli` —— 控制台不会创建技能库。
 
 ```bash
 # 检查系统状态

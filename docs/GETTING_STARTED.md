@@ -6,31 +6,29 @@ Welcome! This guide will help you get started with `skills-manager-cli` in minut
 
 ## Installation
 
-### Option 1: Use without installing (Recommended)
+### Option 1: Bootstrap (Recommended)
 
 ```bash
-npx skills-manager-cli web
+npx skills-manager-cli
 ```
 
-### Option 2: Install globally
+This creates `~/.skills-manager/`, installs the **manager skill** from the bundled copy, and mounts it into your detected agents — from then on you manage everything from your agent's conversation ([ADR-0014](adr/0014-manager-skill-first-bootstrap.md)).
+
+### Option 2: Install the CLI globally (optional)
 
 ```bash
 npm install -g skills-manager-cli
 # or
 pnpm add -g skills-manager-cli
-skills-manager web
 ```
 
-## Your First Launch
+## Your first conversation
 
-When you run any command for the first time, Skills Manager automatically initializes your **skill home** — a local directory that stores all your skills.
+Bootstrap is the only step that creates a **skill home** — a local directory that stores all your skills. After it finishes, go back to your agent and say:
 
-```bash
-# This automatically creates and initializes ~/.skills-manager/
-skills-manager web
-```
+> 帮我看看我的 skills：有哪些、装到哪些 agent 了、有没有能更新的
 
-Your browser will open to `http://localhost:4777` where you can start managing skills.
+The manager skill answers with your library's state and the natural next steps (importing existing skills, installing new ones). It drives the CLI underneath (`npx skills-manager-cli …`); you rarely need to type commands yourself.
 
 ### Default locations
 
@@ -39,7 +37,7 @@ Skills Manager checks these locations in order:
 1. `--home <path>` — if you specify a path explicitly
 2. `SKILL_HOME` — if you set this environment variable
 3. Current directory — if it already contains `skills/` and `registry.yaml`
-4. `~/.skills-manager/` — the default location (created automatically)
+4. `~/.skills-manager/` — the default location (created by bootstrap only; other commands prompt you to run it)
 
 ### Skill home structure
 
@@ -145,14 +143,7 @@ skills-manager provenance adopt          # adopt lockfile evidence where it exis
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 ```
 
-Evidence is adopted automatically; anything found by *searching* is only ever written after you approve it, one skill at a time (ADR-0012). The official agent skill automates the whole loop: install it, then just tell your agent "补齐所有来源" and it adopts evidence, searches the skills ecosystem (skills.sh / GitHub), verifies candidates against the local copy, and asks you to pick:
-
-```bash
-skills-manager add <this-repo-url> --skill skills-manager
-skills-manager distribute --to user --skill skills-manager
-```
-
-That skill also documents every CLI command for your agent, task by task.
+Evidence is adopted automatically; anything found by *searching* is only ever written after you approve it, one skill at a time (ADR-0012). The **manager skill** — installed by bootstrap — automates the whole loop: just tell your agent "补齐所有来源" and it adopts evidence, searches the skills ecosystem (skills.sh / GitHub), verifies candidates against the local copy, and asks you to pick. It also documents every CLI command for your agent, task by task.
 
 ### Open the Dashboard
 
@@ -191,20 +182,23 @@ skills-manager doctor --home ~/my-skills
 
 ### Add your first skill
 
-1. Open Dashboard: `skills-manager web`
-2. Click "＋ Add" in the top right
-3. Enter a GitHub repo (e.g., `owner/repo`) or local path
-4. Click "Discover" to see available skills
-5. Select skills and click "Install"
+Just ask your agent — e.g. "从 github.com/owner/repo 装几个 skills，先列出来给我选". Prefer the CLI?
+
+```bash
+skills-manager add owner/repo --list          # discover first
+skills-manager add owner/repo --skill my-skill
+```
+
+Prefer the visual flow? `skills-manager web` → "＋ Add" opens the same source-first wizard.
 
 ### Distribute skills to agents
 
-Once skills are installed:
+Ask your agent ("把 my-skill 接入到 cursor 和 zed") or use the dashboard:
 
-1. In Dashboard: Click "Distribute" on a skill
+1. In Dashboard: Click "接入" on a skill
 2. Select agents (Claude Code, Cursor, Zed, etc.)
 3. Choose distribution mode: "symlink" (for user scope) or "copy" (for projects)
-4. Click "Distribute"
+4. Click "接入"
 
 ### Update skills
 
@@ -247,6 +241,8 @@ Check [docs/CLI.md](CLI.md) for complete command documentation.
 ## Troubleshooting
 
 ### Dashboard won't start
+
+If it says `No skill home … yet`, run `npx skills-manager-cli` first — the dashboard never creates the hub.
 
 ```bash
 # Check your system

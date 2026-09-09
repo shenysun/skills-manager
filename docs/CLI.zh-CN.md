@@ -11,9 +11,19 @@
 1. `--home <path>`
 2. `SKILL_HOME`
 3. 当前目录（当它已经是一个技能库时）
-4. `~/.skills-manager`（自动初始化）
+4. `~/.skills-manager`（仅由 bootstrap 创建，ADR-0014 —— 其他命令发现技能库缺失时会提示你先跑 bootstrap，不再隐式创建）
 
 初始化会创建 `skills/`、`collections/`、`registry.yaml`，以及 `.skills/` 数据目录。
+
+## bootstrap（正门）
+
+```sh
+npx skills-manager-cli                 # 不带子命令 = bootstrap
+skills-manager bootstrap --agent claude-code --agent cursor   # 脚本化
+skills-manager bootstrap --force       # 替换运行时路径上非托管的 skills-manager
+```
+
+bootstrap（ADR-0014）只做四件事：确保技能库存在；从 npm 包内副本把 **manager skill** 种进库（以发布 tag 作为更新来源戳）；把它（软链接）挂载到你选择的 agent —— TTY 下对检测到的 agent 弹多选（默认全选），`--agent` 跳过提问，非 TTY 挂到全部检测到的 agent；最后打印起始提示词。它永远不做导入：导入现有运行时技能是你之后通过 manager skill 在对话里完成的动作。bootstrap 幂等；且 CLI 每次运行都会自检库内副本与包内副本，未被他改时静默刷新（你手改过的副本视为外来物，不再触碰）。
 
 ## 命令
 

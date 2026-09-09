@@ -11,9 +11,19 @@ Priority:
 1. `--home <path>`
 2. `SKILL_HOME`
 3. the current working directory when it already contains `skills/`, `views/`, `collections/`, and `registry.yaml`
-4. `~/.skills-manager`, which is initialized automatically
+4. `~/.skills-manager`, created by bootstrap only (ADR-0014) — every other command reports the missing hub instead of creating it
 
 Initialization creates `skills/`, `views/`, `collections/`, `registry.yaml`, and the parent directory for `.skills/activity.jsonl`.
+
+## bootstrap (the front door)
+
+```sh
+npx skills-manager-cli                 # no subcommand = bootstrap
+skills-manager bootstrap --agent claude-code --agent cursor   # scripted
+skills-manager bootstrap --force       # replace an unmanaged skills-manager at a runtime path
+```
+
+Bootstrap (ADR-0014) does four things and nothing else: ensures the hub, seeds the **manager skill** into it from the copy bundled in the npm package (stamped with the release tag as its update source), mounts it (symlink) into the chosen agents — an interactive multi-select of detected agents in a TTY, defaulting to all of them; `--agent` skips the prompt; non-TTY applies to every detected agent — and prints the starter prompt. It imports nothing, ever: importing existing runtime skills stays a conversational act you perform later through the manager skill. It is idempotent, and every CLI run self-checks the hub copy against the bundled copy, refreshing it unless you have edited the hub copy yourself (a hand-edited copy is foreign and untouched).
 
 ## Commands
 
