@@ -71,6 +71,13 @@ program.action((stray: string[] | undefined, opts, cmd) => {
   return runBootstrap(opts, cmd);
 });
 
+// Pure output with /bin/echo semantics — an install sanity check. Touches no
+// hub state, so it deliberately skips services() (and the hub check therein).
+program.command('echo')
+  .description('Print the given text to stdout and exit 0 (install sanity check)')
+  .argument('[text...]')
+  .action((text: string[]) => print(text.join(' ')));
+
 const webCommand = (cmd: Command, description: string) =>
   cmd
     .description(description)
