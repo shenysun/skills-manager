@@ -74,7 +74,8 @@ const REMOTE_HEAD_TTL_MS = 5 * 60 * 1000;
  * keep it long-lived per app/process, not per request.
  */
 export class DetectionService {
-  private readonly remoteHeads = new Map<string, { sha: string | null; fetchedAt: number }>();
+  private readonly remoteHeads = new Map<string, { sha: string; fetchedAt: number }>();
+  private readonly remoteHeadsInFlight = new Map<string, Promise<string | null>>();
 
   constructor(private readonly deps: DetectionDeps) {}
 
@@ -146,16 +147,26 @@ export class DetectionService {
     return outcomes;
   }
 
-  /** Successes are cached per url@ref for the TTL; failures are not — the next
-   *  request retries, so a recovered network self-heals the row. */
+  /** Resolved heads are cached per url@ref for the TTL; misses (ls-remote
+   *  resolves no head — a just-pushed ref) and failures are not, so they are
+   *  visible on the next request instead of failing out the whole TTL window
+   *  (adversary L8). Concurrent detections of the same url@ref share one
+   *  in-flight request, mirroring GitHubApiClient (L9). */
   private async remoteHeadSha(url: string, ref: string | null | undefined): Promise<string | null> {
     const key = `${url}|${ref || ''}`;
-    const cached = this.remoteHeads.get(key);
     const now = this.deps.now ?? Date.now;
+    const cached = this.remoteHeads.get(key);
     if (cached && now() - cached.fetchedAt < REMOTE_HEAD_TTL_MS) return cached.sha;
-    const sha = await (this.deps.remoteHead ?? gitLsRemoteHead)(url, ref ?? null);
-    this.remoteHeads.set(key, { sha, fetchedAt: now() });
-    return sha;
+    const pending = this.remoteHeadsInFlight.get(key);
+    if (pending) return pending;
+    const request = (this.deps.remoteHead ?? gitLsRemoteHead)(url, ref ?? null)
+      .then((sha) => {
+        if (sha !== null) this.remoteHeads.set(key, { sha, fetchedAt: now() });
+        return sha;
+      })
+      .finally(() => this.remoteHeadsInFlight.delete(key));
+    this.remoteHeadsInFlight.set(key, request);
+    return request;
   }
 
   /** Mirrors DistributeService.fingerprint's tree hashing so equal trees compare equal.

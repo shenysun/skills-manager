@@ -170,12 +170,12 @@ describe('SourceService temp lifecycle (manager-skill-first ticket 02)', () => {
     expect(createNodeFileSystem().kind(local)).toBe('directory');
   });
 
-  it('checkout sweeps orphaned skills-source-* dirs older than 24h but keeps fresh ones', () => {
+  it('checkout sweeps orphaned skills-source-<uuid> dirs older than 24h but keeps fresh ones', () => {
     const { git } = spyGit();
     const s = service(git);
     const tempRoot = path.join(root, 'tmp');
-    const stale = path.join(tempRoot, 'skills-source-stale');
-    const fresh = path.join(tempRoot, 'skills-source-fresh');
+    const stale = path.join(tempRoot, 'skills-source-1b671a64-40d5-491e-b99d-42e4c0519011');
+    const fresh = path.join(tempRoot, 'skills-source-2c782b75-51e6-4a2f-ca0e-53f5d1620222');
     mkdirSync(stale, { recursive: true });
     mkdirSync(fresh, { recursive: true });
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -185,6 +185,20 @@ describe('SourceService temp lifecycle (manager-skill-first ticket 02)', () => {
 
     expect(createNodeFileSystem().kind(stale)).toBe('missing');
     expect(createNodeFileSystem().kind(fresh)).toBe('directory');
+  });
+
+  it('sweep never touches a same-prefix dir this tool could not have created (adversary M5)', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    const tempRoot = path.join(root, 'tmp');
+    const foreign = path.join(tempRoot, 'skills-source-not-ours');
+    mkdirSync(foreign, { recursive: true });
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    utimesSync(foreign, twoDaysAgo, twoDaysAgo);
+
+    s.checkout('https://github.com/owner/repo.git');
+
+    expect(createNodeFileSystem().kind(foreign)).toBe('directory');
   });
 });
 
@@ -220,7 +234,7 @@ describe('checkout failure hygiene (adversary H1/H2/M2)', () => {
   it('sweep skips entries it cannot delete instead of failing checkout (H2)', () => {
     const realFs = createNodeFileSystem();
     const tempRoot = path.join(root, 'tmp');
-    const poisoned = path.join(tempRoot, 'skills-source-poison');
+    const poisoned = path.join(tempRoot, 'skills-source-3d893c86-62f7-4b30-db1f-64a6e1730333');
     mkdirSync(poisoned, { recursive: true });
     utimesSync(poisoned, new Date(Date.now() - 48 * 3600_000), new Date(Date.now() - 48 * 3600_000));
     // Proxy (not spread): NodeFileSystem methods live on the prototype.

@@ -21,7 +21,11 @@ export class ShellRunner implements ProcessRunnerPort {
       encoding: 'utf8',
       stdio: 'pipe',
       env: { ...process.env, ...options.env },
-      ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
+      // Budget kills go straight to SIGKILL (adversary H3): SIGTERM can be
+      // swallowed by a wrapper, and the exit-0 that follows would read as
+      // success. The kernel-enforced kill makes the wall-clock budget a hard
+      // ceiling — git is crash-safe, so no graceful-teardown is owed here.
+      ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs, killSignal: 'SIGKILL' } : {}),
     });
     return {
       status: result.status,

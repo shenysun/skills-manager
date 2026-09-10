@@ -22,13 +22,13 @@ describe('ShellRunner env injection', () => {
 
 describe('ShellRunner timeout (ticket 08)', () => {
   // Real process, not a fake: the spawnSync timeout/kill contract (status null +
-  // SIGTERM) is exactly what this ticket exists to rely on — asserting it against
+  // SIGKILL) is exactly what this ticket exists to rely on — asserting it against
   // a hand-rolled result object would test nothing.
   it('kills a command that exceeds timeoutMs and reports status null with the kill signal', () => {
     const runner = new ShellRunner();
     const result = runner.run(process.execPath, ['-e', 'setTimeout(() => {}, 5000)'], { timeoutMs: 100 });
     expect(result.status).toBeNull();
-    expect(result.signal).toBe('SIGTERM');
+    expect(result.signal).toBe('SIGKILL');
   });
 
   it('runOrThrow raises a CommandTimeoutError naming the timeout and the command', () => {
@@ -49,6 +49,28 @@ describe('ShellRunner timeout (ticket 08)', () => {
     const result = runner.run(process.execPath, ['-e', 'console.log("done")'], { timeoutMs: 5000 });
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe('done');
+  });
+});
+
+describe('ShellRunner timeout hard-kill (adversary H3 leftover)', () => {
+  // Real node process, not a fake: the defect only shows against a child that
+  // actually swallows SIGTERM and later exits 0 — under a SIGTERM killSignal
+  // spawnSync waits for that exit and reports status 0, selling a budget
+  // overrun as success. The child ignores SIGTERM and self-exits at ~2s.
+  const SIGTERM_SWALLOWER = 'process.on("SIGTERM", () => {}); setTimeout(() => process.exit(0), 2000)';
+
+  it('SIGKILLs a child that swallows SIGTERM at the deadline instead of waiting out its exit 0', () => {
+    const runner = new ShellRunner();
+    const result = runner.run(process.execPath, ['-e', SIGTERM_SWALLOWER], { timeoutMs: 100 });
+    expect(result.status).toBeNull();
+    expect(result.signal).toBe('SIGKILL');
+  });
+
+  it('runOrThrow surfaces the kill as a CommandTimeoutError, never success', () => {
+    const runner = new ShellRunner();
+    expect(() =>
+      runner.runOrThrow(process.execPath, ['-e', SIGTERM_SWALLOWER], { timeoutMs: 100 }),
+    ).toThrow(CommandTimeoutError);
   });
 });
 

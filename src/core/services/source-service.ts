@@ -10,6 +10,21 @@ import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } fro
 const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
 
+/** The shape of a source-checkout dir this tool mints and is allowed to sweep.
+ *  One source of truth: minting goes through `mintCheckoutDirName`, and the
+ *  sweepable pattern below shares the same prefix — change them together. */
+const CHECKOUT_DIR_PREFIX = 'skills-source-';
+/** Only dirs this tool minted (`skills-source-` + a randomUUID) are sweepable —
+ *  a same-prefix name another tool chose in the shared tmpdir is never ours to
+ *  delete (adversary M5). */
+const SWEEPABLE_CHECKOUT_DIR = new RegExp(
+  `^${CHECKOUT_DIR_PREFIX}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+);
+
+function mintCheckoutDirName(): string {
+  return `${CHECKOUT_DIR_PREFIX}${randomUUID()}`;
+}
+
 /** Canonical GitHub repo URL from owner + repo (strips a redundant `.git`). */
 function githubRepoUrl(owner: string, repo: string): string {
   return `https://github.com/${owner}/${repo.replace(/\.git$/, '')}.git`;
@@ -97,7 +112,7 @@ export class SourceService {
 
     this.sweepStaleCheckouts();
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
-    const repoDir = path.join(this.tempRoot, `skills-source-${randomUUID()}`, 'repo');
+    const repoDir = path.join(this.tempRoot, mintCheckoutDirName(), 'repo');
     this.fs.makeDirectory(path.dirname(repoDir));
     try {
       // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
@@ -144,17 +159,18 @@ export class SourceService {
   }
 
   /**
-   * Remove `skills-source-*` dirs abandoned by earlier runs (crashes, and any
-   * predating the withCheckout lifecycle). The 24h age floor keeps concurrent
-   * processes' active checkouts safe. An undeletable entry (foreign owner,
-   * locked flags) is skipped, never fatal (adversary H2) — one poisoned dir
-   * must not take down every git-source command on the machine.
+   * Remove `skills-source-<uuid>` dirs abandoned by earlier runs (crashes, and
+   * any predating the withCheckout lifecycle). The uuid shape keeps foreign
+   * same-prefix dirs out of scope (adversary M5); the 24h age floor keeps
+   * concurrent processes' active checkouts safe. An undeletable entry (foreign
+   * owner, locked flags) is skipped, never fatal (adversary H2) — one poisoned
+   * dir must not take down every git-source command on the machine.
    */
   private sweepStaleCheckouts(): void {
     if (this.fs.kind(this.tempRoot) !== 'directory') return;
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     for (const entry of this.fs.readDirectory(this.tempRoot)) {
-      if (!entry.name.startsWith('skills-source-')) continue;
+      if (!SWEEPABLE_CHECKOUT_DIR.test(entry.name)) continue;
       const dir = path.join(this.tempRoot, entry.name);
       const modified = this.fs.modifiedAt(dir);
       if (modified > 0 && modified < cutoff) {

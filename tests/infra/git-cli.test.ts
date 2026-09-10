@@ -300,6 +300,44 @@ describe('GitCli clone timeout against real git (ticket 08)', () => {
   });
 });
 
+describe('GitCli.listRemoteHeads (GitHub tree URL import path, adversary M3)', () => {
+  const LS_REMOTE_TIMEOUT = new CommandTimeoutError('git', ['ls-remote', '--heads', URL], 300_000);
+
+  it('runs under the clone budget — a dead connection cannot hang the import', () => {
+    const { calls, cli } = scriptedCli([]);
+    cli.listRemoteHeads(URL);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args).toEqual(['ls-remote', '--heads', URL]);
+    expect(calls[0].options?.timeoutMs).toBe(300_000);
+  });
+
+  it('honors SKILLS_MANAGER_CLONE_TIMEOUT_MS like clone does', () => {
+    const { calls, cli } = scriptedCli([], () => 1_000_000, { SKILLS_MANAGER_CLONE_TIMEOUT_MS: '1500' });
+    cli.listRemoteHeads(URL);
+    expect(calls[0].options?.timeoutMs).toBe(1500);
+  });
+
+  it('retries a network-class failure exactly once over HTTP/1.1 (same semantics as clone)', () => {
+    const { calls, cli } = scriptedCli([CURL_92]);
+    cli.listRemoteHeads(URL);
+    expect(calls).toHaveLength(2);
+    expect(calls[1].args).toEqual(calls[0].args);
+    expect(calls[1].options?.env).toEqual(HTTP1_ENV);
+  });
+
+  it('does not retry a timeout — it reports the guided transport-stall error', () => {
+    const { calls, cli } = scriptedCli([LS_REMOTE_TIMEOUT]);
+    let thrown: unknown;
+    try {
+      cli.listRemoteHeads(URL);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(calls).toHaveLength(1);
+    expect((thrown as Error).message).toContain('SKILLS_MANAGER_CLONE_TIMEOUT_MS');
+  });
+});
+
 describe('GitCli.revParseTree (source anchor, ADR-0013)', () => {
   it('resolves the sub-directory tree SHA at HEAD — against a real shallow clone', () => {
     // Real git, not a recording fake: git's revision parser rejects

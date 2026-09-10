@@ -108,8 +108,12 @@ export class GitCli implements GitPort {
     return this.runner.runOrThrow('git', ['-C', repoDir, 'rev-parse', `HEAD:${subpath}`]);
   }
 
+  /** Branch discovery for GitHub tree URLs — an import-path transport like any
+   *  other: it gets the clone budget and retry semantics (adversary M3), so a
+   *  dead connection fails the import instead of hanging it. */
   listRemoteHeads(repoUrl: string): string[] {
-    const output = this.runner.runOrThrow('git', ['ls-remote', '--heads', repoUrl]);
+    const deadline = this.clock() + this.cloneTimeoutMs();
+    const output = this.runTransport('git', ['ls-remote', '--heads', repoUrl], deadline);
     return output.split('\n')
       .map((line) => line.match(/refs\/heads\/(.+)$/)?.[1])
       .filter((value): value is string => Boolean(value));
