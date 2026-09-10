@@ -191,6 +191,7 @@ program.command('edit')
   .option('--title <title>', 'display title')
   .option('--description <description>', 'short description')
   .option('--category <category>', 'category')
+  .option('--categories <categories...>', 'domain categories (replace semantics; same as `categories set`)')
   .option('--tags <tags...>', 'tags')
   .action((skill, opts, cmd) => {
     const s = services(cmd);
@@ -200,6 +201,7 @@ program.command('edit')
     if (opts.title !== undefined) patch.title = opts.title;
     if (opts.description !== undefined) patch.description = opts.description;
     if (opts.category !== undefined) patch.category = opts.category;
+    if (opts.categories !== undefined) patch.categories = opts.categories;
     if (opts.tags !== undefined) patch.tags = opts.tags;
     if (opts.sourceGit !== undefined) {
       patch.source = { type: 'git', url: normalizeGitSourceUrl(opts.sourceGit), ...(opts.subpath !== undefined ? { subpath: opts.subpath } : {}), ...(opts.sourceRef !== undefined ? { ref: opts.sourceRef } : {}) };
@@ -209,6 +211,47 @@ program.command('edit')
     const result = s.registry.editSafeFields(skill, patch);
     s.activity.record({ action: 'cli-edit', summary: `Edited ${skill}`, details: patch });
     print(result);
+  });
+
+// Domain categories: a free-form multi-valued registry axis, orthogonal to the
+// frozen legacy `category` (ADR-0015). Tag edits never touch runtime dirs.
+const categories = program.command('categories').description('Tag skills with domain categories and inspect the hub vocabulary');
+categories.command('set')
+  .description('Replace the whole category list for a skill (no categories given = clear)')
+  .argument('<skill>')
+  .argument('[category...]')
+  .action((skill, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.setCategories(skill, values);
+    s.activity.record({ action: 'cli-categories-set', summary: `set categories on ${skill}`, details: { skill, categories: values } });
+    print(result);
+  });
+categories.command('add')
+  .description('Add categories to a skill without restating the full list')
+  .argument('<skill>')
+  .argument('<category...>')
+  .action((skill, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.addCategories(skill, values);
+    s.activity.record({ action: 'cli-categories-add', summary: `add categories on ${skill}`, details: { skill, categories: values } });
+    print(result);
+  });
+categories.command('remove')
+  .description('Remove categories from a skill')
+  .argument('<skill>')
+  .argument('<category...>')
+  .action((skill, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.removeCategories(skill, values);
+    s.activity.record({ action: 'cli-categories-remove', summary: `remove categories on ${skill}`, details: { skill, categories: values } });
+    print(result);
+  });
+categories.command('list')
+  .description('List every category in the hub with a per-category skill count')
+  .action((_opts, cmd) => {
+    const counts = services(cmd).registry.listCategoryCounts();
+    for (const { category, count } of counts) console.log(`${category} (${count})`);
+    if (counts.length === 0) console.log('No categories yet — tag a skill with `categories set <skill> <category...>`.');
   });
 
 const provenance = program.command('provenance').description('Backfill provenance for source-less skills (lockfile evidence adoption, ADR-0011/0012)');

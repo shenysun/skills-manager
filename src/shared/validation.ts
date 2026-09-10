@@ -69,13 +69,14 @@ export function parseSkillMarkdownMetadata(text: string): SkillMarkdownMetadata 
   return metadata;
 }
 
-export type RegistrySafePatch = Pick<RegistryEntry, 'title' | 'category' | 'tags' | 'consumers' | 'source' | 'description'>;
+export type RegistrySafePatch = Pick<RegistryEntry, 'title' | 'category' | 'tags' | 'categories' | 'consumers' | 'source' | 'description'>;
 
 export function validateRegistrySafePatch(patch: Partial<RegistrySafePatch>): Partial<RegistrySafePatch> {
   const next: Partial<RegistrySafePatch> = {};
   if ('title' in patch && patch.title !== undefined) next.title = String(patch.title).trim();
   if ('category' in patch && patch.category !== undefined) next.category = String(patch.category).trim() || 'experimental';
   if ('tags' in patch && patch.tags !== undefined) next.tags = normalizeTags(patch.tags);
+  if ('categories' in patch && patch.categories !== undefined) next.categories = normalizeTags(patch.categories);
   if ('consumers' in patch && patch.consumers !== undefined) next.consumers = parseAgentTags(patch.consumers, undefined, { allowEmpty: true });
   if ('description' in patch && patch.description !== undefined) next.description = String(patch.description).trim();
   if ('source' in patch && patch.source !== undefined) {
