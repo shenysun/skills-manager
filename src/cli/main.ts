@@ -253,6 +253,16 @@ categories.command('list')
     for (const { category, count } of counts) console.log(`${category} (${count})`);
     if (counts.length === 0) console.log('No categories yet — tag a skill with `categories set <skill> <category...>`.');
   });
+categories.command('apply')
+  .description("Rewrite the selected agents' runtime dirs to exactly the skills in the given categories (manager skill exempt; foreign entries untouched)")
+  .argument('<category...>')
+  .option('-a, --agent <id...>', 'catalog agent ids (repeatable); defaults to the detected set')
+  .action((values, opts, cmd) => {
+    const s = services(cmd);
+    const result = s.distribute.applyCategorySet(values, opts.agent);
+    s.activity.record({ action: 'cli-categories-apply', summary: `Applied categories [${result.categories.join(', ')}] to ${result.paths.length} runtime path(s)`, details: { categories: result.categories, agents: result.agents } });
+    print(result);
+  });
 
 const provenance = program.command('provenance').description('Backfill provenance for source-less skills (lockfile evidence adoption, ADR-0011/0012)');
 provenance.command('adopt')
