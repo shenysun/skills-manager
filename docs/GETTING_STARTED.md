@@ -26,7 +26,7 @@ pnpm add -g skills-manager-cli
 
 Bootstrap is the only step that creates a **skill home** — a local directory that stores all your skills. After it finishes, go back to your agent and say:
 
-> 帮我看看我的 skills：有哪些、装到哪些 agent 了、有没有能更新的
+> Take stock of my skills: what I have, which agents they are wired into, and what has updates
 
 The manager skill answers with your library's state and the natural next steps (importing existing skills, installing new ones). It drives the CLI underneath (`npx skills-manager-cli …`); you rarely need to type commands yourself.
 
@@ -143,21 +143,21 @@ skills-manager provenance adopt          # adopt lockfile evidence where it exis
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 ```
 
-Evidence is adopted automatically; anything found by *searching* is only ever written after you approve it, one skill at a time (ADR-0012). The **manager skill** — installed by bootstrap — automates the whole loop: just tell your agent "补齐所有来源" and it adopts evidence, searches the skills ecosystem (skills.sh / GitHub), verifies candidates against the local copy, and asks you to pick. It also documents every CLI command for your agent, task by task.
+Evidence is adopted automatically; anything found by *searching* is only ever written after you approve it, one skill at a time (ADR-0012). The **manager skill** — installed by bootstrap — automates the whole loop: just tell your agent "backfill all my sources" and it adopts evidence, searches the skills ecosystem (skills.sh / GitHub), verifies candidates against the local copy, and asks you to pick. It also documents every CLI command for your agent, task by task.
 
 ### Load only one domain (category sets)
 
 Agents load whatever sits in their runtime dir — tag skills with your own domain vocabulary, then apply a category set so an agent loads **only** those domains.
 
 ```bash
-skills-manager categories set my-skill 前端     # tag (replace semantics; add/remove are incremental)
+skills-manager categories set my-skill frontend     # tag (replace semantics; add/remove are incremental)
 skills-manager categories list                  # every tag in the hub + counts
-skills-manager categories apply 前端 -a claude-code   # rewrite that runtime dir to exactly the set
+skills-manager categories apply frontend -a claude-code   # rewrite that runtime dir to exactly the set
 skills-manager categories status                # applied sets + drift; never writes
 skills-manager categories apply --all           # dissolve the filter, restore every managed skill
 ```
 
-Strict but reversible semantics: managed skills outside the set (**including untagged ones**) are removed, the manager skill and foreign entries are never touched, apply is idempotent, and `distribute rollback --to user` restores everything. Later tag edits never auto-push — `categories status` shows the drift and re-running `apply` converges (ADR-0015). In conversation, just say: 把 show-me 归到前端类，然后让 claude-code 只加载前端的 skills.
+Strict but reversible semantics: managed skills outside the set (**including untagged ones**) are removed, the manager skill and foreign entries are never touched, apply is idempotent, and `distribute rollback --to user` restores everything. Later tag edits never auto-push — `categories status` shows the drift and re-running `apply` converges (ADR-0015). In conversation, just say: tag show-me as frontend, then make claude-code load only the frontend skills.
 
 ### Open the Dashboard
 
@@ -196,7 +196,7 @@ skills-manager doctor --home ~/my-skills
 
 ### Add your first skill
 
-Just ask your agent — e.g. "从 github.com/owner/repo 装几个 skills，先列出来给我选". Prefer the CLI?
+Just ask your agent — e.g. "install a few skills from github.com/owner/repo, list them first so I can pick". Prefer the CLI?
 
 ```bash
 skills-manager add owner/repo --list          # discover first
@@ -207,12 +207,12 @@ Prefer the visual flow? `skills-manager web` → "＋ Add" opens the same source
 
 ### Distribute skills to agents
 
-Ask your agent ("把 my-skill 接入到 cursor 和 zed") or use the dashboard:
+Ask your agent ("wire my-skill into cursor and zed") or use the dashboard:
 
-1. In Dashboard: Click "接入" on a skill
+1. In Dashboard: click **Distribute** on a skill
 2. Select agents (Claude Code, Cursor, Zed, etc.)
 3. Choose distribution mode: "symlink" (for user scope) or "copy" (for projects)
-4. Click "接入"
+4. Confirm
 
 ### Update skills
 
