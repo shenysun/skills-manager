@@ -71,6 +71,13 @@ program.action((stray: string[] | undefined, opts, cmd) => {
   return runBootstrap(opts, cmd);
 });
 
+// Pure output with /bin/echo semantics — an install sanity check. Touches no
+// hub state, so it deliberately skips services() (and the hub check therein).
+program.command('echo')
+  .description('Print the given text to stdout and exit 0 (install sanity check)')
+  .argument('[text...]')
+  .action((text: string[]) => print(text.join(' ')));
+
 const webCommand = (cmd: Command, description: string) =>
   cmd
     .description(description)
@@ -184,6 +191,7 @@ program.command('edit')
   .option('--title <title>', 'display title')
   .option('--description <description>', 'short description')
   .option('--category <category>', 'category')
+  .option('--categories <categories...>', 'domain categories (replace semantics; same as `categories set`)')
   .option('--tags <tags...>', 'tags')
   .action((skill, opts, cmd) => {
     const s = services(cmd);
@@ -193,6 +201,7 @@ program.command('edit')
     if (opts.title !== undefined) patch.title = opts.title;
     if (opts.description !== undefined) patch.description = opts.description;
     if (opts.category !== undefined) patch.category = opts.category;
+    if (opts.categories !== undefined) patch.categories = opts.categories;
     if (opts.tags !== undefined) patch.tags = opts.tags;
     if (opts.sourceGit !== undefined) {
       patch.source = { type: 'git', url: normalizeGitSourceUrl(opts.sourceGit), ...(opts.subpath !== undefined ? { subpath: opts.subpath } : {}), ...(opts.sourceRef !== undefined ? { ref: opts.sourceRef } : {}) };
@@ -202,6 +211,86 @@ program.command('edit')
     const result = s.registry.editSafeFields(skill, patch);
     s.activity.record({ action: 'cli-edit', summary: `Edited ${skill}`, details: patch });
     print(result);
+  });
+
+// Domain categories: a free-form multi-valued registry axis, orthogonal to the
+// frozen legacy `category` (ADR-0015). Tag edits never touch runtime dirs.
+const categories = program.command('categories').description('Tag skills with domain categories and inspect the hub vocabulary');
+categories.command('set')
+  .description('Replace the whole category list for a skill (no categories given = clear)')
+  .argument('<skill>')
+  .argument('[category...]')
+  .action((skill, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.setCategories(skill, values);
+    s.activity.record({ action: 'cli-categories-set', summary: `set categories on ${skill}`, details: { skill, categories: values } });
+    print(result);
+  });
+categories.command('add')
+  .description('Add categories to a skill without restating the full list')
+  .argument('<skill>')
+  .argument('<category...>')
+  .action((skill, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.addCategories(skill, values);
+    s.activity.record({ action: 'cli-categories-add', summary: `add categories on ${skill}`, details: { skill, categories: values } });
+    print(result);
+  });
+categories.command('remove')
+  .description('Remove categories from a skill')
+  .argument('<skill>')
+  .argument('<category...>')
+  .action((skill, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.removeCategories(skill, values);
+    s.activity.record({ action: 'cli-categories-remove', summary: `remove categories on ${skill}`, details: { skill, categories: values } });
+    print(result);
+  });
+categories.command('list')
+  .description('List every category in the hub with a per-category skill count')
+  .action((_opts, cmd) => {
+    const counts = services(cmd).registry.listCategoryCounts();
+    for (const { category, count } of counts) console.log(`${category} (${count})`);
+    if (counts.length === 0) console.log('No categories yet — tag a skill with `categories set <skill> <category...>`.');
+  });
+categories.command('apply')
+  .description("Rewrite the selected agents' runtime dirs to exactly the skills in the given categories (--all dissolves the filter and restores every managed skill; manager skill exempt; foreign entries untouched)")
+  .argument('[category...]')
+  .option('-a, --agent <id...>', 'catalog agent ids (repeatable); defaults to the detected set')
+  .option('--all', 'dissolve the category filter: restore the full managed skill set on the selected paths')
+  .action((values, opts, cmd) => {
+    if (opts.all && values.length > 0) throw new Error('Pass either --all or a category list, not both.');
+    if (!opts.all && values.length === 0) throw new Error('Pass a category list (e.g. `categories apply 前端`) or --all to restore the full managed set.');
+    const s = services(cmd);
+    const result = opts.all ? s.distribute.applyAllCategories(opts.agent) : s.distribute.applyCategorySet(values, opts.agent);
+    const summary = result.all
+      ? `Applied all managed skills to ${result.paths.length} runtime path(s)`
+      : `Applied categories [${result.categories.join(', ')}] to ${result.paths.length} runtime path(s)`;
+    s.activity.record({ action: 'cli-categories-apply', summary, details: { all: result.all, categories: result.categories, agents: result.agents } });
+    print(result);
+  });
+categories.command('status')
+  .description("Show each runtime path's applied category set and drift (skills now matching the set but undistributed); never writes")
+  .action((_opts, cmd) => {
+    const { paths } = services(cmd).distribute.categorySetStatus();
+    if (paths.length === 0) {
+      console.log('No runtime paths recorded yet — distribute skills or apply a category set first.');
+      return;
+    }
+    for (const item of paths) {
+      const agents = item.agents.length > 0 ? item.agents.join(', ') : 'none';
+      const set = item.applied === null
+        ? 'no filter (no category set applied)'
+        : 'all' in item.applied ? 'no filter (--all applied)' : `categories: ${item.applied.categories.join(', ')}`;
+      console.log(`${item.runtimeDir} (agents: ${agents}) — ${set}`);
+      if (item.drift.length > 0) {
+        console.log(`  drift: ${item.drift.length} skill(s) match the set but are undistributed: ${item.drift.join(', ')}`);
+        const rerun = item.applied !== null && 'all' in item.applied
+          ? 'skills-manager categories apply --all'
+          : `skills-manager categories apply ${item.applied?.categories.join(' ')}`;
+        console.log(`  re-run \`${rerun}\` to converge`);
+      }
+    }
   });
 
 const provenance = program.command('provenance').description('Backfill provenance for source-less skills (lockfile evidence adoption, ADR-0011/0012)');
@@ -358,17 +447,24 @@ const distribute = program.command('distribute')
     print(result);
   });
 
-function runDistributeRollback(opts: { to: string; project?: string }, cmd: Command) {
+function runDistributeRollback(opts: { to?: string; project?: string }, cmd: Command) {
   const s = services(cmd);
-  if (opts.to !== 'user' && opts.to !== 'project') throw new Error('--to must be user or project');
-  const result = s.distribute.rollback(opts.to, opts.project);
-  s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${opts.to} distribution`, details: opts });
+  // The `distribute` group owns `--to`/`--project`; commander parses them onto
+  // the parent, so the rollback subcommand's same-named options never receive
+  // values — fall back to the command chain. The subcommand keeps its own
+  // declarations so `--help` still documents the interface.
+  const globals = cmd.optsWithGlobals() as { to?: string; project?: string };
+  const to = opts.to ?? globals.to;
+  const project = opts.project ?? globals.project;
+  if (to !== 'user' && to !== 'project') throw new Error('--to must be user or project');
+  const result = s.distribute.rollback(to, project);
+  s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${to} distribution`, details: { to, project } });
   print(result);
 }
 
 distribute.command('rollback')
   .description('Restore the last distribute snapshot for a target')
-  .requiredOption('--to <kind>', 'user or project')
+  .option('--to <kind>', 'user or project (required)')
   .option('--project <path>', 'project root (required when --to project)')
   .action((opts, cmd) => runDistributeRollback(opts, cmd));
 

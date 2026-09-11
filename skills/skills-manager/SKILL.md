@@ -1,6 +1,6 @@
 ---
 name: skills-manager
-description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, or wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo).
+description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories) or applying / inspecting a category set (类别集) so an agent loads only the selected domains, or wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo).
 ---
 
 # Skills Manager
@@ -13,6 +13,7 @@ Key vocabulary you will need when reading output:
 - **Update detection**: the freshness engine behind `update --check` and the dashboard's 可更新 check. GitHub sources compare the skill sub-directory's tree SHA (`source.upstream_tree`) against the GitHub Trees API — one call per repo (shared by all its skills), TTL-cached, through the logged-in `gh` CLI when present (5000 req/h) or anonymous HTTPS otherwise (60 req/h). A row reading **检测失败 / detection failed** means the check did not complete — that is *not* "no update"; every failure appends a JSON line to `<home>/.skills/dashboard.log`.
 - **`imported: true`**: how the skill *entered* the hub (via `init`), orthogonal to whether it has a source.
 - **Detected agents**: the agent set `npx skills` would target on this machine, resolved locally from the bundled catalog snapshot.
+- **Domain category / category set**: a skill's free-form `categories: []` (前端 / 金融 / backend — the user's own vocabulary, orthogonal to the frozen legacy `category`); a **category set** is the per-runtime-path applied filter state that `categories status` reports.
 
 The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. Commands print JSON — except `status` (a human-readable summary) and `--help`. Parse stdout; don't guess the shape.
 
@@ -77,6 +78,37 @@ skills-manager distribute rollback --to user
 ```
 
 Omitting `--agent` targets the **detected set** — which can be dozens of agents on a busy machine. Check `catalog info` first and name agents explicitly unless the user truly means "everywhere". User scope defaults to symlink, project scope to copy.
+
+### Domain categories: tag skills, apply a category set
+
+Every skill can carry free-form **domain categories** (前端 / 金融 / backend — no controlled vocabulary; `categories list` keeps the wording consistent). Tagging only writes the registry — what loads changes **only** on an explicit apply.
+
+```bash
+skills-manager categories set <skill> 前端 后端     # replace the whole list (no values = clear)
+skills-manager categories add <skill> 金融          # incremental, no full restatement
+skills-manager categories remove <skill> 金融
+skills-manager categories list                     # every tag in the hub + per-tag skill count
+skills-manager edit <skill> --categories 前端 后端  # same replace semantics inside edit
+```
+
+Map conversational tagging asks ("给 X 归到前端类" / "tag this as frontend") straight onto these commands — there are no flags for the user to remember.
+
+`categories apply` rewrites the selected agents' runtime dirs to **exactly** the skills in the given categories: distributes what's missing, removes managed skills outside the set.
+
+```bash
+skills-manager categories apply 前端 金融 -a claude-code
+skills-manager categories apply --all              # dissolve the filter, restore every managed skill
+skills-manager categories status                   # per-path applied set + drift; never writes
+```
+
+Agent selection reuses distribute's mental model, not a new one: `-a` repeatable, default = detected set. The CLI itself never prompts — when the user doesn't name agents, *you* pick in conversation, the way distribute's dashboard picker behaves: detected agents prechecked when no apply has been confirmed yet, and the last confirmed apply selection — remembered per scope, within this conversation — offered as the default next time. Agents sharing one physical runtime dir (an agent family) necessarily share one category set; selection is always by agent id.
+
+State the strict semantics plainly whenever proposing an apply:
+
+- **Only the selected set** — managed skills outside the categories, *including uncategorized ones*, are removed from the runtime dir. It is reversible: `apply --all` restores everything, and `distribute rollback --to user` restores the runtime content and the category-set record together.
+- **Exemptions** — this manager skill is always exempt (switching categories never cuts off this conversation); foreign (unmanaged) entries are never touched.
+- **Idempotent** — re-running the same apply changes nothing; recovering from an interruption is just "run it again".
+- **No auto-push** — apply is an explicit snapshot; later tag edits or updates never mutate the runtime. `categories status` reports the drift ("N skills now match the set but are undistributed") and names the re-run command that converges.
 
 ### Update from sources
 

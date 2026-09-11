@@ -110,6 +110,35 @@ export class RegistryService {
     });
   }
 
+  /** Replace the whole category list (same semantics as `edit --categories`, ADR-0015). */
+  setCategories(skill: SkillName, categories: readonly string[]) {
+    return this.editSafeFields(skill, { categories: [...categories] });
+  }
+
+  addCategories(skill: SkillName, categories: readonly string[]) {
+    const current = this.getEntry(skill)?.categories || [];
+    return this.editSafeFields(skill, { categories: [...current, ...categories] });
+  }
+
+  removeCategories(skill: SkillName, categories: readonly string[]) {
+    const dropping = new Set(normalizeTags(categories));
+    const current = this.getEntry(skill)?.categories || [];
+    return this.editSafeFields(skill, { categories: current.filter((value) => !dropping.has(value)) });
+  }
+
+  /** Every category in the hub with a per-category skill count — the operator's vocabulary view. */
+  listCategoryCounts(): Array<{ category: string; count: number }> {
+    const counts = new Map<string, number>();
+    for (const skill of this.listSkills()) {
+      for (const category of skill.categories) {
+        counts.set(category, (counts.get(category) || 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => (a.category < b.category ? -1 : a.category > b.category ? 1 : 0));
+  }
+
   defaultEntry(skill: SkillName, patch: Partial<RegistryEntry> = {}): RegistryEntry {
     assertSafeSkillName(skill);
     // No legacy default tags: desired agents are catalog ids (see ADR-0004).
@@ -119,6 +148,7 @@ export class RegistryService {
       title: skill,
       category: 'experimental',
       tags: [],
+      categories: [],
       consumers,
       source: { type: 'local', url: null, subpath: null, ref: null, upstream_commit: null, upstream_tree: null, baseline_hash: null },
       update_policy: 'manual',
@@ -126,6 +156,7 @@ export class RegistryService {
       ...patch,
     };
     entry.tags = normalizeTags(patch.tags || []);
+    entry.categories = normalizeTags(patch.categories || []);
     entry.consumers = consumers;
     return entry;
   }
@@ -137,6 +168,7 @@ export class RegistryService {
       title: entry.title || name,
       category: entry.category || 'experimental',
       tags: normalizeTags(entry.tags || []),
+      categories: normalizeTags(entry.categories || []),
       consumers: entry.consumers !== undefined ? parseAgentTags(entry.consumers, undefined, { allowEmpty: true }) : [],
       description: entry.description || '',
       source: entry.source || {},

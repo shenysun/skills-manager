@@ -31,6 +31,8 @@ export type RegistryEntry = {
   title?: string;
   category?: string;
   tags?: string[];
+  /** Domain categories — free-form multi-valued axis, orthogonal to the frozen legacy `category` (ADR-0015). */
+  categories?: string[];
   /** Desired/default agent ids from the catalog (metadata only; see ADR-0004). */
   consumers?: string[];
   source?: SkillSource;
@@ -54,6 +56,8 @@ export type Skill = {
   title: string;
   category: string;
   tags: string[];
+  /** Domain categories — free-form multi-valued axis (ADR-0015). */
+  categories: string[];
   consumers: string[];
   description: string;
   source: SkillSource;
@@ -189,12 +193,17 @@ export type DistributionIndexEntry = {
   error?: DistributionIndexError;
 };
 
+/** The category set applied to one physical runtime dir (ADR-0015): a concrete tag list, or the `--all` restore marker. */
+export type AppliedCategorySet = { categories: string[] } | { all: true };
+
 export type DistributionIndexRecord = {
   id: string;
   kind: DistributionTargetKind;
   targetRoot: string;
   updatedAt: string;
   entries: DistributionIndexEntry[];
+  /** Applied category sets keyed by physical runtime dir — one per shared path, not per agent (ADR-0015). */
+  categorySets?: Record<string, AppliedCategorySet>;
 };
 
 export type ActivityRecord = {

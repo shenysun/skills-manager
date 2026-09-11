@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -41,5 +41,26 @@ describe('official skills-manager agent skill', () => {
     const entry = JSON.parse(listed.stdout).find((skill: { name: string }) => skill.name === 'skills-manager');
     expect(entry.source.type).toBe('local'); // installed from the local checkout
     expect(entry.source.subpath).toBe('skills/skills-manager');
+  });
+
+  it('delivers bundled docs covering the categories conversation surface, hub copy identical to the bundle', () => {
+    // Seed-path delivery: the every-run refresh semantics (changed bundle → hub
+    // copy replaced) are covered at the services seam in manager-skill.test.ts.
+    const result = run(['bootstrap']);
+
+    expect(result.status, result.stderr).toBe(0);
+    const hubDoc = readFileSync(path.join(home, 'skills', 'skills-manager', 'SKILL.md'), 'utf8');
+    const bundleDoc = readFileSync(path.join(repoRoot, 'skills', 'skills-manager', 'SKILL.md'), 'utf8');
+    expect(hubDoc).toBe(bundleDoc);
+    // The conversation surface stays in step with the CLI (skill-categories ticket 07).
+    for (const phrase of [
+      'categories set', 'categories add', 'categories remove', 'categories list',
+      'categories apply', 'categories status', 'apply --all',
+    ]) expect(hubDoc, `missing "${phrase}" in bundled SKILL.md`).toContain(phrase);
+    // Strict semantics stated accurately: exemptions + reversibility + idempotence.
+    expect(hubDoc).toMatch(/exempt/);
+    expect(hubDoc).toMatch(/foreign/);
+    expect(hubDoc).toMatch(/uncategorized/i);
+    expect(hubDoc).toMatch(/idempotent/i);
   });
 });
