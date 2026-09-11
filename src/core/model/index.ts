@@ -193,12 +193,17 @@ export type DistributionIndexEntry = {
   error?: DistributionIndexError;
 };
 
+/** The category set applied to one physical runtime dir (ADR-0015): a concrete tag list, or the `--all` restore marker. */
+export type AppliedCategorySet = { categories: string[] } | { all: true };
+
 export type DistributionIndexRecord = {
   id: string;
   kind: DistributionTargetKind;
   targetRoot: string;
   updatedAt: string;
   entries: DistributionIndexEntry[];
+  /** Applied category sets keyed by physical runtime dir — one per shared path, not per agent (ADR-0015). */
+  categorySets?: Record<string, AppliedCategorySet>;
 };
 
 export type ActivityRecord = {
