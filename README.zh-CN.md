@@ -40,13 +40,30 @@ npx skills-manager-cli
 - 它自己保持最新：CLI 每次运行都会对比包内副本与库内副本并静默刷新——除非你自己改过库内副本，那就是你的了，不再碰它。
 - 底层的 CLI 是纯粹的引擎（JSON 输出、非交互 flag）——见 [CLI 参考](docs/CLI.zh-CN.md)。
 
+## 类别集：只加载你需要的
+
+agent 是整个目录 wholesale 加载 skills 的——没有 per-skill 开关。领域类别把这个开关带到技能库：用你自己的词表给 skill 打标（前端 / 金融 / backend——自由字符串，不受控词表），再应用一个类别集，该 agent 的运行时目录就**恰好**只装这些领域。
+
+> 帮我把 show-me 归到前端类，然后让 claude-code 只加载前端的 skills
+
+```sh
+skills-manager categories set show-me 前端 web    # 覆盖式替换整个标签列表
+skills-manager categories add show-me 前端        # 增量补标
+skills-manager categories list                    # 全库标签 + 每标签 skill 数
+skills-manager categories apply 前端 金融 -a claude-code   # 把运行时目录改写为恰好该集合
+skills-manager categories apply --all             # 解散过滤，恢复全部受管 skill
+skills-manager categories status                  # 各路径已应用集合 + 漂移
+```
+
+apply 是显式的、可逆的快照：缺的分发、集合外（含未打标）的受管 skill 撤除；manager skill 自身与 foreign 条目永不触碰；重跑同一 apply 零变化。之后改标签不会自动推送——`categories status` 报漂移，重跑 `apply` 即收敛。`distribute rollback --to user` 会把运行时内容和类别集记录一起恢复。共享同一物理运行时目录的 agent（agent family）必然共享同一个集合。见 [ADR-0015](docs/adr/0015-domain-categories-category-set-loading.md)。
+
 ## 技能库（skill home）结构
 
 一个技能库包含：
 
 - `skills/`：规范技能目录，扁平存放为 `skills/<skill-name>/SKILL.md`
 - `collections/`：生成的分类软链接树（仅供浏览）
-- `registry.yaml`：元数据 —— 分类、标签、消费方、来源（仓库、子路径、ref、基线）、更新策略
+- `registry.yaml`：元数据 —— 领域类别、旧版分类、标签、消费方、来源（仓库、子路径、ref、基线）、更新策略
 - `.skills/`：分发索引（`distributions.jsonl`）、活动日志、可选的 agent 目录覆盖
 - `.backups/`：init 前的原始内容，保留 30 天
 
@@ -76,6 +93,9 @@ skills-manager backup restore my-skill           # 回滚某次导入
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager provenance list                   # 仍缺来源的技能清单
 skills-manager provenance adopt                  # 补采锁文件证据
+skills-manager categories set my-skill 前端       # 打领域类别标签
+skills-manager categories apply 前端 -a claude-code  # 只加载该领域
+skills-manager categories status                  # 已应用集合 + 漂移
 skills-manager archive old-skill
 ```
 

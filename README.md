@@ -41,13 +41,30 @@ Content moves into the hub, originals become symlinks (backed up first). Prefer 
 - It keeps itself current: every CLI run compares the bundled copy with the hub copy and silently refreshes it — unless you edited the hub copy yourself, in which case it is yours and stays untouched.
 - The CLI underneath is a plain engine (JSON output, non-interactive flags) — see the [CLI reference](docs/CLI.md).
 
+## Category sets: load only what you need
+
+Agents load skills wholesale from their runtime dir — no per-skill switch. Domain categories bring that switch to the hub: tag skills with your own vocabulary (前端 / 金融 / backend — free-form, no controlled list), then apply a category set so an agent's runtime dir holds **exactly** those domains.
+
+> 帮我把 show-me 归到前端类，然后让 claude-code 只加载前端的 skills
+
+```sh
+skills-manager categories set show-me 前端 web    # replace the whole tag list
+skills-manager categories add show-me 前端        # incremental
+skills-manager categories list                    # every tag in the hub + counts
+skills-manager categories apply 前端 金融 -a claude-code   # rewrite that runtime dir to exactly the set
+skills-manager categories apply --all             # dissolve the filter, restore every managed skill
+skills-manager categories status                  # per-path applied set + drift
+```
+
+Apply is an explicit, reversible snapshot: missing skills get distributed, managed skills outside the set (including untagged ones) are removed, the manager skill itself and foreign entries are never touched, and re-running the same apply changes nothing. Later tag edits never auto-push — `categories status` reports the drift and re-running `apply` converges. `distribute rollback --to user` restores the runtime content and the category-set record together. Agents sharing one physical runtime dir (an agent family) necessarily share one set. See [ADR-0015](docs/adr/0015-domain-categories-category-set-loading.md).
+
 ## Skill home layout
 
 A skill home contains:
 
 - `skills/`: canonical skill directories, kept flat as `skills/<skill-name>/SKILL.md`
 - `collections/`: generated category symlink trees (browse-only)
-- `registry.yaml`: metadata — category, tags, consumers, source (repo, subpath, ref, baseline), update policy
+- `registry.yaml`: metadata — domain categories, legacy category, tags, consumers, source (repo, subpath, ref, baseline), update policy
 - `.skills/`: distribution index (`distributions.jsonl`), activity log, optional agent-catalog override
 - `.backups/`: pre-init originals, kept for 30 days
 
@@ -77,6 +94,9 @@ skills-manager backup restore my-skill           # roll one import back
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager provenance list                   # skills still missing a source
 skills-manager provenance adopt                  # backfill lockfile evidence
+skills-manager categories set my-skill 前端       # tag with a domain category
+skills-manager categories apply 前端 -a claude-code  # load only that domain
+skills-manager categories status                  # applied sets + drift
 skills-manager archive old-skill
 ```
 

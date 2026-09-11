@@ -55,11 +55,26 @@ skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill -
 skills-manager provenance list
 skills-manager provenance adopt
 skills-manager provenance adopt --dry-run --skill my-skill
+skills-manager categories set my-skill 前端 后端
+skills-manager categories add my-skill 金融
+skills-manager categories remove my-skill 金融
+skills-manager categories list
+skills-manager categories apply 前端 金融 --agent claude-code
+skills-manager categories apply --all
+skills-manager categories status
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
 
 Distribute targets any catalog agent id (`--agent`, repeatable). Omitting `--agent` applies to the detected set on this machine. User scope defaults to `--mode symlink`, project scope to `--mode copy`; one mode per apply.
+
+### categories (domain categories and category sets, ADR-0015)
+
+Skills carry a free-form multi-valued `categories: []` axis (前端 / 金融 / backend — the user's own vocabulary, no controlled list; normalization trims, dedupes, drops empties). It is orthogonal to the frozen legacy scalar `category` (which keeps feeding `collections/` and `list --category`). `categories set` and `edit --categories` are replace-semantics; `add` / `remove` are incremental; `list` reports every tag in the hub with per-tag counts.
+
+`categories apply <cat...>` is a distribute-level operation: it resolves the selected agents (`--agent` repeatable, default = detected set) to physical runtime paths (deduped), then rewrites each path to hold **exactly** the managed skills whose categories intersect the applied set — distributing what's missing and removing managed entries outside the set, **including untagged ones**. Removal is path-strict (an out-of-set entry goes even if an unselected same-path family agent references it; in-set entries fold in the union of referencing agents). The manager skill is unconditionally exempt; foreign entries are never touched. Apply is idempotent and takes a pre-apply snapshot; `apply --all` dissolves the filter (restores every managed skill, clears the record) and is mutually exclusive with a category list. The applied set is persisted per physical runtime path as an extension of the distribution index; `distribute rollback --to user` restores runtime content and the category-set record together.
+
+Apply is an explicit snapshot — later tag edits or updates never auto-push. `categories status` reports each path's applied set plus drift ("N skills now match the set but are undistributed"); re-running `apply` converges. See [ADR-0015](adr/0015-domain-categories-category-set-loading.md).
 
 ### Stale copy targets and auto-refresh (ADR-0008)
 

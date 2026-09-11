@@ -55,11 +55,26 @@ skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill -
 skills-manager provenance list
 skills-manager provenance adopt
 skills-manager provenance adopt --dry-run --skill my-skill
+skills-manager categories set my-skill 前端 后端
+skills-manager categories add my-skill 金融
+skills-manager categories remove my-skill 金融
+skills-manager categories list
+skills-manager categories apply 前端 金融 --agent claude-code
+skills-manager categories apply --all
+skills-manager categories status
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
 
 distribute 的目标可以是任意目录中的 agent id（`--agent`，可重复）。省略 `--agent` 时作用于本机检测到的 agent 集合。用户范围默认 `--mode symlink`，项目范围默认 `--mode copy`；每次应用只能用一种模式。
+
+### categories（领域类别与类别集，ADR-0015）
+
+每个技能可携带自由多值的 `categories: []` 轴（前端 / 金融 / backend——用户自己的词表，不受控；规范化为 trim、去重、去空）。它与冻结的旧版标量 `category`（继续喂 `collections/` 与 `list --category`）正交。`categories set` 与 `edit --categories` 为覆盖式；`add` / `remove` 为增量式；`list` 输出全库标签及每标签计数。
+
+`categories apply <cat...>` 是 distribute 层操作：把所选 agent（`--agent` 可重复，缺省 = 检测集）解析到物理运行时路径（去重），然后把每个路径改写为**恰好**持有类别与所应用集合相交的受管技能——缺的分发、集合外的受管条目撤除，**包括未打标的**。撤除是路径级严格语义（越集条目即使被未选中的同路径 family 成员引用也撤；集内条目折叠引用 agent 的并集）。manager skill 无条件豁免；foreign 条目永不触碰。apply 幂等且先打快照；`apply --all` 解散过滤（恢复全部受管技能、清除记录），与类别列表互斥。已应用集合按物理运行时路径持久化为分发索引的扩展；`distribute rollback --to user` 把运行时内容与类别集记录一起恢复。
+
+apply 是显式快照——之后的打标或更新不会自动推送。`categories status` 报告各路径的已应用集合与漂移（「N 个技能现已匹配集合但未分发」）；重跑 `apply` 即收敛。见 [ADR-0015](adr/0015-domain-categories-category-set-loading.md)。
 
 ### 副本过期与自动刷新（ADR-0008）
 

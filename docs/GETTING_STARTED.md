@@ -145,6 +145,20 @@ skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 
 Evidence is adopted automatically; anything found by *searching* is only ever written after you approve it, one skill at a time (ADR-0012). The **manager skill** — installed by bootstrap — automates the whole loop: just tell your agent "补齐所有来源" and it adopts evidence, searches the skills ecosystem (skills.sh / GitHub), verifies candidates against the local copy, and asks you to pick. It also documents every CLI command for your agent, task by task.
 
+### Load only one domain (category sets)
+
+Agents load whatever sits in their runtime dir — tag skills with your own domain vocabulary, then apply a category set so an agent loads **only** those domains.
+
+```bash
+skills-manager categories set my-skill 前端     # tag (replace semantics; add/remove are incremental)
+skills-manager categories list                  # every tag in the hub + counts
+skills-manager categories apply 前端 -a claude-code   # rewrite that runtime dir to exactly the set
+skills-manager categories status                # applied sets + drift; never writes
+skills-manager categories apply --all           # dissolve the filter, restore every managed skill
+```
+
+Strict but reversible semantics: managed skills outside the set (**including untagged ones**) are removed, the manager skill and foreign entries are never touched, apply is idempotent, and `distribute rollback --to user` restores everything. Later tag edits never auto-push — `categories status` shows the drift and re-running `apply` converges (ADR-0015). In conversation, just say: 把 show-me 归到前端类，然后让 claude-code 只加载前端的 skills.
+
 ### Open the Dashboard
 
 ```bash
