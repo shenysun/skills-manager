@@ -140,3 +140,59 @@ describe('categories apply core semantics', () => {
     expect(runtimeNames('.claude/skills')).toEqual(['foo']);
   });
 });
+
+describe('categories apply --all', () => {
+  it('restores the full managed set on the path after a filtered apply: out-of-set and uncategorized return', () => {
+    run(['distribute', '--to', 'user', '--skill', 'foo', '--skill', 'bar', '--skill', 'baz', '--agent', 'zed']);
+    run(['categories', 'apply', '前端', '--agent', 'zed']);
+    expect(runtimeNames()).toEqual(['foo']);
+    const result = run(['categories', 'apply', '--all', '--agent', 'zed']);
+    expect(result.status).toBe(0);
+    expect(runtimeNames()).toEqual(['bar', 'baz', 'foo']);
+  });
+
+  it('marks the category-set record as the --all marker, replacing the prior category list', () => {
+    run(['distribute', '--to', 'user', '--skill', 'foo', '--skill', 'bar', '--agent', 'zed']);
+    run(['categories', 'apply', '前端', '--agent', 'zed']);
+    const result = run(['categories', 'apply', '--all', '--agent', 'zed']);
+    expect(result.status).toBe(0);
+    const record = indexRecords().find((item) => item.id.startsWith('user:'));
+    expect(record?.categorySets?.[runtimeDir()]).toEqual({ all: true });
+    // The restored entries are back in the index — including previously removed uncategorized ones.
+    expect(record?.entries.map((entry) => entry.skill).sort()).toEqual(['bar', 'baz', 'foo']);
+  });
+
+  it('keeps the manager skill and foreign entries untouched under --all', () => {
+    run(['distribute', '--to', 'user', '--skill', 'foo', '--skill', 'skills-manager', '--agent', 'zed']);
+    mkdirSync(path.join(runtimeDir(), 'hand-placed'));
+    run(['categories', 'apply', '前端', '--agent', 'zed']);
+    const result = run(['categories', 'apply', '--all', '--agent', 'zed']);
+    expect(result.status).toBe(0);
+    // Manager retained (not removed, not duplicated); foreign survives; full set restored.
+    expect(runtimeNames()).toEqual(['bar', 'baz', 'foo', 'hand-placed', 'skills-manager']);
+  });
+
+  it('rejects --all together with a category list, and an empty invocation with neither', () => {
+    const both = run(['categories', 'apply', '--all', '前端', '--agent', 'zed']);
+    expect(both.status).not.toBe(0);
+    expect(both.stderr).toMatch(/--all.*category/i);
+    const neither = run(['categories', 'apply', '--agent', 'zed']);
+    expect(neither.status).not.toBe(0);
+    expect(neither.stderr).toMatch(/category list|--all/i);
+  });
+
+  it('is idempotent: a second --all changes nothing (index byte-identical, no extra snapshot)', () => {
+    run(['distribute', '--to', 'user', '--skill', 'foo', '--skill', 'bar', '--agent', 'zed']);
+    run(['categories', 'apply', '前端', '--agent', 'zed']);
+    run(['categories', 'apply', '--all', '--agent', 'zed']);
+    const indexBefore = readFileSync(path.join(home, '.skills', 'distributions.jsonl'), 'utf8');
+    const backups = path.join(home, '.skills', 'distribute-backups');
+    const snapshotsBefore = readdirSync(backups, { recursive: true }).filter((item) => String(item).includes('manifest.yaml')).length;
+    const second = run(['categories', 'apply', '--all', '--agent', 'zed']);
+    expect(second.status).toBe(0);
+    expect(runtimeNames()).toEqual(['bar', 'baz', 'foo']);
+    expect(readFileSync(path.join(home, '.skills', 'distributions.jsonl'), 'utf8')).toBe(indexBefore);
+    const snapshotsAfter = readdirSync(backups, { recursive: true }).filter((item) => String(item).includes('manifest.yaml')).length;
+    expect(snapshotsAfter).toBe(snapshotsBefore);
+  });
+});

@@ -254,13 +254,19 @@ categories.command('list')
     if (counts.length === 0) console.log('No categories yet — tag a skill with `categories set <skill> <category...>`.');
   });
 categories.command('apply')
-  .description("Rewrite the selected agents' runtime dirs to exactly the skills in the given categories (manager skill exempt; foreign entries untouched)")
-  .argument('<category...>')
+  .description("Rewrite the selected agents' runtime dirs to exactly the skills in the given categories (--all dissolves the filter and restores every managed skill; manager skill exempt; foreign entries untouched)")
+  .argument('[category...]')
   .option('-a, --agent <id...>', 'catalog agent ids (repeatable); defaults to the detected set')
+  .option('--all', 'dissolve the category filter: restore the full managed skill set on the selected paths')
   .action((values, opts, cmd) => {
+    if (opts.all && values.length > 0) throw new Error('Pass either --all or a category list, not both.');
+    if (!opts.all && values.length === 0) throw new Error('Pass a category list (e.g. `categories apply 前端`) or --all to restore the full managed set.');
     const s = services(cmd);
-    const result = s.distribute.applyCategorySet(values, opts.agent);
-    s.activity.record({ action: 'cli-categories-apply', summary: `Applied categories [${result.categories.join(', ')}] to ${result.paths.length} runtime path(s)`, details: { categories: result.categories, agents: result.agents } });
+    const result = opts.all ? s.distribute.applyAllCategories(opts.agent) : s.distribute.applyCategorySet(values, opts.agent);
+    const summary = result.all
+      ? `Applied all managed skills to ${result.paths.length} runtime path(s)`
+      : `Applied categories [${result.categories.join(', ')}] to ${result.paths.length} runtime path(s)`;
+    s.activity.record({ action: 'cli-categories-apply', summary, details: { all: result.all, categories: result.categories, agents: result.agents } });
     print(result);
   });
 
