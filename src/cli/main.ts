@@ -269,6 +269,29 @@ categories.command('apply')
     s.activity.record({ action: 'cli-categories-apply', summary, details: { all: result.all, categories: result.categories, agents: result.agents } });
     print(result);
   });
+categories.command('status')
+  .description("Show each runtime path's applied category set and drift (skills now matching the set but undistributed); never writes")
+  .action((_opts, cmd) => {
+    const { paths } = services(cmd).distribute.categorySetStatus();
+    if (paths.length === 0) {
+      console.log('No runtime paths recorded yet — distribute skills or apply a category set first.');
+      return;
+    }
+    for (const item of paths) {
+      const agents = item.agents.length > 0 ? item.agents.join(', ') : 'none';
+      const set = item.applied === null
+        ? 'no filter (no category set applied)'
+        : 'all' in item.applied ? 'no filter (--all applied)' : `categories: ${item.applied.categories.join(', ')}`;
+      console.log(`${item.runtimeDir} (agents: ${agents}) — ${set}`);
+      if (item.drift.length > 0) {
+        console.log(`  drift: ${item.drift.length} skill(s) match the set but are undistributed: ${item.drift.join(', ')}`);
+        const rerun = item.applied !== null && 'all' in item.applied
+          ? 'skills-manager categories apply --all'
+          : `skills-manager categories apply ${item.applied?.categories.join(' ')}`;
+        console.log(`  re-run \`${rerun}\` to converge`);
+      }
+    }
+  });
 
 const provenance = program.command('provenance').description('Backfill provenance for source-less skills (lockfile evidence adoption, ADR-0011/0012)');
 provenance.command('adopt')

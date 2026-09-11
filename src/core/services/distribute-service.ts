@@ -77,6 +77,16 @@ export type CategoryApplyResult = {
   paths: CategoryApplyPathOutcome[];
 };
 
+/** One physical runtime path's filter state (ADR-0015): the applied set and what has drifted since. */
+export type CategorySetStatusPath = {
+  runtimeDir: string;
+  agents: string[];
+  /** The applied set — a category list, the `--all` marker, or null when the path was never applied. */
+  applied: AppliedCategorySet | null;
+  /** Skills that currently match the effective set (the full managed set under `--all`) but have no live entry on this path. */
+  drift: SkillName[];
+};
+
 type SnapshotManifest = {
   kind: DistributionTargetKind;
   targetRoot: string;
@@ -175,12 +185,7 @@ export class DistributeService {
   applyCategorySet(categories: readonly string[], agents?: readonly string[]): CategoryApplyResult {
     const set = normalizeTags(categories);
     this.assertCategorySet({ categories: set });
-    const wanted = new Set(
-      this.manageableSkills()
-        .filter((skill) => skill.categories.some((category) => set.includes(category)))
-        .map((skill) => skill.name),
-    );
-    return this.rewriteToWanted(wanted, { categories: set }, agents);
+    return this.rewriteToWanted(this.wantedSkills({ categories: set }), { categories: set }, agents);
   }
 
   /**
@@ -191,13 +196,21 @@ export class DistributeService {
    * entries stay untouched. Rerunning changes nothing.
    */
   applyAllCategories(agents?: readonly string[]): CategoryApplyResult {
-    const wanted = new Set(this.manageableSkills().map((skill) => skill.name));
-    return this.rewriteToWanted(wanted, { all: true }, agents);
+    return this.rewriteToWanted(this.wantedSkills({ all: true }), { all: true }, agents);
   }
 
   /** Managed hub skills every category apply draws from — the manager skill is never in the pool. */
   private manageableSkills() {
     return this.registry.listSkills().filter((skill) => skill.name !== MANAGER_SKILL_NAME);
+  }
+
+  /** The skills an applied set covers: the full managed pool under `--all`, otherwise exactly those tagged in the list. */
+  private wantedSkills(applied: AppliedCategorySet): Set<SkillName> {
+    return new Set(
+      this.manageableSkills()
+        .filter((skill) => 'all' in applied || skill.categories.some((category) => applied.categories.includes(category)))
+        .map((skill) => skill.name),
+    );
   }
 
   /** Per-path rewrite kernel shared by apply and apply --all; see applyCategorySet for the semantics. */
@@ -304,6 +317,42 @@ export class DistributeService {
     const key = path.resolve(runtimeDir);
     const record = this.loadRecord(target.id);
     this.rewriteRecord(target, record?.entries ?? [], { ...record?.categorySets, [key]: set });
+  }
+
+  /**
+   * Report-only view of every known physical runtime path (ADR-0015): which
+   * category set each path currently serves, and the drift an explicit apply
+   * snapshot leaves behind — later tagging changes or installs never push into
+   * the runtime, so status tells the operator when to re-run apply. Reads only.
+   */
+  categorySetStatus(): { paths: CategorySetStatusPath[] } {
+    const paths = new Map<string, { agents: Set<string>; applied: AppliedCategorySet | null; live: Set<SkillName> }>();
+    const getOrInit = (dir: string) => {
+      let item = paths.get(dir);
+      if (item === undefined) {
+        item = { agents: new Set<string>(), applied: null, live: new Set<SkillName>() };
+        paths.set(dir, item);
+      }
+      return item;
+    };
+    for (const record of this.loadIndex()) {
+      for (const [dir, set] of Object.entries(record.categorySets ?? {})) {
+        getOrInit(path.resolve(dir)).applied = set;
+      }
+      for (const entry of record.entries) {
+        const item = getOrInit(path.resolve(path.dirname(entry.runtimePath)));
+        entry.agents.forEach((id) => item.agents.add(id));
+        if (this.fs.kind(entry.runtimePath) !== 'missing') item.live.add(entry.skill);
+      }
+    }
+    return {
+      paths: [...paths.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([dir, { agents, applied, live }]) => ({
+        runtimeDir: dir,
+        agents: [...agents].sort(),
+        applied,
+        drift: applied === null ? [] : [...this.wantedSkills(applied)].filter((skill) => !live.has(skill)),
+      })),
+    };
   }
 
   /** Clear the applied category set for one physical runtime dir, leaving sibling paths' records untouched. */
