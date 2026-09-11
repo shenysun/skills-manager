@@ -237,7 +237,22 @@ export class DistributeService {
     }
 
     const runtimeChanged = plans.some((plan) => plan.removed.length > 0 || plan.distributed.length > 0);
-    if (runtimeChanged) this.snapshotRestorePoint(target);
+
+    // What the recorded sets become — computed before any write so the restore
+    // point is taken whenever this apply changes hub-side state at all (runtime,
+    // agent coverage, or the set record itself): a set-only apply is still a
+    // rollback point, or rollback would revert two applies at once (ADR-0015).
+    const categorySets = { ...record?.categorySets };
+    let setsChanged = false;
+    for (const plan of plans) {
+      const existing = categorySets[plan.dir];
+      if (existing && this.sameAppliedSet(existing, applied)) continue;
+      categorySets[plan.dir] = applied;
+      setsChanged = true;
+    }
+
+    const hubStateChanged = runtimeChanged || entriesChanged || setsChanged;
+    if (hubStateChanged) this.snapshotRestorePoint(target);
     const appliedAt = new Date().toISOString();
     for (const plan of plans) {
       // Strict per-path semantics: the entry goes even when an unselected
@@ -253,15 +268,7 @@ export class DistributeService {
       }
     }
 
-    const categorySets = { ...record?.categorySets };
-    let setsChanged = false;
-    for (const plan of plans) {
-      const existing = categorySets[plan.dir];
-      if (existing && this.sameAppliedSet(existing, applied)) continue;
-      categorySets[plan.dir] = applied;
-      setsChanged = true;
-    }
-    if (runtimeChanged || entriesChanged || setsChanged) this.rewriteRecord(target, [...merged.values()], categorySets);
+    if (hubStateChanged) this.rewriteRecord(target, [...merged.values()], categorySets);
 
     return {
       agents: agentIds,

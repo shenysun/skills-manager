@@ -447,17 +447,24 @@ const distribute = program.command('distribute')
     print(result);
   });
 
-function runDistributeRollback(opts: { to: string; project?: string }, cmd: Command) {
+function runDistributeRollback(opts: { to?: string; project?: string }, cmd: Command) {
   const s = services(cmd);
-  if (opts.to !== 'user' && opts.to !== 'project') throw new Error('--to must be user or project');
-  const result = s.distribute.rollback(opts.to, opts.project);
-  s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${opts.to} distribution`, details: opts });
+  // The `distribute` group owns `--to`/`--project`; commander parses them onto
+  // the parent, so the rollback subcommand's same-named options never receive
+  // values — fall back to the command chain. The subcommand keeps its own
+  // declarations so `--help` still documents the interface.
+  const globals = cmd.optsWithGlobals() as { to?: string; project?: string };
+  const to = opts.to ?? globals.to;
+  const project = opts.project ?? globals.project;
+  if (to !== 'user' && to !== 'project') throw new Error('--to must be user or project');
+  const result = s.distribute.rollback(to, project);
+  s.activity.record({ action: 'cli-distribute-rollback', summary: `Rolled back ${to} distribution`, details: { to, project } });
   print(result);
 }
 
 distribute.command('rollback')
   .description('Restore the last distribute snapshot for a target')
-  .requiredOption('--to <kind>', 'user or project')
+  .option('--to <kind>', 'user or project (required)')
   .option('--project <path>', 'project root (required when --to project)')
   .action((opts, cmd) => runDistributeRollback(opts, cmd));
 
