@@ -90,6 +90,62 @@ describe('SourceService.checkout passes shallow-clone intent (ADR-0013)', () => 
   });
 });
 
+describe('normalize dispatches the source kind (source-formats ticket 01)', () => {
+  it('dispatches a local path to kind local', () => {
+    const { git } = spyGit();
+    const local = path.join(root, 'local-repo');
+    mkdirSync(local, { recursive: true });
+    expect(service(git).normalize(local).kind).toBe('local');
+  });
+
+  it('dispatches every git-recognized remote input to kind git', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    for (const input of [
+      'owner/repo',
+      'https://github.com/owner/repo.git',
+      'https://github.com/owner/repo/tree/main/skills/alpha',
+      'https://gitlab.com/owner/repo.git',
+    ]) {
+      expect(s.normalize(input).kind).toBe('git');
+    }
+  });
+});
+
+describe('upstreamTree anchors per dispatched kind (ADR-0016)', () => {
+  function checkoutOf(kind: SourceCheckout['kind']): SourceCheckout {
+    return { input: 'unused', repoUrl: 'https://example.com/repo', kind, repoDir: path.join(root, 'repo'), commit: SHA };
+  }
+
+  it('leaves url, wellknown and archive checkouts unanchored', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    for (const kind of ['url', 'wellknown', 'archive'] as const) {
+      expect(s.upstreamTree(checkoutOf(kind), 'skills/alpha')).toBeNull();
+    }
+  });
+
+  it('anchors a marketplace checkout on the skill sub-directory tree SHA, like git', () => {
+    const revParseTreeCalls: Array<{ repoDir: string; subpath: string }> = [];
+    const git: GitPort = {
+      ...spyGit().git,
+      revParseTree: (repoDir, subpath) => {
+        revParseTreeCalls.push({ repoDir, subpath });
+        return TREE;
+      },
+    };
+    const s = service(git);
+    expect(s.upstreamTree(checkoutOf('marketplace'), 'skills/alpha')).toBe(TREE);
+    expect(revParseTreeCalls).toEqual([{ repoDir: path.join(root, 'repo'), subpath: 'skills/alpha' }]);
+  });
+
+  it('anchors a marketplace repo-root skill on the commit SHA, like git', () => {
+    const { git } = spyGit();
+    const s = service(git);
+    expect(s.upstreamTree(checkoutOf('marketplace'), '')).toBe(SHA);
+  });
+});
+
 describe('install after a shallow clone', () => {
   it('still records upstream_commit from rev-parse HEAD', () => {
     const upstream = path.join(root, 'upstream');

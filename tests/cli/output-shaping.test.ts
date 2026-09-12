@@ -53,6 +53,18 @@ describe('list --brief (manager-skill-first ticket 04)', () => {
   });
 });
 
+describe('add --list source shape (source-formats ticket 01)', () => {
+  it('keeps the conversational source JSON exactly as before — the internal kind key never leaks', () => {
+    const source = path.join(root, 'source');
+    const result = run(['add', source, '--list']);
+
+    expect(result.status, result.stderr).toBe(0);
+    const payload = json(result);
+    expect(payload.source.isLocal).toBe(true);
+    expect(Object.keys(payload.source)).not.toContain('kind');
+  });
+});
+
 describe('catalog info detected detail (manager-skill-first ticket 04)', () => {
   it('pairs each detected agent id with its runtime dir instead of a bare name list', () => {
     mkdirSync(path.join(userHome, '.claude'), { recursive: true });

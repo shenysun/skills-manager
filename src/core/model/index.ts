@@ -9,6 +9,16 @@ export const LEGACY_CONSUMERS = ['agents', 'claude'] as const;
 
 export type SkillSourceType = 'local' | 'git' | 'github' | string;
 
+/**
+ * What `normalize` dispatched a source input to — the determinant of the
+ * registry `type` install persists and of the per-kind update-anchor policy
+ * (ADR-0016): git-like kinds (git/marketplace) anchor on `upstream_tree`,
+ * url/wellknown leave it empty, archive carries no anchor, local none either.
+ * Orthogonal to `SourceSpec.isLocal`, which is transport shape (the repoUrl is
+ * the working tree, nothing to clone or unpack), not source kind.
+ */
+export type SourceKind = 'local' | 'git' | 'url' | 'archive' | 'marketplace' | 'wellknown';
+
 export type SkillSource = {
   type?: SkillSourceType;
   url?: string | null;
@@ -21,6 +31,12 @@ export type SkillSource = {
    * instead (ADR-0013). Missing/null = local source or not yet calibrated.
    */
   upstream_tree?: string | null;
+  /**
+   * sha256 digest the well-known index declared for the artifact at install
+   * (ADR-0016) — the update anchor for wellknown sources, parallel to
+   * `upstream_tree`. Absent/null for every other kind.
+   */
+  upstream_digest?: string | null;
   /** Upstream Git tree SHA captured at install/import — the baseline update compares against (ADR-0011). */
   baseline_hash?: string | null;
   imported_from?: string[];
@@ -79,6 +95,7 @@ export type SourceSpec = {
   baseSubpath?: string;
   ref?: string;
   isLocal: boolean;
+  kind: SourceKind;
   treeRest?: string;
 };
 

@@ -149,6 +149,65 @@ describe('source anchor persistence (ADR-0013)', () => {
     expect(revParseTreeCalls).toEqual([]);
   });
 
+  it('persists the source type normalize dispatched — git inputs record type git', () => {
+    const upstream = writeUpstream(['alpha']);
+    const { git } = fakeGit(upstream);
+    const s = services(git);
+
+    for (const input of ['https://github.com/owner/repo.git', 'owner/repo']) {
+      s.install.installFromSourceSelection({ source: input, selectors: ['skills/alpha'], overwrite: true });
+      expect(s.source.normalize(input).kind).toBe('git');
+      expect(s.registry.load().skills.alpha?.source?.type).toBe('git');
+    }
+  });
+
+  it('leaves existing local/git installs without upstream_digest — records stay field-for-field as before', () => {
+    const upstream = writeUpstream(['alpha']);
+    const { git } = fakeGit(upstream);
+    const s = services(git);
+    s.install.installFromSourceSelection({ source: 'https://github.com/owner/repo.git', selectors: ['skills/alpha'] });
+
+    expect(s.registry.load().skills.alpha?.source?.upstream_digest).toBeUndefined();
+    expect(registryYaml()).not.toContain('upstream_digest');
+  });
+
+  it('round-trips a registry entry carrying upstream_digest (ADR-0016 schema)', () => {
+    const home = path.join(root, 'digest-home');
+    const skillsDir = path.join(home, 'skills', 'alpha');
+    mkdirSync(skillsDir, { recursive: true });
+    writeFileSync(path.join(skillsDir, 'SKILL.md'), '---\nname: alpha\n---\n# a\n');
+    writeFileSync(path.join(home, 'registry.yaml'), [
+      'skills:',
+      '  alpha:',
+      '    path: skills/alpha',
+      '    title: alpha',
+      '    source:',
+      '      type: wellknown',
+      '      url: https://example.com/index.json',
+      '      subpath: skills/alpha',
+      '      upstream_commit: null',
+      '      upstream_tree: null',
+      '      upstream_digest: sha256:0123456789abcdef',
+      '    update_policy: manual',
+      '    description: ""',
+      '    tags: []',
+      '    consumers: []',
+      '    category: experimental',
+      '    archived: false',
+      '    imported: false',
+      '    imported_at: null',
+      ''
+    ].join('\n'));
+
+    const { git } = fakeGit(path.join(root, 'unused'));
+    const s = services(git, 'digest-home');
+
+    expect(s.registry.load().skills.alpha?.source?.upstream_digest).toBe('sha256:0123456789abcdef');
+    // An edit through the safe-patch path must not drop the field.
+    s.registry.editSafeFields('alpha', { description: 'edited' });
+    expect(s.registry.load().skills.alpha?.source?.upstream_digest).toBe('sha256:0123456789abcdef');
+  });
+
   it('treats a legacy registry entry without the field as uncalibrated (null)', () => {
     const home = path.join(root, 'legacy-home');
     const skillsDir = path.join(home, 'skills', 'alpha');

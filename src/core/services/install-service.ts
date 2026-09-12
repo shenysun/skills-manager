@@ -71,7 +71,9 @@ export class InstallService {
       title: skill.title,
       consumers,
       source: {
-        type: source.isLocal ? 'local' : 'git',
+        // The dispatched kind is the single determinant of the persisted type
+        // (source-formats ticket 01); local/git inputs map exactly as before.
+        type: source.kind,
         url: source.repoUrl,
         subpath: skill.subpath,
         ref: source.ref || null,

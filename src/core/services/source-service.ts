@@ -80,25 +80,25 @@ export class SourceService {
   normalize(source: string): SourceSpec {
     const input = source.trim();
     if (!input) throw new SkillsManagerError('missing_source', 'Source is required');
-    if (this.fs.exists(input)) return { input, repoUrl: path.resolve(input), isLocal: true };
+    if (this.fs.exists(input)) return { input, repoUrl: path.resolve(input), isLocal: true, kind: 'local' };
 
     if (OWNER_REPO_PATTERN.test(input)) {
       const [owner, repo] = input.split('/');
-      return { input, repoUrl: githubRepoUrl(owner, repo), isLocal: false };
+      return { input, repoUrl: githubRepoUrl(owner, repo), isLocal: false, kind: 'git' };
     }
 
     const githubTree = input.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/(.+)$/);
     if (githubTree) {
       const [, owner, repo, treeRest] = githubTree;
-      return { input, repoUrl: githubRepoUrl(owner, repo), treeRest, isLocal: false };
+      return { input, repoUrl: githubRepoUrl(owner, repo), treeRest, isLocal: false, kind: 'git' };
     }
 
     const githubRepo = input.match(GITHUB_REPO_URL_PATTERN);
     if (githubRepo) {
-      return { input, repoUrl: githubRepoUrl(githubRepo[1], githubRepo[2]), isLocal: false };
+      return { input, repoUrl: githubRepoUrl(githubRepo[1], githubRepo[2]), isLocal: false, kind: 'git' };
     }
 
-    return { input, repoUrl: input, isLocal: false };
+    return { input, repoUrl: input, isLocal: false, kind: 'git' };
   }
 
   checkout(source: string, forcedRef?: string): SourceCheckout {
@@ -184,16 +184,26 @@ export class SourceService {
   }
 
   /**
-   * Source anchor for update decisions (ADR-0013): the tree SHA of the skill's
-   * own sub-directory, resolved in the checked-out clone — so a checkout and its
-   * anchors are captured in one consistent state. Local sources carry no git
-   * anchor (null); a skill anchored at the repo root records the commit SHA,
-   * matching what the GitHub Trees API reports for the root.
+   * Source anchor for update decisions, dispatched on the source kind
+   * (ADR-0016): git-like kinds (git/marketplace) anchor on the tree SHA of the
+   * skill's own sub-directory, resolved in the checked-out clone — so a
+   * checkout and its anchors are captured in one consistent state. A skill
+   * anchored at the repo root records the commit SHA, matching what the GitHub
+   * Trees API reports for the root (ADR-0013). Every other kind carries no git
+   * anchor: local sources never did; url/wellknown anchor on content
+   * hash/digest instead; archive is a one-shot snapshot.
    */
   upstreamTree(checkout: SourceCheckout, subpath: string): string | null {
-    if (checkout.isLocal) return null;
-    if (!subpath) return checkout.commit;
-    return this.git.revParseTree(checkout.repoDir, subpath);
+    switch (checkout.kind) {
+      case 'local':
+      case 'url':
+      case 'wellknown':
+      case 'archive':
+        return null;
+      case 'git':
+      case 'marketplace':
+        return subpath ? this.git.revParseTree(checkout.repoDir, subpath) : checkout.commit;
+    }
   }
 
   discover(source: SourceCheckout): DiscoveredSkill[] {

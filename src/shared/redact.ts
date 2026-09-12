@@ -6,8 +6,8 @@ import type { DiscoveredSkill, SourceCheckout } from '../core/model/index.js';
  * Internal callers keep the full objects — these are for the conversation
  * layer only (ticket manager-skill-first/02).
  */
-export function redactCheckout(checkout: SourceCheckout): Omit<SourceCheckout, 'repoDir' | 'treeRest'> {
-  const { repoDir: _repoDir, treeRest: _treeRest, ...publicShape } = checkout;
+export function redactCheckout(checkout: SourceCheckout): Omit<SourceCheckout, 'repoDir' | 'treeRest' | 'kind'> {
+  const { repoDir: _repoDir, treeRest: _treeRest, kind: _kind, ...publicShape } = checkout;
   return publicShape;
 }
 
