@@ -8,7 +8,10 @@ import type { DownloadRequest, HttpDownloadPort } from '../ports/http-download.j
 import { DEFAULT_DOWNLOAD_REQUEST, unconfiguredHttpDownload } from '../ports/http-download.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
-import { DEFAULT_ARCHIVE_LIMITS, type ArchiveLimits, extractZipArchive } from './archive-extract.js';
+import { type ArchiveLimits, DEFAULT_ARCHIVE_LIMITS } from './archive-safety.js';
+import { extractZipArchive } from './archive-extract.js';
+import { extractTarArchive } from './tar-extract.js';
+import { judgeUrlPayload, predictFromContentType, predictFromUrlPath, type UrlPayloadFormat } from './url-payload.js';
 
 const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
@@ -89,6 +92,10 @@ export type CheckoutOptions = {
   /** The user explicitly confirmed a plain-http download. Without it, an
    *  http:// url source is refused before any byte is requested. */
   allowInsecureHttp?: boolean;
+  /** The `--format` escape hatch (US-5): forces how a url payload is parsed,
+   *  overriding the extension/Content-Type/magic judgment. Never changes the
+   *  source dispatch — meaningless for non-url kinds and refused there. */
+  format?: UrlPayloadFormat;
 };
 
 /** Whether checking out this spec would download over unencrypted http — the
@@ -114,17 +121,20 @@ const ZIP_FILE_SUFFIX = /\.zip$/i;
  *  must be markdown whose frontmatter carries both name and description —
  *  anything else (an archive, an HTML page, prose) fails actionably instead
  *  of a guessed install. A frontmatter name that fails the existing
- *  untrusted-metadata checks (e.g. a path-traversal name) keeps that verdict. */
-function singleSkillMarkdownMetadata(payload: string): { name: string; description: string } {
+ *  untrusted-metadata checks (e.g. a path-traversal name) keeps that verdict.
+ *  When the format was auto-judged (not forced via --format), the failure
+ *  points at the escape hatch (US-6). */
+function singleSkillMarkdownMetadata(payload: string, autoJudged: boolean): { name: string; description: string } {
+  const hint = autoJudged ? ' If the payload is really an archive, pass --format zip or --format tar.' : '';
   let metadata;
   try {
     metadata = parseSkillMarkdownMetadata(payload);
   } catch (error) {
     if (error instanceof SkillsManagerError) throw error;
-    throw new SkillsManagerError('url_payload_invalid', 'The URL did not return a single SKILL.md — its frontmatter is not valid YAML.');
+    throw new SkillsManagerError('url_payload_invalid', `The URL did not return a single SKILL.md — its frontmatter is not valid YAML.${hint}`);
   }
   if (!metadata.name || !metadata.description) {
-    throw new SkillsManagerError('url_payload_invalid', 'The URL did not return a single SKILL.md (markdown whose frontmatter carries both a name and a description).');
+    throw new SkillsManagerError('url_payload_invalid', `The URL did not return a single SKILL.md (markdown whose frontmatter carries both a name and a description).${hint}`);
   }
   return { name: metadata.name, description: metadata.description };
 }
@@ -184,6 +194,9 @@ export class SourceService {
 
   checkout(source: string, forcedRef?: string, options: CheckoutOptions = {}): SourceCheckout {
     const normalized = this.normalize(source);
+    if (options.format !== undefined && normalized.kind !== 'url') {
+      throw new SkillsManagerError('format_flag_misplaced', `--format only applies to url sources — this source is a ${normalized.kind} source, judged by its own transport.`);
+    }
     if (normalized.isLocal) {
       const commit = this.fs.kind(path.join(normalized.repoUrl, '.git')) !== 'missing'
         ? this.git.revParseHead(normalized.repoUrl)
@@ -205,17 +218,7 @@ export class SourceService {
           `${normalized.repoUrl} uses unencrypted http — a download could be tampered with in transit. Pass --yes to confirm, or use an https URL.`,
         );
       }
-      return this.mintTempCheckout((repoDir) => {
-        const downloaded = this.http.download(normalized.repoUrl, this.downloadRequest);
-        const payload = downloaded.bytes.toString('utf8');
-        const metadata = singleSkillMarkdownMetadata(payload);
-        // The minimal skill tree — a single-file source lands as skills/<name>/SKILL.md
-        // and discovery sees an ordinary directory tree (spec source-formats).
-        const skillDir = path.join(repoDir, 'skills', metadata.name);
-        this.fs.makeDirectory(skillDir);
-        this.fs.writeText(path.join(skillDir, 'SKILL.md'), payload);
-        return { ...normalized, repoDir, commit: null };
-      });
+      return this.mintTempCheckout((repoDir) => this.checkoutUrlPayload(normalized, repoDir, options));
     }
 
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
@@ -225,6 +228,42 @@ export class SourceService {
       const commit = this.git.revParseHead(repoDir);
       return { ...normalized, ...tree, repoDir, commit };
     });
+  }
+
+  /** The url-source transport (ticket 04): the format judgment chain —
+   *  extension predicts before the download (a .tar.bz2 URL is refused
+   *  without one), Content-Type predicts for extension-less URLs, the
+   *  downloaded bytes are the final judge. --format overrides the predictions
+   *  but never the dispatch: the source kind stays url whatever the payload. */
+  private checkoutUrlPayload(normalized: SourceSpec, repoDir: string, options: CheckoutOptions): SourceCheckout {
+    const extensionPrediction = predictFromUrlPath(normalized.repoUrl);
+    const downloaded = this.http.download(normalized.repoUrl, this.downloadRequest);
+    const prediction = extensionPrediction ?? predictFromContentType(downloaded.headers.contentType);
+    const format = options.format ?? judgeUrlPayload(downloaded.bytes, prediction);
+    if (format === 'zip' || format === 'tar') {
+      return this.checkoutArchivePayload(normalized, downloaded.bytes, format, repoDir);
+    }
+    const payload = downloaded.bytes.toString('utf8');
+    const metadata = singleSkillMarkdownMetadata(payload, options.format === undefined);
+    // The minimal skill tree — a single-file source lands as skills/<name>/SKILL.md
+    // and discovery sees an ordinary directory tree (spec source-formats).
+    const skillDir = path.join(repoDir, 'skills', metadata.name);
+    this.fs.makeDirectory(skillDir);
+    this.fs.writeText(path.join(skillDir, 'SKILL.md'), payload);
+    return { ...normalized, repoDir, commit: null };
+  }
+
+  /** An archive payload lands beside repo/ inside the minted temp dir, so the
+   *  extractor size-checks it where it lies (US-10) and the checkout lifecycle
+   *  sweeps the whole dir — no separate cleanup path. The full archive-safety
+   *  policy applies to downloaded archives exactly as to local ones (no trust
+   *  exemption for either). */
+  private checkoutArchivePayload(normalized: SourceSpec, bytes: Buffer, format: 'zip' | 'tar', repoDir: string): SourceCheckout {
+    const payloadPath = path.join(path.dirname(repoDir), 'payload.bin');
+    this.fs.writeBytes(payloadPath, bytes);
+    if (format === 'zip') extractZipArchive(this.fs, payloadPath, repoDir, this.archiveLimits);
+    else extractTarArchive(this.fs, payloadPath, repoDir, this.archiveLimits);
+    return { ...normalized, repoDir, commit: null };
   }
 
   /** Shared temp-checkout scaffold for transport-based sources: mint a fresh

@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { deflateRawSync } from 'node:zlib';
+import { deflateRawSync, gzipSync } from 'node:zlib';
 
 /**
  * Programmatic zip writer for archive-source fixtures (spec source-formats,
@@ -121,7 +121,116 @@ export function writeZip(dir: string, fileName: string, entries: readonly ZipEnt
   return filePath;
 }
 
+/**
+ * Programmatic ustar writer for tar-source fixtures (spec source-formats,
+ * Testing Decisions) — the tar counterpart of buildZip, deliberately an
+ * independent framing implementation so the production reader cannot mirror a
+ * bug into the fixture side. Covers the member shapes the tickets need: plain
+ * files, directories, symlink members (linkname), and the hostile typeflags
+ * (hardlink, device, fifo) plus pax extended headers for long names.
+ */
+export type TarEntrySpec = {
+  name: string;
+  /** File content; absent for directory entries. For symlinks the target is `linkname`. */
+  data?: string | Buffer;
+  /** Permission bits (default 0o644 files / 0o755 dirs). Use 0o755 for the exec-bit fixture. */
+  mode?: number;
+  /** POSIX typeflag: '0'/'\0' regular (default), '5' directory, '2' symlink,
+   *  '1' hardlink, '3' char device, '4' block device, '6' fifo, '7' contiguous. */
+  typeflag?: string;
+  /** Symlink target (typeflag '2'). */
+  linkname?: string;
+  /** Emit a pax extended header ('x') before this entry that overrides its path. */
+  paxPath?: string;
+  /** Emit a GNU longname entry ('L') before this entry carrying this name (the header name stays truncated). */
+  gnuLongName?: string;
+};
+
+function writeField(header: Buffer, offset: number, value: string, length: number): void {
+  header.write(value, offset, length, 'latin1');
+}
+
+function writeOctal(header: Buffer, offset: number, value: number, length: number): void {
+  writeField(header, offset, `${value.toString(8).padStart(length - 1, '0')}\0`, length);
+}
+
+function tarHeader(name: string, size: number, mode: number, typeflag: string, linkname: string): Buffer {
+  const header = Buffer.alloc(512);
+  writeField(header, 0, name, Math.min(name.length, 100));
+  writeOctal(header, 100, mode, 8);
+  writeOctal(header, 108, 0, 8);
+  writeOctal(header, 116, 0, 8);
+  writeOctal(header, 124, size, 12);
+  writeOctal(header, 136, 0, 12);
+  writeField(header, 148, '        ', 8);
+  writeField(header, 156, typeflag, 1);
+  writeField(header, 157, linkname, Math.min(linkname.length, 100));
+  writeField(header, 257, 'ustar\0', 6);
+  writeField(header, 263, '00', 2);
+  let sum = 0;
+  for (const byte of header) sum += byte;
+  writeField(header, 148, `${sum.toString(8).padStart(6, '0')}\0 `, 8);
+  return header;
+}
+
+function tarPayload(data: Buffer): Buffer {
+  const padding = (512 - (data.length % 512)) % 512;
+  return Buffer.concat([data, Buffer.alloc(padding)]);
+}
+
+function paxHeader(record: string): Buffer {
+  let length = record.length + 1;
+  for (;;) {
+    const next = `${length} ${record}\n`.length;
+    if (next === length) break;
+    length = next;
+  }
+  return Buffer.concat([tarHeader('pax-record', length, 0o644, 'x', ''), tarPayload(Buffer.from(`${length} ${record}\n`, 'utf8'))]);
+}
+
+export function buildTar(entries: readonly TarEntrySpec[]): Buffer {
+  const blocks: Buffer[] = [];
+  for (const entry of entries) {
+    if (entry.paxPath !== undefined) blocks.push(paxHeader(`path=${entry.paxPath}`));
+    if (entry.gnuLongName !== undefined) {
+      const nameBytes = Buffer.concat([Buffer.from(entry.gnuLongName, 'utf8'), Buffer.alloc(1)]);
+      blocks.push(tarHeader('././@LongLink', nameBytes.length, 0o644, 'L', ''), tarPayload(nameBytes));
+    }
+    const isDir = entry.typeflag === '5' || (entry.typeflag === undefined && entry.name.endsWith('/'));
+    const data = entry.data === undefined ? Buffer.alloc(0) : Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data, 'utf8');
+    const typeflag = entry.typeflag ?? (isDir ? '5' : '0');
+    const size = typeflag === '5' ? 0 : data.length;
+    const mode = entry.mode ?? (isDir ? 0o755 : 0o644);
+    blocks.push(tarHeader(entry.name, size, mode, typeflag, entry.linkname ?? ''));
+    if (size > 0) blocks.push(tarPayload(data));
+  }
+  return Buffer.concat([...blocks, Buffer.alloc(1024)]);
+}
+
 /** A minimal SKILL.md frontmatter body for fixture skills. */
 export function skillMarkdown(name: string, description = 'fixture skill'): string {
   return `---\nname: ${name}\ntitle: ${name}\ndescription: ${description}\n---\n# ${name}\n`;
+}
+
+/** A gzip-wrapped tar fixture (the .tar.gz / .tgz payloads). The gzip framing
+ *  itself is zlib's contract on both sides; the tar framing above stays
+ *  independent. */
+export function buildTarGz(entries: readonly TarEntrySpec[]): Buffer {
+  return gzipSync(buildTar(entries));
+}
+
+/** A pre-POSIX v7 tarball: correct framing and checksum, but the ustar magic
+ *  field stays NUL — the boundary fixture proving the extractor and the isTar
+ *  judgment agree on what `--format tar` may unwrap. */
+export function buildV7Tar(name: string, content: string): Buffer {
+  const header = Buffer.alloc(512);
+  writeField(header, 0, name, Math.min(name.length, 100));
+  writeOctal(header, 100, 0o644, 8);
+  writeOctal(header, 124, content.length, 12);
+  writeField(header, 148, '        ', 8);
+  writeField(header, 156, '0', 1);
+  let sum = 0;
+  for (const byte of header) sum += byte;
+  writeField(header, 148, `${sum.toString(8).padStart(6, '0')}\0 `, 8);
+  return Buffer.concat([header, tarPayload(Buffer.from(content, 'utf8')), Buffer.alloc(1024)]);
 }

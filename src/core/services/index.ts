@@ -1,7 +1,7 @@
 import { createSkillHome, SkillHomeService } from './skill-home-service.js';
 import { RegistryService } from './registry-service.js';
 import { SourceService } from './source-service.js';
-import { archiveLimitsFromEnv } from './archive-extract.js';
+import { archiveLimitsFromEnv } from './archive-safety.js';
 import { downloadRequestFromEnv, unconfiguredHttpDownload, type HttpDownloadPort } from '../ports/http-download.js';
 import { ViewService } from './view-service.js';
 import { DistributeService } from './distribute-service.js';

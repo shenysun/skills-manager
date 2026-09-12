@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { archiveLimitsFromEnv, DEFAULT_ARCHIVE_LIMITS } from '../../src/core/services/archive-extract.js';
+import { archiveLimitsFromEnv, DEFAULT_ARCHIVE_LIMITS } from '../../src/core/services/archive-safety.js';
 import { createCoreServices } from '../../src/core/services/index.js';
 import { SourceService } from '../../src/core/services/source-service.js';
 import { createNodeFileSystem } from '../../src/infra/index.js';

@@ -10,7 +10,7 @@ import { Worker } from 'node:worker_threads';
  */
 
 export type WireScenario =
-  | { kind: 'file'; body: string }
+  | { kind: 'file'; body: string | Buffer; contentType?: string }
   | { kind: 'chain'; routes: Record<string, { status: number; location?: string }>; body: string }
   | { kind: 'loop-redirect' }
   | { kind: 'downgrade' }
@@ -77,7 +77,11 @@ const scenario = workerData.scenario;
 const lib = workerData.tls ? https : http;
 const server = lib.createServer(workerData.tls ? { key: workerData.tls.key, cert: workerData.tls.cert } : {}, (request, response) => {
   if (scenario.kind === 'file') {
-    response.writeHead(200, { 'content-type': 'text/markdown', etag: '"v1"', 'last-modified': 'Wed, 09 Sep 2026 10:00:00 GMT' });
+    response.writeHead(200, {
+      'content-type': scenario.contentType ?? 'text/markdown',
+      etag: '"v1"',
+      'last-modified': 'Wed, 09 Sep 2026 10:00:00 GMT',
+    });
     response.end(scenario.body);
     return;
   }

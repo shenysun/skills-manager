@@ -7,6 +7,7 @@ import type { RegistryService } from './registry-service.js';
 import type { SourceService } from './source-service.js';
 import type { ViewService } from './view-service.js';
 import type { DistributeService } from './distribute-service.js';
+import type { UrlPayloadFormat } from './url-payload.js';
 
 export class InstallService {
   constructor(
@@ -42,13 +43,13 @@ export class InstallService {
     return { installed: plan.selected.map((skill) => skill.name), plan };
   }
 
-  installFromSourceSelection(input: { source: string; selectors: readonly string[]; consumers?: readonly string[]; overwrite?: boolean; allowInsecureHttp?: boolean }) {
+  installFromSourceSelection(input: { source: string; selectors: readonly string[]; consumers?: readonly string[]; overwrite?: boolean; allowInsecureHttp?: boolean; format?: UrlPayloadFormat }) {
     return this.source.withCheckout(input.source, undefined, (sourceCheckout) => {
       const discovered = this.source.discover(sourceCheckout);
       const selectors = input.selectors.length > 0 ? input.selectors : discovered.map((skill) => skill.subpath);
       const plan = this.planInstall(sourceCheckout, discovered, selectors, input.consumers, { overwrite: input.overwrite });
       return this.installPlan(plan);
-    }, { allowInsecureHttp: input.allowInsecureHttp });
+    }, { allowInsecureHttp: input.allowInsecureHttp, format: input.format });
   }
 
   private selectDiscovered(discovered: DiscoveredSkill[], selectors: readonly string[]) {

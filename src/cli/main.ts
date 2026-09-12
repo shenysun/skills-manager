@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
 import { isInsecureHttpSource, normalizeGitSourceUrl } from '../core/services/source-service.js';
 import { isUpdatableSourceType } from '../core/services/update-service.js';
+import { parseFormatFlag } from '../core/services/url-payload.js';
 import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
@@ -371,13 +372,15 @@ program.command('list')
 
 program.command('add')
   .description('Discover from a source, then install selected skills')
-  .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, local path, local .zip archive, or http(s) URL of a single SKILL.md')
+  .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, local path, local .zip archive, or http(s) URL of a single SKILL.md / zip / tar archive')
   .option('--list', 'only list discovered skills')
   .option('--all', 'install all discovered skills')
   .option('-s, --skill <skill...>', 'skill name or source subpath to install')
+  .option('-f, --format <format>', 'how to interpret a url payload: md, zip, or tar (tar covers tar/tar.gz/tgz) — the escape hatch when extension and Content-Type identify nothing')
   .option('-y, --yes', 'overwrite existing skills without prompting; also confirms plain-http URL downloads')
   .action(async (source, opts, cmd) => {
     const s = services(cmd);
+    const format = parseFormatFlag(opts.format);
     // A plain-http url source downloads only with explicit confirmation
     // (US-12): --yes on the command line or an interactive y/N — https and
     // every other source kind needs none.
@@ -388,12 +391,12 @@ program.command('add')
       return s.source.withCheckout(source, undefined, (checkout) => {
         const discovered = s.source.discover(checkout);
         return print({ source: redactCheckout(checkout), discovered: discovered.map(redactDiscovered) });
-      }, { allowInsecureHttp });
+      }, { allowInsecureHttp, format });
     }
     if (!opts.all && (opts.skill || []).length === 0) throw new Error('Use --all or --skill <name-or-subpath> to choose skills in this non-interactive CLI.');
     // Empty selectors mean "everything discovered" — the --all semantics.
     const selectors = opts.all ? [] : (opts.skill || []);
-    const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes), allowInsecureHttp });
+    const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes), allowInsecureHttp, format });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
     print({ ...result, plan: { ...result.plan, source: redactCheckout(result.plan.source), selected: result.plan.selected.map(redactDiscovered) } });
     remindStaleTargets(s);
