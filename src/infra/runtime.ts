@@ -5,6 +5,7 @@ import { SkillHomeResolver, type SkillHomeResolution } from '../core/services/sk
 import type { CatalogSnapshot } from '../core/model/catalog.js';
 import { NodeFileSystem } from './fs-skill-home.js';
 import { GitCli } from './git-cli.js';
+import { HttpDownloadClient } from './http-download-client.js';
 import { ShellRunner } from './shell-runner.js';
 
 export type RuntimeOptions = {
@@ -29,7 +30,7 @@ export function createRuntimeServices(options: RuntimeOptions = {}, projectRoot 
   const processRunner = new ShellRunner();
   const env = options.env || process.env;
   const userHome = options.userHome || env.SKILLS_MANAGER_USER_HOME;
-  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome, env: options.env, catalogSnapshot: options.catalogSnapshot });
+  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome, env: options.env, catalogSnapshot: options.catalogSnapshot, http: new HttpDownloadClient() });
   if (options.ensureDefaultHub) services.skillHome.ensure();
   return { ...services, resolution } satisfies ReturnType<typeof createCoreServices> & { resolution: SkillHomeResolution };
 }

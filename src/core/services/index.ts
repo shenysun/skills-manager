@@ -2,6 +2,7 @@ import { createSkillHome, SkillHomeService } from './skill-home-service.js';
 import { RegistryService } from './registry-service.js';
 import { SourceService } from './source-service.js';
 import { archiveLimitsFromEnv } from './archive-extract.js';
+import { downloadRequestFromEnv, unconfiguredHttpDownload, type HttpDownloadPort } from '../ports/http-download.js';
 import { ViewService } from './view-service.js';
 import { DistributeService } from './distribute-service.js';
 import { InstallService } from './install-service.js';
@@ -36,13 +37,22 @@ export type CoreServicesOptions = {
   env?: Record<string, string | undefined>;
   /** Fixture catalog snapshot for tests; defaults to bundled + hub override. */
   catalogSnapshot?: CatalogSnapshot;
+  /** Direct-download transport for url/wellknown sources; production wiring always injects the real adapter. */
+  http?: HttpDownloadPort;
 };
 
 export function createCoreServices(options: CoreServicesOptions) {
   const home = createSkillHome(options.skillHomeRoot);
   const skillHome = new SkillHomeService(options.fs, home);
   const registry = new RegistryService(options.fs, home);
-  const source = new SourceService(options.fs, options.git, options.tempRoot, archiveLimitsFromEnv(options.env ?? process.env));
+  const source = new SourceService(
+    options.fs,
+    options.git,
+    options.tempRoot,
+    archiveLimitsFromEnv(options.env ?? process.env),
+    options.http ?? unconfiguredHttpDownload(),
+    downloadRequestFromEnv(options.env ?? process.env),
+  );
   const views = new ViewService(options.fs, home, registry);
   const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot, env: options.env, userHomeDir: options.userHome });
   const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);

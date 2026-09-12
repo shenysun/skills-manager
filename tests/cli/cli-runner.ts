@@ -26,6 +26,6 @@ export function cliEnv(userHome: string): NodeJS.ProcessEnv {
 }
 
 /** Run the built CLI against a test hub, returning raw spawn output. */
-export function runCli(home: string, userHome: string, args: string[]) {
-  return spawnSync(process.execPath, [cli, '--home', home, ...args], { encoding: 'utf8', env: cliEnv(userHome) });
+export function runCli(home: string, userHome: string, args: string[], extraEnv: Record<string, string> = {}) {
+  return spawnSync(process.execPath, [cli, '--home', home, ...args], { encoding: 'utf8', env: { ...cliEnv(userHome), ...extraEnv } });
 }

@@ -6,6 +6,14 @@ import type { InstallService } from './install-service.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { parseAgentTags } from '../../shared/validation.js';
 
+/** Whether a source type can re-check upstream — one ruling shared by the
+ *  update plan and the CLI's brief table (source-formats): archive installs
+ *  are one-shot snapshots (ADR-0016), url installs await freshness detection
+ *  (ticket 05). */
+export function isUpdatableSourceType(type: string | undefined): boolean {
+  return type !== 'archive' && type !== 'url';
+}
+
 export class UpdateService {
   constructor(private readonly registry: RegistryService, private readonly source: SourceService, private readonly installer: InstallService) {}
 
@@ -14,9 +22,9 @@ export class UpdateService {
     const candidates: UpdateCandidate[] = [];
     for (const [skill, entry] of Object.entries(registry.skills || {})) {
       if (entry.archived || !this.registry.skillExists(skill)) continue;
-      // Archive installs are one-shot snapshots with no upstream to re-check —
-      // same standing as a source-less import (ADR-0016).
-      if (entry.source?.type === 'archive') continue;
+      // Source-less imports and one-shot/uncheckable kinds stay out via the
+      // shared ruling above; entries without a url+subpath pair follow below.
+      if (!isUpdatableSourceType(entry.source?.type)) continue;
       const url = entry.source?.url;
       const subpath = entry.source?.subpath;
       if (!url || !subpath) continue;

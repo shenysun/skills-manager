@@ -42,13 +42,13 @@ export class InstallService {
     return { installed: plan.selected.map((skill) => skill.name), plan };
   }
 
-  installFromSourceSelection(input: { source: string; selectors: readonly string[]; consumers?: readonly string[]; overwrite?: boolean }) {
+  installFromSourceSelection(input: { source: string; selectors: readonly string[]; consumers?: readonly string[]; overwrite?: boolean; allowInsecureHttp?: boolean }) {
     return this.source.withCheckout(input.source, undefined, (sourceCheckout) => {
       const discovered = this.source.discover(sourceCheckout);
       const selectors = input.selectors.length > 0 ? input.selectors : discovered.map((skill) => skill.subpath);
       const plan = this.planInstall(sourceCheckout, discovered, selectors, input.consumers, { overwrite: input.overwrite });
       return this.installPlan(plan);
-    });
+    }, { allowInsecureHttp: input.allowInsecureHttp });
   }
 
   private selectDiscovered(discovered: DiscoveredSkill[], selectors: readonly string[]) {

@@ -4,12 +4,32 @@ import path from 'node:path';
 import type { DiscoveredSkill, SourceCheckout, SourceSpec } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
+import type { DownloadRequest, HttpDownloadPort } from '../ports/http-download.js';
+import { DEFAULT_DOWNLOAD_REQUEST, unconfiguredHttpDownload } from '../ports/http-download.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
 import { DEFAULT_ARCHIVE_LIMITS, type ArchiveLimits, extractZipArchive } from './archive-extract.js';
 
 const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
+
+/** Hosts whose http(s) URLs keep the git-clone transport — the npx skills
+ *  exclusion table (spec source-formats): every other http(s) URL is a
+ *  direct-download source. Subdomains of a hosting domain stay on git too. */
+const GIT_HOSTING_DOMAINS = ['github.com', 'gitlab.com', 'huggingface.co'];
+
+function parseHttpUrl(input: string): URL | null {
+  if (!/^https?:\/\//i.test(input)) return null;
+  try {
+    return new URL(input);
+  } catch {
+    return null;
+  }
+}
+
+function isGitHostingDomain(hostname: string): boolean {
+  return GIT_HOSTING_DOMAINS.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+}
 
 /** The shape of a source-checkout dir this tool mints and is allowed to sweep.
  *  One source of truth: minting goes through `mintCheckoutDirName`, and the
@@ -64,6 +84,19 @@ export function parseGitHubRepoRef(input: string): { owner: string; repo: string
   return null;
 }
 
+/** Per-checkout confirmations a caller may have already collected (spec US-12). */
+export type CheckoutOptions = {
+  /** The user explicitly confirmed a plain-http download. Without it, an
+   *  http:// url source is refused before any byte is requested. */
+  allowInsecureHttp?: boolean;
+};
+
+/** Whether checking out this spec would download over unencrypted http — the
+ *  confirmation the CLI must collect before opening the checkout (US-12). */
+export function isInsecureHttpSource(spec: SourceSpec): boolean {
+  return spec.kind === 'url' && spec.repoUrl.startsWith('http://');
+}
+
 /** Swap the temp checkout path out of an error message before it reaches the
  *  conversation layer (adversary H1): the diagnostic value lives in git's
  *  stderr, not in the machine-local clone destination. */
@@ -77,12 +110,33 @@ function redactCheckoutPath(error: unknown, repoDir: string): unknown {
 
 const ZIP_FILE_SUFFIX = /\.zip$/i;
 
+/** Single-SKILL.md rule (npx skills parity, spec source-formats): the payload
+ *  must be markdown whose frontmatter carries both name and description —
+ *  anything else (an archive, an HTML page, prose) fails actionably instead
+ *  of a guessed install. A frontmatter name that fails the existing
+ *  untrusted-metadata checks (e.g. a path-traversal name) keeps that verdict. */
+function singleSkillMarkdownMetadata(payload: string): { name: string; description: string } {
+  let metadata;
+  try {
+    metadata = parseSkillMarkdownMetadata(payload);
+  } catch (error) {
+    if (error instanceof SkillsManagerError) throw error;
+    throw new SkillsManagerError('url_payload_invalid', 'The URL did not return a single SKILL.md — its frontmatter is not valid YAML.');
+  }
+  if (!metadata.name || !metadata.description) {
+    throw new SkillsManagerError('url_payload_invalid', 'The URL did not return a single SKILL.md (markdown whose frontmatter carries both a name and a description).');
+  }
+  return { name: metadata.name, description: metadata.description };
+}
+
 export class SourceService {
   constructor(
     private readonly fs: FileSystemPort,
     private readonly git: GitPort,
     private readonly tempRoot = os.tmpdir(),
     private readonly archiveLimits: ArchiveLimits = DEFAULT_ARCHIVE_LIMITS,
+    private readonly http: HttpDownloadPort = unconfiguredHttpDownload(),
+    private readonly downloadRequest: DownloadRequest = DEFAULT_DOWNLOAD_REQUEST,
   ) {}
 
   normalize(source: string): SourceSpec {
@@ -115,10 +169,20 @@ export class SourceService {
       return { input, repoUrl: githubRepoUrl(githubRepo[1], githubRepo[2]), isLocal: false, kind: 'git' };
     }
 
+    const httpUrl = parseHttpUrl(input);
+    if (httpUrl) {
+      // A git-hosting domain keeps the git fallback (current behavior); every
+      // other http(s) URL is a direct-download source (ticket 03; well-known
+      // index probing joins this branch in ticket 07, ahead of the download).
+      return isGitHostingDomain(httpUrl.hostname)
+        ? { input, repoUrl: input, isLocal: false, kind: 'git' }
+        : { input, repoUrl: input, isLocal: false, kind: 'url' };
+    }
+
     return { input, repoUrl: input, isLocal: false, kind: 'git' };
   }
 
-  checkout(source: string, forcedRef?: string): SourceCheckout {
+  checkout(source: string, forcedRef?: string, options: CheckoutOptions = {}): SourceCheckout {
     const normalized = this.normalize(source);
     if (normalized.isLocal) {
       const commit = this.fs.kind(path.join(normalized.repoUrl, '.git')) !== 'missing'
@@ -130,6 +194,26 @@ export class SourceService {
     if (normalized.kind === 'archive') {
       return this.mintTempCheckout((repoDir) => {
         extractZipArchive(this.fs, normalized.repoUrl, repoDir, this.archiveLimits);
+        return { ...normalized, repoDir, commit: null };
+      });
+    }
+
+    if (normalized.kind === 'url') {
+      if (isInsecureHttpSource(normalized) && !options.allowInsecureHttp) {
+        throw new SkillsManagerError(
+          'insecure_http_unconfirmed',
+          `${normalized.repoUrl} uses unencrypted http — a download could be tampered with in transit. Pass --yes to confirm, or use an https URL.`,
+        );
+      }
+      return this.mintTempCheckout((repoDir) => {
+        const downloaded = this.http.download(normalized.repoUrl, this.downloadRequest);
+        const payload = downloaded.bytes.toString('utf8');
+        const metadata = singleSkillMarkdownMetadata(payload);
+        // The minimal skill tree — a single-file source lands as skills/<name>/SKILL.md
+        // and discovery sees an ordinary directory tree (spec source-formats).
+        const skillDir = path.join(repoDir, 'skills', metadata.name);
+        this.fs.makeDirectory(skillDir);
+        this.fs.writeText(path.join(skillDir, 'SKILL.md'), payload);
         return { ...normalized, repoDir, commit: null };
       });
     }
@@ -172,8 +256,8 @@ export class SourceService {
    * the promise is *created*, deleting the tree under the awaiting work
    * (adversary L4). The type cannot forbid it — the discipline is documented.
    */
-  withCheckout<T>(source: string, forcedRef: string | undefined, use: (checkout: SourceCheckout) => T): T {
-    const checkout = this.checkout(source, forcedRef);
+  withCheckout<T>(source: string, forcedRef: string | undefined, use: (checkout: SourceCheckout) => T, options: CheckoutOptions = {}): T {
+    const checkout = this.checkout(source, forcedRef, options);
     try {
       return use(checkout);
     } catch (error) {

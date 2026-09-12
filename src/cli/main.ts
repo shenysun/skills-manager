@@ -2,7 +2,9 @@
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runtime.js';
-import { normalizeGitSourceUrl } from '../core/services/source-service.js';
+import { isInsecureHttpSource, normalizeGitSourceUrl } from '../core/services/source-service.js';
+import { isUpdatableSourceType } from '../core/services/update-service.js';
+import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
 import { NodeFileSystem } from '../infra/fs-skill-home.js';
@@ -362,30 +364,36 @@ program.command('list')
       name: row.name,
       title: row.title,
       category: row.category,
-      updatable: Boolean(row.source?.url && row.source?.subpath && row.source.type !== 'archive'),
+      updatable: Boolean(row.source?.url && row.source?.subpath && isUpdatableSourceType(row.source.type)),
       archived: Boolean(row.archived),
     })));
   });
 
 program.command('add')
   .description('Discover from a source, then install selected skills')
-  .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, local path, or local .zip archive')
+  .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, local path, local .zip archive, or http(s) URL of a single SKILL.md')
   .option('--list', 'only list discovered skills')
   .option('--all', 'install all discovered skills')
   .option('-s, --skill <skill...>', 'skill name or source subpath to install')
-  .option('-y, --yes', 'overwrite existing skills without prompting')
-  .action((source, opts, cmd) => {
+  .option('-y, --yes', 'overwrite existing skills without prompting; also confirms plain-http URL downloads')
+  .action(async (source, opts, cmd) => {
     const s = services(cmd);
+    // A plain-http url source downloads only with explicit confirmation
+    // (US-12): --yes on the command line or an interactive y/N — https and
+    // every other source kind needs none.
+    const allowInsecureHttp = isInsecureHttpSource(s.source.normalize(source))
+      ? Boolean(opts.yes) || await confirmInsecureHttp(source)
+      : false;
     if (opts.list) {
       return s.source.withCheckout(source, undefined, (checkout) => {
         const discovered = s.source.discover(checkout);
         return print({ source: redactCheckout(checkout), discovered: discovered.map(redactDiscovered) });
-      });
+      }, { allowInsecureHttp });
     }
     if (!opts.all && (opts.skill || []).length === 0) throw new Error('Use --all or --skill <name-or-subpath> to choose skills in this non-interactive CLI.');
     // Empty selectors mean "everything discovered" — the --all semantics.
     const selectors = opts.all ? [] : (opts.skill || []);
-    const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes) });
+    const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes), allowInsecureHttp });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
     print({ ...result, plan: { ...result.plan, source: redactCheckout(result.plan.source), selected: result.plan.selected.map(redactDiscovered) } });
     remindStaleTargets(s);
