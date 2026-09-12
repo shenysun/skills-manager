@@ -362,14 +362,14 @@ program.command('list')
       name: row.name,
       title: row.title,
       category: row.category,
-      updatable: Boolean(row.source?.url && row.source?.subpath),
+      updatable: Boolean(row.source?.url && row.source?.subpath && row.source.type !== 'archive'),
       archived: Boolean(row.archived),
     })));
   });
 
 program.command('add')
   .description('Discover from a source, then install selected skills')
-  .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, or local path')
+  .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, local path, or local .zip archive')
   .option('--list', 'only list discovered skills')
   .option('--all', 'install all discovered skills')
   .option('-s, --skill <skill...>', 'skill name or source subpath to install')

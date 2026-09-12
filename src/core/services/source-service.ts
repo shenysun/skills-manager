@@ -6,6 +6,7 @@ import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
+import { DEFAULT_ARCHIVE_LIMITS, type ArchiveLimits, extractZipArchive } from './archive-extract.js';
 
 const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
@@ -74,13 +75,29 @@ function redactCheckoutPath(error: unknown, repoDir: string): unknown {
   return error;
 }
 
+const ZIP_FILE_SUFFIX = /\.zip$/i;
+
 export class SourceService {
-  constructor(private readonly fs: FileSystemPort, private readonly git: GitPort, private readonly tempRoot = os.tmpdir()) {}
+  constructor(
+    private readonly fs: FileSystemPort,
+    private readonly git: GitPort,
+    private readonly tempRoot = os.tmpdir(),
+    private readonly archiveLimits: ArchiveLimits = DEFAULT_ARCHIVE_LIMITS,
+  ) {}
 
   normalize(source: string): SourceSpec {
     const input = source.trim();
     if (!input) throw new SkillsManagerError('missing_source', 'Source is required');
-    if (this.fs.exists(input)) return { input, repoUrl: path.resolve(input), isLocal: true, kind: 'local' };
+    if (this.fs.exists(input)) {
+      // An existing regular .zip file is an archive source (source-formats
+      // ticket 02): one-shot snapshot, transported through a temp checkout —
+      // not the local working-tree transport. Everything else existing stays
+      // on the local path.
+      if (ZIP_FILE_SUFFIX.test(input) && this.fs.targetKind(input) === 'file') {
+        return { input, repoUrl: path.resolve(input), isLocal: false, kind: 'archive' };
+      }
+      return { input, repoUrl: path.resolve(input), isLocal: true, kind: 'local' };
+    }
 
     if (OWNER_REPO_PATTERN.test(input)) {
       const [owner, repo] = input.split('/');
@@ -110,18 +127,34 @@ export class SourceService {
       return { ...normalized, repoDir: normalized.repoUrl, commit };
     }
 
-    this.sweepStaleCheckouts();
+    if (normalized.kind === 'archive') {
+      return this.mintTempCheckout((repoDir) => {
+        extractZipArchive(this.fs, normalized.repoUrl, repoDir, this.archiveLimits);
+        return { ...normalized, repoDir, commit: null };
+      });
+    }
+
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
-    const repoDir = path.join(this.tempRoot, mintCheckoutDirName(), 'repo');
-    this.fs.makeDirectory(path.dirname(repoDir));
-    try {
+    return this.mintTempCheckout((repoDir) => {
       // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
       this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
       const commit = this.git.revParseHead(repoDir);
       return { ...normalized, ...tree, repoDir, commit };
+    });
+  }
+
+  /** Shared temp-checkout scaffold for transport-based sources: mint a fresh
+   *  skills-source-* dir and run the transport inside it. A transport that
+   *  never became usable — clone or extraction — has its half-built temp
+   *  removed and the checkout path redacted from the message before
+   *  rethrowing (adversary M2/H1). */
+  private mintTempCheckout(transport: (repoDir: string) => SourceCheckout): SourceCheckout {
+    this.sweepStaleCheckouts();
+    const repoDir = path.join(this.tempRoot, mintCheckoutDirName(), 'repo');
+    this.fs.makeDirectory(path.dirname(repoDir));
+    try {
+      return transport(repoDir);
     } catch (error) {
-      // The clone never became usable — clean the half-built temp now (adversary M2),
-      // redact its path from the message (H1), rethrow.
       this.fs.removeTree(path.dirname(repoDir));
       throw redactCheckoutPath(error, repoDir);
     }

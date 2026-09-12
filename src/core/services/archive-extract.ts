@@ -1,0 +1,366 @@
+import { inflateRawSync } from 'node:zlib';
+import path from 'node:path';
+import type { FileSystemPort } from '../ports/filesystem.js';
+import { SkillsManagerError } from '../../shared/errors.js';
+import { assertPathInside } from '../../shared/validation.js';
+
+/**
+ * Zip extraction kernel for archive sources (spec source-formats; ADR-0016:
+ * an archive install is a one-shot snapshot). Node built-ins only — the zip
+ * central directory is parsed directly and deflate goes through zlib, so no
+ * new dependency enters the package (bz2/xz stay out of scope).
+ *
+ * The safety policy is enforced here on the full entry path: member names are
+ * normalized and contained, executable-bit and special-file members are
+ * refused, every payload is CRC-verified against its header, and symlink
+ * members may only resolve inside the extraction root — checked against the
+ * fully materialized tree, because a chain of individually-inside links can
+ * still lead out.
+ */
+
+export type ArchiveLimits = {
+  maxArchiveBytes: number;
+  maxUnpackedBytes: number;
+  maxCompressionRatio: number;
+  maxMembers: number;
+};
+
+/** Ruled values (PO, source-formats spec): 100MB / 500MB / 100x / 10,000. */
+export const DEFAULT_ARCHIVE_LIMITS: ArchiveLimits = {
+  maxArchiveBytes: 100 * 1024 * 1024,
+  maxUnpackedBytes: 500 * 1024 * 1024,
+  maxCompressionRatio: 100,
+  maxMembers: 10_000,
+};
+
+const EOCD_SIGNATURE = 0x06054b50;
+const CENTRAL_SIGNATURE = 0x02014b50;
+const LOCAL_SIGNATURE = 0x04034b50;
+const EOCD_MIN_SIZE = 22;
+const MAX_EOCD_COMMENT = 0xffff;
+const CENTRAL_FIXED_SIZE = 46;
+const LOCAL_FIXED_SIZE = 30;
+const METHOD_STORE = 0;
+const METHOD_DEFLATE = 8;
+const FLAG_ENCRYPTED = 0x0001;
+const ZIP64_PLACEHOLDER = 0xffffffff;
+
+const S_IFMT = 0xf000;
+const S_IFDIR = 0x4000;
+const S_IFCHR = 0x2000;
+const S_IFBLK = 0x6000;
+const S_IFREG = 0x8000;
+const S_IFLNK = 0xa000;
+const S_IFIFO = 0x1000;
+const S_IFSOCK = 0xc000;
+const MODE_EXEC_BITS = 0o111;
+
+/** Symlink chains longer than this are treated as cyclic or hostile. */
+const SYMLINK_HOP_BUDGET = 40;
+
+const CRC_TABLE = new Uint32Array(256).map((_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  return value >>> 0;
+});
+
+function crc32(buf: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of buf) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function invalid(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_invalid', message);
+}
+
+function corrupt(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_corrupt', message);
+}
+
+function crcMismatch(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_crc_mismatch', message);
+}
+
+function unsafe(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_member_path_unsafe', message);
+}
+
+function forbidden(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_member_forbidden', message);
+}
+
+function escaped(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_symlink_escape', message);
+}
+
+function limit(message: string): SkillsManagerError {
+  return new SkillsManagerError('archive_limit_exceeded', message);
+}
+
+/** Test-injectability channel for the extraction limits (PO ruling): the
+ *  ruled defaults above are the only production behavior — these env
+ *  overrides exist so tests can exercise limit violations with small
+ *  fixtures, and are deliberately not a documented configuration surface.
+ *  Parsing mirrors the SKILLS_MANAGER_CLONE_TIMEOUT_MS precedent: strict
+ *  digit strings above zero, anything else falls back to the default. */
+export function archiveLimitsFromEnv(env: Record<string, string | undefined> | undefined): ArchiveLimits {
+  const read = (name: string): number | undefined => {
+    const raw = env?.[name];
+    return typeof raw === 'string' && /^\d+$/.test(raw) && Number(raw) > 0 ? Number(raw) : undefined;
+  };
+  return {
+    maxArchiveBytes: read('SKILLS_MANAGER_ARCHIVE_MAX_BYTES') ?? DEFAULT_ARCHIVE_LIMITS.maxArchiveBytes,
+    maxUnpackedBytes: read('SKILLS_MANAGER_ARCHIVE_MAX_UNPACKED_BYTES') ?? DEFAULT_ARCHIVE_LIMITS.maxUnpackedBytes,
+    maxCompressionRatio: read('SKILLS_MANAGER_ARCHIVE_MAX_COMPRESSION_RATIO') ?? DEFAULT_ARCHIVE_LIMITS.maxCompressionRatio,
+    maxMembers: read('SKILLS_MANAGER_ARCHIVE_MAX_MEMBERS') ?? DEFAULT_ARCHIVE_LIMITS.maxMembers,
+  };
+}
+
+type CentralEntry = {
+  name: string;
+  method: number;
+  flags: number;
+  crc: number;
+  compressedSize: number;
+  uncompressedSize: number;
+  localOffset: number;
+  hostUnix: boolean;
+  externalAttrs: number;
+};
+
+type PlannedMember =
+  | { kind: 'directory'; path: string }
+  | { kind: 'file'; path: string; data: Buffer }
+  | { kind: 'symlink'; path: string; target: string };
+
+/** Locate the End of Central Directory record: the signature whose declared
+ *  comment length reaches exactly the end of the file. Anything else is not a
+ *  zip this kernel will guess at. */
+function locateEocd(file: Buffer): number {
+  if (file.length < EOCD_MIN_SIZE) return -1;
+  const scanFloor = Math.max(0, file.length - EOCD_MIN_SIZE - MAX_EOCD_COMMENT);
+  for (let pos = file.length - EOCD_MIN_SIZE; pos >= scanFloor; pos--) {
+    if (file.readUInt32LE(pos) !== EOCD_SIGNATURE) continue;
+    const commentLength = file.readUInt16LE(pos + 20);
+    if (pos + EOCD_MIN_SIZE + commentLength === file.length) return pos;
+  }
+  return -1;
+}
+
+function readCentralDirectory(file: Buffer, eocdOffset: number): CentralEntry[] {
+  const count = file.readUInt16LE(eocdOffset + 10);
+  const cdSize = file.readUInt32LE(eocdOffset + 12);
+  const cdOffset = file.readUInt32LE(eocdOffset + 16);
+  if (cdOffset === ZIP64_PLACEHOLDER || cdSize === ZIP64_PLACEHOLDER) {
+    throw invalid('zip64 archives are not supported');
+  }
+  if (cdOffset + cdSize > file.length) throw invalid('not a valid zip archive: central directory is truncated');
+  const entries: CentralEntry[] = [];
+  let pos = cdOffset;
+  for (let index = 0; index < count; index++) {
+    if (pos + CENTRAL_FIXED_SIZE > file.length) throw invalid('not a valid zip archive: central directory is truncated');
+    if (file.readUInt32LE(pos) !== CENTRAL_SIGNATURE) throw invalid('not a valid zip archive: central directory signature mismatch');
+    const versionMadeBy = file.readUInt16LE(pos + 4);
+    const entry: CentralEntry = {
+      name: '',
+      method: file.readUInt16LE(pos + 10),
+      flags: file.readUInt16LE(pos + 8),
+      crc: file.readUInt32LE(pos + 16),
+      compressedSize: file.readUInt32LE(pos + 20),
+      uncompressedSize: file.readUInt32LE(pos + 24),
+      localOffset: file.readUInt32LE(pos + 42),
+      hostUnix: ((versionMadeBy >>> 8) & 0xff) === 3,
+      externalAttrs: file.readUInt32LE(pos + 38),
+    };
+    const nameLength = file.readUInt16LE(pos + 28);
+    const extraLength = file.readUInt16LE(pos + 30);
+    const commentLength = file.readUInt16LE(pos + 32);
+    const recordEnd = pos + CENTRAL_FIXED_SIZE + nameLength + extraLength + commentLength;
+    if (recordEnd > file.length) throw invalid('not a valid zip archive: central directory is truncated');
+    entry.name = file.subarray(pos + CENTRAL_FIXED_SIZE, pos + CENTRAL_FIXED_SIZE + nameLength).toString('utf8');
+    entries.push(entry);
+    pos = recordEnd;
+  }
+  return entries;
+}
+
+/** Contained member path: separators normalized, `..` segments and absolute
+ *  forms refused, final containment re-asserted (US-9, defense in depth). */
+function resolveMemberPath(destDir: string, name: string): string {
+  if (name.length === 0) throw unsafe('archive member has an empty name');
+  if (name.includes('\0')) throw unsafe(`archive member name contains a NUL byte: ${JSON.stringify(name)}`);
+  if (name.startsWith('/') || name.startsWith('\\') || /^[A-Za-z]:[\\/]/.test(name)) {
+    throw unsafe(`archive member has an absolute path: ${JSON.stringify(name)}`);
+  }
+  const segments = name.split(/[\\/]+/).filter((segment) => segment !== '' && segment !== '.');
+  if (segments.some((segment) => segment === '..')) {
+    throw unsafe(`archive member path escapes the extraction root: ${JSON.stringify(name)}`);
+  }
+  const memberPath = path.join(destDir, ...segments);
+  assertPathInside(memberPath, destDir);
+  return memberPath;
+}
+
+/** Extract one member's bytes: finds the local header, refuses encryption and
+ *  method disagreement, inflates deflate members bounded by the declared
+ *  uncompressed size (lying headers fail instead of allocating unbounded). */
+function memberData(file: Buffer, entry: CentralEntry): Buffer {
+  if (entry.localOffset + LOCAL_FIXED_SIZE > file.length) throw corrupt('member local header is out of bounds');
+  const local = entry.localOffset;
+  if (file.readUInt32LE(local) !== LOCAL_SIGNATURE) throw corrupt('member local header signature mismatch');
+  if (file.readUInt16LE(local + 6) & FLAG_ENCRYPTED) {
+    throw new SkillsManagerError('archive_unsupported', 'encrypted archive members are not supported');
+  }
+  if (file.readUInt16LE(local + 8) !== entry.method) throw corrupt('member compression method disagrees between headers');
+  const dataStart = local + LOCAL_FIXED_SIZE + file.readUInt16LE(local + 26) + file.readUInt16LE(local + 28);
+  const dataEnd = dataStart + entry.compressedSize;
+  if (dataEnd > file.length) throw corrupt('member data is truncated');
+  const stored = file.subarray(dataStart, dataEnd);
+  if (entry.method === METHOD_STORE) {
+    if (stored.length !== entry.uncompressedSize) throw corrupt('stored member size disagrees with its header');
+    return Buffer.from(stored);
+  }
+  if (entry.method === METHOD_DEFLATE) {
+    let inflated: Buffer;
+    try {
+      inflated = inflateRawSync(stored, { maxOutputLength: entry.uncompressedSize });
+    } catch {
+      throw corrupt('member data does not inflate to its declared size');
+    }
+    if (inflated.length !== entry.uncompressedSize) throw corrupt('member size disagrees with its header');
+    return inflated;
+  }
+  throw new SkillsManagerError('archive_unsupported', `unsupported archive compression method: ${entry.method}`);
+}
+
+/** Resolve `startPath` against the materialized tree, following symlinks with
+ *  a hop budget. Realpath semantics: `..` applies to the already-resolved
+ *  position, never to the lexical string — so a path that travels through a
+ *  symlink directory is judged by where it really lands. Missing tail
+ *  components resolve lexically (nothing is created after this runs, so the
+ *  fallback is final). */
+function resolveReal(fs: FileSystemPort, startPath: string, budget: { hops: number }): string {
+  let current = path.parse(startPath).root;
+  const pending = startPath.split(/[\\/]+/);
+  while (pending.length > 0) {
+    const segment = pending.shift();
+    if (segment === undefined || segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      current = path.dirname(current);
+      continue;
+    }
+    const next = path.join(current, segment);
+    if (fs.kind(next) === 'symlink') {
+      if (budget.hops-- <= 0) throw escaped('symlink chain is too long or cyclic');
+      const target = fs.readlink(next);
+      if (path.isAbsolute(target)) current = path.parse(target).root;
+      pending.unshift(...target.split(/[\\/]+/));
+    } else {
+      current = next;
+    }
+  }
+  return current;
+}
+
+/** Classify a central-directory entry into a planned member, enforcing the
+ *  file-type policy: special files (device/fifo/socket) and regular files
+ *  with executable bits are refused outright (US-11). The compression-ratio
+ *  limit is judged on the member's ACTUAL bytes — lying headers are caught
+ *  by the size checks in memberData before this can misfire on them. */
+function planMember(fs: FileSystemPort, file: Buffer, entry: CentralEntry, destDir: string, limits: ArchiveLimits): PlannedMember {
+  const memberPath = resolveMemberPath(destDir, entry.name);
+  if (entry.flags & FLAG_ENCRYPTED) {
+    throw new SkillsManagerError('archive_unsupported', 'encrypted archive members are not supported');
+  }
+  const mode = entry.hostUnix ? (entry.externalAttrs >>> 16) & 0xffff : 0;
+  const fileType = mode & S_IFMT;
+
+  if (entry.hostUnix && (fileType === S_IFCHR || fileType === S_IFBLK || fileType === S_IFIFO || fileType === S_IFSOCK)) {
+    throw forbidden(`archive member has a special file type (device/fifo/socket): ${JSON.stringify(entry.name)}`);
+  }
+
+  const isDirectory = entry.name.endsWith('/') || fileType === S_IFDIR || (!entry.hostUnix && (entry.externalAttrs & 0x10) !== 0);
+  if (isDirectory && fileType !== S_IFLNK) return { kind: 'directory', path: memberPath };
+
+  if (fileType === S_IFLNK) {
+    const target = memberData(file, entry).toString('utf8');
+    if (target.length === 0) throw invalid(`symlink member has an empty target: ${JSON.stringify(entry.name)}`);
+    return { kind: 'symlink', path: memberPath, target };
+  }
+
+  if (entry.hostUnix && (mode & MODE_EXEC_BITS) !== 0) {
+    throw forbidden(`archive member carries the executable bit: ${JSON.stringify(entry.name)}`);
+  }
+  const data = memberData(file, entry);
+  if (data.length > 0) {
+    const ratio = entry.compressedSize === 0 ? Infinity : data.length / entry.compressedSize;
+    if (ratio > limits.maxCompressionRatio) {
+      throw limit(`archive member ${JSON.stringify(entry.name)} has a compression ratio of ${Math.round(ratio)}x, exceeding the maximum of ${limits.maxCompressionRatio}x`);
+    }
+  }
+  if (crc32(data) !== entry.crc) throw crcMismatch(`member fails its CRC check: ${JSON.stringify(entry.name)}`);
+  return { kind: 'file', path: memberPath, data };
+}
+
+/** Unpack the zip at `zipPath` into `destDir`, enforcing the extraction safety
+ *  policy on the full entry path (spec: no separate seam for the unpacker). */
+export function extractZipArchive(fs: FileSystemPort, zipPath: string, destDir: string, limits: ArchiveLimits = DEFAULT_ARCHIVE_LIMITS): void {
+  // US-10 limits. The archive-size check runs before the read so an oversized
+  // archive is refused without ever being loaded into memory. Member count and
+  // unpacked total are header-level checks over the central directory — they
+  // hold against the data too because inflate is bounded by the declared
+  // size; the compression ratio is judged per member on its actual bytes in
+  // planMember, once lying headers have already failed the size checks.
+  const archiveBytes = fs.size(zipPath);
+  if (archiveBytes > limits.maxArchiveBytes) {
+    throw limit(`archive is ${archiveBytes} bytes, exceeding the maximum archive size of ${limits.maxArchiveBytes} bytes`);
+  }
+  const file = fs.readBytes(zipPath);
+  const eocd = locateEocd(file);
+  if (eocd < 0) throw invalid('not a valid zip archive: no end-of-central-directory record');
+  const entries = readCentralDirectory(file, eocd);
+  if (entries.length > limits.maxMembers) {
+    throw limit(`archive has ${entries.length} members, exceeding the maximum of ${limits.maxMembers} members`);
+  }
+  const totalUnpacked = entries.reduce((total, entry) => total + entry.uncompressedSize, 0);
+  if (totalUnpacked > limits.maxUnpackedBytes) {
+    throw limit(`archive unpacks to ${totalUnpacked} bytes, exceeding the maximum of ${limits.maxUnpackedBytes} bytes`);
+  }
+  const members = entries.map((entry) => planMember(fs, file, entry, destDir, limits));
+
+  // Pass 1 — directories and regular files only, so no write can ever travel
+  // through a symlink: links simply do not exist yet.
+  for (const member of members) {
+    if (member.kind === 'directory') fs.makeDirectory(member.path);
+    else if (member.kind === 'file') fs.writeBytes(member.path, member.data);
+  }
+
+  // Pass 2 — symlink members, then a containment check against the complete
+  // tree: each link's real resolution must stay inside the extraction root.
+  // Checking only each target lexically misses chains that escape through an
+  // earlier link, so the verdict is computed on the final graph. The root
+  // itself is resolved the same way first — system-level symlinks on the
+  // prefix (e.g. /var -> /private/var) would otherwise make every inside
+  // resolution look like an escape.
+  const links = members.filter((member): member is Extract<PlannedMember, { kind: 'symlink' }> => member.kind === 'symlink');
+  if (links.length > 0) {
+    const resolvedRoot = resolveReal(fs, destDir, { hops: SYMLINK_HOP_BUDGET });
+    const assertInside = (link: Extract<PlannedMember, { kind: 'symlink' }>) => {
+      const resolved = resolveReal(fs, link.path, { hops: SYMLINK_HOP_BUDGET });
+      const inside = resolved === resolvedRoot || resolved.startsWith(resolvedRoot + path.sep);
+      if (!inside) throw escaped(`symlink member resolves outside the extraction root: ${JSON.stringify(link.path.slice(destDir.length + 1))}`);
+    };
+    for (const link of links) {
+      // The member path itself must resolve inside the root BEFORE anything
+      // is written for it: an earlier link member can bend a later member's
+      // path outside, and creating through it (symlink or parent mkdir) would
+      // write outside the root before the final pass could object.
+      assertInside(link);
+      fs.makeDirectory(path.dirname(link.path));
+      if (fs.kind(link.path) !== 'missing') throw invalid(`conflicting archive member: ${JSON.stringify(link.path.slice(destDir.length + 1))}`);
+      fs.symlink(link.target, link.path);
+    }
+    for (const link of links) assertInside(link);
+  }
+}

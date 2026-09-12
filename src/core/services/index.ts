@@ -1,6 +1,7 @@
 import { createSkillHome, SkillHomeService } from './skill-home-service.js';
 import { RegistryService } from './registry-service.js';
 import { SourceService } from './source-service.js';
+import { archiveLimitsFromEnv } from './archive-extract.js';
 import { ViewService } from './view-service.js';
 import { DistributeService } from './distribute-service.js';
 import { InstallService } from './install-service.js';
@@ -41,7 +42,7 @@ export function createCoreServices(options: CoreServicesOptions) {
   const home = createSkillHome(options.skillHomeRoot);
   const skillHome = new SkillHomeService(options.fs, home);
   const registry = new RegistryService(options.fs, home);
-  const source = new SourceService(options.fs, options.git, options.tempRoot);
+  const source = new SourceService(options.fs, options.git, options.tempRoot, archiveLimitsFromEnv(options.env ?? process.env));
   const views = new ViewService(options.fs, home, registry);
   const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot, env: options.env, userHomeDir: options.userHome });
   const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);

@@ -11,7 +11,20 @@ export class NodeFileSystem implements FileSystemPort {
     return readFileSync(filePath, 'utf8');
   }
 
+  readBytes(filePath: string): Buffer {
+    return readFileSync(filePath);
+  }
+
+  size(filePath: string): number {
+    return statSync(filePath).size;
+  }
+
   writeText(filePath: string, contents: string): void {
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, contents);
+  }
+
+  writeBytes(filePath: string, contents: Buffer): void {
     mkdirSync(path.dirname(filePath), { recursive: true });
     writeFileSync(filePath, contents);
   }

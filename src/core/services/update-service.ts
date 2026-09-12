@@ -14,6 +14,9 @@ export class UpdateService {
     const candidates: UpdateCandidate[] = [];
     for (const [skill, entry] of Object.entries(registry.skills || {})) {
       if (entry.archived || !this.registry.skillExists(skill)) continue;
+      // Archive installs are one-shot snapshots with no upstream to re-check —
+      // same standing as a source-less import (ADR-0016).
+      if (entry.source?.type === 'archive') continue;
       const url = entry.source?.url;
       const subpath = entry.source?.subpath;
       if (!url || !subpath) continue;
