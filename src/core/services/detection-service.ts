@@ -7,6 +7,7 @@ import { DEFAULT_DOWNLOAD_REQUEST, unconfiguredHttpDownload, type DownloadHeader
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { SkillSource, SourceCheckout } from '../model/index.js';
 import { REGISTERED_SOURCE_RECHECK, parseGitHubRepoRef, type CheckoutOptions } from './source-service.js';
+import { wellknownEntryNameOfSubpath, type FetchedWellknownIndex } from './wellknown-index.js';
 import { appendDetectionFailure } from './detection-log.js';
 export { detectionLogPath } from './detection-log.js';
 
@@ -47,6 +48,7 @@ export type DetectionServices = {
   resolution: { root: string };
   source: {
     withCheckout<T>(source: string, forcedRef: string | undefined, use: (checkout: SourceCheckout) => T, options?: CheckoutOptions): T;
+    fetchWellknownIndex(sourceUrl: string, options?: CheckoutOptions): Pick<FetchedWellknownIndex, 'entries'> | null;
   };
 };
 
@@ -125,6 +127,10 @@ export class DetectionService {
       }
       if (source.type === 'url') {
         this.detectUrlSource(services, skill.name, source, homeRoot, outcomes);
+        continue;
+      }
+      if (source.type === 'wellknown') {
+        this.detectWellknownSource(services, skill.name, source, homeRoot, outcomes);
         continue;
       }
       const github = parseGitHubRepoRef(source.url);
@@ -236,6 +242,43 @@ export class DetectionService {
     } catch (error) {
       outcomes.set(name, { detection: 'failed', hasUpdate: false });
       this.recordDetectionFailure(fs, homeRoot, [name], source.url!, error, 'url');
+    }
+  }
+
+  /** wellknown-source freshness (US-25, ADR-0016): the index itself is the
+   *  anchor's comparison side — re-pull it, find the skill's entry, compare
+   *  digests. The artifact is downloaded only by the actual update reinstall,
+   *  never by detection. A vanished entry is 'skipped' (the upstream no longer
+   *  offers it — the row cannot be judged, exactly like a git subdirectory the
+   *  tree listing lost); an unreachable index is a failed row with a
+   *  detection-log line. An entry missing its anchor (legacy data) adopts the
+   *  digest this pull observed — detection-as-calibration, no update flagged. */
+  private detectWellknownSource(
+    services: DetectionServices,
+    name: string,
+    source: DetectionSkillRow['source'],
+    homeRoot: string,
+    outcomes: Map<string, DetectionOutcome>,
+  ) {
+    const fs = this.deps.fs;
+    try {
+      const pulled = services.source.fetchWellknownIndex(source.url!, REGISTERED_SOURCE_RECHECK);
+      if (!pulled) throw new Error(`well-known index is no longer reachable for ${source.url}`);
+      const entryName = wellknownEntryNameOfSubpath(source.subpath!);
+      const entry = pulled.entries.find((candidate) => candidate.name === entryName);
+      if (!entry) {
+        outcomes.set(name, { detection: 'skipped', hasUpdate: false });
+        return;
+      }
+      if (!source.upstream_digest) {
+        services.registry.editSafeFields(name, { source: { upstream_digest: entry.digest } });
+        outcomes.set(name, { detection: 'ok', hasUpdate: false });
+        return;
+      }
+      outcomes.set(name, { detection: 'ok', hasUpdate: entry.digest !== source.upstream_digest });
+    } catch (error) {
+      outcomes.set(name, { detection: 'failed', hasUpdate: false });
+      this.recordDetectionFailure(fs, homeRoot, [name], source.url!, error, 'wellknown');
     }
   }
 

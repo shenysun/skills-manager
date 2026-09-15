@@ -8,6 +8,7 @@ import type { SourceService } from './source-service.js';
 import type { ViewService } from './view-service.js';
 import type { DistributeService } from './distribute-service.js';
 import type { UrlPayloadFormat } from './url-payload.js';
+import { wellknownEntryNameOfSubpath } from './wellknown-index.js';
 
 export class InstallService {
   constructor(
@@ -104,6 +105,12 @@ export class InstallService {
         ref: source.ref || null,
         upstream_commit: source.commit,
         upstream_tree: this.source.upstreamTree(source, skill.subpath),
+        // The digest anchor is wellknown-exclusive (ADR-0016): other kinds never
+        // carry the key at all. The skill's subpath always sits inside its entry
+        // dir, so the first segment names the entry.
+        ...(source.wellknownDigests
+          ? { upstream_digest: source.wellknownDigests[wellknownEntryNameOfSubpath(skill.subpath)] ?? null }
+          : {}),
         // url sources record the download's validators (US-24); every other
         // kind has no http download and stays null.
         upstream_etag: source.httpHeaders?.etag ?? null,

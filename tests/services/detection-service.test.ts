@@ -166,6 +166,13 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     return detection.detect(bundle, bundle.registry.listSkills({ includeArchived: false }));
   }
 
+  /** The payload traffic this describe's assertions talk about — well-known
+   *  probe candidates that every url checkout now spends before the payload
+   *  are ticket-07 behavior and excluded here (covered in wellknown-source). */
+  function payloadCalls(http: { calls: string[] }): string[] {
+    return http.calls.filter((call) => !call.includes('.well-known'));
+  }
+
   function installUrl(s: ReturnType<typeof urlServices>['s']) {
     s.install.installFromSourceSelection({ source: 'https://example.com/SKILL.md', selectors: ['alpha'] });
   }
@@ -177,7 +184,7 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     const outcomes = await detectUrl(detection, bundle);
 
     expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
-    expect(http.calls).toEqual(['GET https://example.com/SKILL.md', 'HEAD https://example.com/SKILL.md']);
+    expect(payloadCalls(http)).toEqual(['GET https://example.com/SKILL.md', 'HEAD https://example.com/SKILL.md']);
   });
 
   it('a refused probe is not a verdict — detection falls through to the full download (HEAD-405 servers)', async () => {
@@ -198,7 +205,7 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     // The full download decided on the content hash; had the URL been dead the
     // download's own failure would keep the failed visibility.
     expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: true });
-    expect(http.calls).toEqual(['GET https://example.com/SKILL.md', 'GET https://example.com/SKILL.md']);
+    expect(payloadCalls(http)).toEqual(['GET https://example.com/SKILL.md', 'GET https://example.com/SKILL.md']);
   });
 
   it('ETag changed and content changed — re-download, content hash flags the update, validators hold until an install', async () => {
@@ -210,7 +217,7 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     const outcomes = await detectUrl(detection, bundle);
 
     expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: true });
-    expect(http.calls).toEqual(['GET https://example.com/SKILL.md', 'HEAD https://example.com/SKILL.md', 'GET https://example.com/SKILL.md']);
+    expect(payloadCalls(http)).toEqual(['GET https://example.com/SKILL.md', 'HEAD https://example.com/SKILL.md', 'GET https://example.com/SKILL.md']);
     // The stale signal must survive later checks (the ETag is a pre-check, never
     // an anchor): the row keeps the installed validators until an install moves
     // the content, so the next probe still reports "changed" instead of silently
@@ -239,7 +246,7 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     const outcomes = await detectUrl(detection, bundle);
 
     expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
-    expect(http.calls.filter((call) => call.startsWith('GET'))).toHaveLength(2);
+    expect(payloadCalls(http).filter((call) => call.startsWith('GET'))).toHaveLength(2);
   });
 
   it('Last-Modified only — unchanged skips the download, changed re-downloads and compares', async () => {
@@ -248,12 +255,12 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     installUrl(s);
     const unchanged = await detectUrl(detection, bundle);
     expect(unchanged.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
-    expect(http.calls.filter((call) => call.startsWith('GET'))).toHaveLength(1);
+    expect(payloadCalls(http).filter((call) => call.startsWith('GET'))).toHaveLength(1);
 
     serving.headers = { lastModified: 'Fri, 11 Sep 2026 10:00:00 GMT' };
     const changed = await detectUrl(detection, bundle);
     expect(changed.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
-    expect(http.calls.filter((call) => call.startsWith('GET'))).toHaveLength(2);
+    expect(payloadCalls(http).filter((call) => call.startsWith('GET'))).toHaveLength(2);
   });
 
   it('a failed probe is a failed row with a detection-log line, never silence (AC6)', async () => {

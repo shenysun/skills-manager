@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import type { DiscoveredSkill, SourceCheckout, SourceSpec } from '../model/index.js';
@@ -13,6 +13,7 @@ import { extractZipArchive } from './archive-extract.js';
 import { extractTarArchive } from './tar-extract.js';
 import { judgeUrlPayload, predictFromContentType, predictFromUrlPath, type UrlPayloadFormat } from './url-payload.js';
 import { parseMarketplacePlugins, type MarketplaceView, type ParsedMarketplacePlugin } from './marketplace-manifest.js';
+import { assertDigestMatches, parseWellknownIndex, resolveWellknownArtifactUrl, wellknownCandidateUrls, type FetchedWellknownIndex } from './wellknown-index.js';
 
 const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
@@ -114,6 +115,15 @@ export function isInsecureHttpSource(spec: SourceSpec): boolean {
   return spec.kind === 'url' && spec.repoUrl.startsWith('http://');
 }
 
+/** The US-12 refusal itself, shared by every http(s) fetch entry point
+ *  (checkout and the well-known probe) so the wording cannot drift. */
+function insecureHttpError(sourceUrl: string): SkillsManagerError {
+  return new SkillsManagerError(
+    'insecure_http_unconfirmed',
+    `${sourceUrl} uses unencrypted http — a download could be tampered with in transit. Pass --yes to confirm, or use an https URL.`,
+  );
+}
+
 /** Checkout options for re-fetching a source the operator already registered
  *  (detection's re-download, update's reinstall): the US-12 confirmation
  *  happened when the source was introduced (add's `--yes`), so the re-check
@@ -140,20 +150,23 @@ const ZIP_FILE_SUFFIX = /\.zip$/i;
  *  untrusted-metadata checks (e.g. a path-traversal name) keeps that verdict.
  *  When the format was auto-judged (not forced via --format), the failure
  *  points at the escape hatch (US-6). */
-function singleSkillMarkdownMetadata(payload: string, autoJudged: boolean): { name: string; description: string } {
-  const hint = autoJudged ? ' If the payload is really an archive, pass --format zip or --format tar.' : '';
+function singleSkillMarkdownMetadata(payload: string, messageSuffix: string): { name: string; description: string } {
   let metadata;
   try {
     metadata = parseSkillMarkdownMetadata(payload);
   } catch (error) {
     if (error instanceof SkillsManagerError) throw error;
-    throw new SkillsManagerError('url_payload_invalid', `The URL did not return a single SKILL.md — its frontmatter is not valid YAML.${hint}`);
+    throw new SkillsManagerError('url_payload_invalid', `The URL did not return a single SKILL.md — its frontmatter is not valid YAML.${messageSuffix}`);
   }
   if (!metadata.name || !metadata.description) {
-    throw new SkillsManagerError('url_payload_invalid', `The URL did not return a single SKILL.md (markdown whose frontmatter carries both a name and a description).${hint}`);
+    throw new SkillsManagerError('url_payload_invalid', `The URL did not return a single SKILL.md (markdown whose frontmatter carries both a name and a description).${messageSuffix}`);
   }
   return { name: metadata.name, description: metadata.description };
 }
+
+/** The `--format` escape-hatch hint, appended only when the format was
+ *  auto-judged — a forced `--format` verdict is never second-guessed. */
+const FORMAT_HINT = ' If the payload is really an archive, pass --format zip or --format tar.';
 
 export class SourceService {
   constructor(
@@ -228,13 +241,17 @@ export class SourceService {
     }
 
     if (normalized.kind === 'url') {
-      if (isInsecureHttpSource(normalized) && !options.allowInsecureHttp) {
-        throw new SkillsManagerError(
-          'insecure_http_unconfirmed',
-          `${normalized.repoUrl} uses unencrypted http — a download could be tampered with in transit. Pass --yes to confirm, or use an https URL.`,
-        );
-      }
-      return this.mintTempCheckout((repoDir) => this.checkoutUrlPayload(normalized, repoDir, options));
+      if (isInsecureHttpSource(normalized) && !options.allowInsecureHttp) throw insecureHttpError(normalized.repoUrl);
+      // The extension prediction runs before anything is downloaded: a URL
+      // declaring an unsupported archive format (.tar.bz2/xz) is refused
+      // outright, well-known probing included (US-32). The verdict feeds both
+      // consumers below — probed once, never recomputed.
+      const extensionPrediction = predictFromUrlPath(normalized.repoUrl);
+      return this.mintTempCheckout((repoDir) => {
+        const wellknown = this.fetchWellknownIndex(normalized.repoUrl, options);
+        if (wellknown) return this.checkoutWellknownEntries(normalized, wellknown, repoDir);
+        return this.checkoutUrlPayload(normalized, repoDir, options, extensionPrediction);
+      });
     }
 
     const tree: { ref?: string; baseSubpath?: string } = normalized.treeRest ? this.resolveGitHubTreeRef(normalized.repoUrl, normalized.treeRest) : (forcedRef ? { ref: forcedRef } : {});
@@ -253,13 +270,82 @@ export class SourceService {
     });
   }
 
+  /**
+   * Probe the well-known discovery index for a url source (ticket 07, ADR-0016):
+   * the candidate paths are tried in order, and the first candidate that
+   * answers with a parseable JSON object IS the site's index — its `$schema`
+   * then decides support (V2-only), so a present-but-unsupported index is an
+   * error, never a silent fall-through to direct download. No candidate
+   * answering (404s, transport failures, non-JSON) returns null and the caller
+   * falls back to the plain url-source transport (tickets 03/04). Shared by
+   * checkout and update detection.
+   */
+  fetchWellknownIndex(sourceUrl: string, options: CheckoutOptions = {}): FetchedWellknownIndex | null {
+    if (sourceUrl.startsWith('http://') && !options.allowInsecureHttp) throw insecureHttpError(sourceUrl);
+    for (const candidate of wellknownCandidateUrls(sourceUrl)) {
+      let body: Buffer;
+      try {
+        body = this.http.download(candidate, this.downloadRequest).bytes;
+      } catch {
+        continue;
+      }
+      // A non-JSON body means this candidate simply is not the index — keep
+      // probing. A parsed index that fails the V2/shape checks is a verdict
+      // about the site's index and must surface.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(body.toString('utf8'));
+      } catch {
+        continue;
+      }
+      return { indexUrl: candidate, entries: parseWellknownIndex(parsed) };
+    }
+    return null;
+  }
+
+  /** The well-known transport (ticket 07): every entry's artifact is
+   *  downloaded, digest-checked against the index declaration (US-22), and
+   *  materialized under its entry directory — a skill-md lands as SKILL.md, an
+   *  archive is unpacked with the full archive-safety policy. The entry digests
+   *  ride on the checkout as the registry's update anchor. */
+  private checkoutWellknownEntries(normalized: SourceSpec, wellknown: FetchedWellknownIndex, repoDir: string): SourceCheckout {
+    const digests: Record<string, string> = {};
+    for (const entry of wellknown.entries) {
+      const downloaded = this.http.download(resolveWellknownArtifactUrl(entry, wellknown.indexUrl), this.downloadRequest);
+      assertDigestMatches(downloaded.bytes, entry.digest, entry.name);
+      const entryDir = path.join(repoDir, entry.name);
+      this.fs.makeDirectory(entryDir);
+      if (entry.type === 'skill-md') {
+        singleSkillMarkdownMetadata(downloaded.bytes.toString('utf8'), ` (well-known entry "${entry.name}")`);
+        this.fs.writeText(path.join(entryDir, 'SKILL.md'), downloaded.bytes.toString('utf8'));
+      } else {
+        this.extractWellknownArchive(downloaded.bytes, entry.name, entryDir, repoDir);
+      }
+      digests[entry.name] = entry.digest;
+    }
+    return { ...normalized, repoDir, commit: null, kind: 'wellknown', wellknownDigests: digests };
+  }
+
+  /** An archive entry is unpacked by magic bytes (the index's type declaration
+   *  is not trusted as the format verdict); the payload lands beside `repo/` so
+   *  the extractor size-checks it in place and the checkout lifecycle sweeps it. */
+  private extractWellknownArchive(bytes: Buffer, entryName: string, entryDir: string, repoDir: string): void {
+    const format = judgeUrlPayload(bytes, null);
+    if (format !== 'zip' && format !== 'tar') {
+      throw new SkillsManagerError('url_payload_mismatch', `The well-known entry "${entryName}" declares an archive but the download carries no archive magic bytes — refusing to install.`);
+    }
+    const payloadPath = path.join(path.dirname(repoDir), `payload-${entryName}.bin`);
+    this.fs.writeBytes(payloadPath, bytes);
+    if (format === 'zip') extractZipArchive(this.fs, payloadPath, entryDir, this.archiveLimits);
+    else extractTarArchive(this.fs, payloadPath, entryDir, this.archiveLimits);
+  }
+
   /** The url-source transport (ticket 04): the format judgment chain —
    *  extension predicts before the download (a .tar.bz2 URL is refused
    *  without one), Content-Type predicts for extension-less URLs, the
    *  downloaded bytes are the final judge. --format overrides the predictions
    *  but never the dispatch: the source kind stays url whatever the payload. */
-  private checkoutUrlPayload(normalized: SourceSpec, repoDir: string, options: CheckoutOptions): SourceCheckout {
-    const extensionPrediction = predictFromUrlPath(normalized.repoUrl);
+  private checkoutUrlPayload(normalized: SourceSpec, repoDir: string, options: CheckoutOptions, extensionPrediction: UrlPayloadFormat | null): SourceCheckout {
     const downloaded = this.http.download(normalized.repoUrl, this.downloadRequest);
     const prediction = extensionPrediction ?? predictFromContentType(downloaded.headers.contentType);
     const format = options.format ?? judgeUrlPayload(downloaded.bytes, prediction);
@@ -267,7 +353,7 @@ export class SourceService {
       return this.checkoutArchivePayload(normalized, downloaded, format, repoDir);
     }
     const payload = downloaded.bytes.toString('utf8');
-    const metadata = singleSkillMarkdownMetadata(payload, options.format === undefined);
+    const metadata = singleSkillMarkdownMetadata(payload, options.format === undefined ? FORMAT_HINT : '');
     // The minimal skill tree — a single-file source lands as skills/<name>/SKILL.md
     // and discovery sees an ordinary directory tree (spec source-formats).
     const skillDir = path.join(repoDir, 'skills', metadata.name);

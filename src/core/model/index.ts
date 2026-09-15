@@ -116,6 +116,10 @@ export type SourceCheckout = SourceSpec & {
    *  — the validators install and update re-download runs record for the
    *  cheap ETag/Last-Modified pre-check. Every other kind omits it. */
   httpHeaders?: DownloadHeaders;
+  /** wellknown sources only (ticket 07): the digest each index entry declared,
+   *  keyed by entry name — install persists it as registry `upstream_digest`,
+   *  the well-known update anchor (ADR-0016). Every other kind omits it. */
+  wellknownDigests?: Record<string, string>;
 };
 
 export type DiscoveredSkill = {
