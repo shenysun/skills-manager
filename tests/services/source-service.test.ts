@@ -7,6 +7,7 @@ import { createCoreServices } from '../../src/core/services/index.js';
 import { SourceService } from '../../src/core/services/source-service.js';
 import { createNodeFileSystem } from '../../src/infra/index.js';
 import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
+import { materializingGit } from '../fixtures/git-transport.js';
 
 const SHA = 'fedcba9876543210fedcba9876543210fedcba98';
 const TREE = '0123456789abcdef0123456789abcdef01234567';
@@ -143,6 +144,145 @@ describe('upstreamTree anchors per dispatched kind (ADR-0016)', () => {
     const { git } = spyGit();
     const s = service(git);
     expect(s.upstreamTree(checkoutOf('marketplace'), '')).toBe(SHA);
+  });
+});
+
+describe('marketplace detection (source-formats ticket 06)', () => {
+  function marketplaceUpstream(): string {
+    const upstream = path.join(root, 'mp-upstream');
+    mkdirSync(path.join(upstream, '.claude-plugin'), { recursive: true });
+    writeFileSync(path.join(upstream, '.claude-plugin', 'marketplace.json'), JSON.stringify({ name: 'test-mp', plugins: [] }));
+    return upstream;
+  }
+
+  it('detects a root marketplace manifest after clone and switches kind to marketplace', () => {
+    const git = materializingGit(marketplaceUpstream());
+    const checkout = service(git).checkout('https://github.com/owner/repo.git');
+    expect(checkout.kind).toBe('marketplace');
+  });
+
+  it('keeps kind git when the root has no manifest', () => {
+    const upstream = path.join(root, 'plain-upstream');
+    mkdirSync(upstream, { recursive: true });
+    const checkout = service(materializingGit(upstream)).checkout('https://github.com/owner/repo.git');
+    expect(checkout.kind).toBe('git');
+  });
+
+  it('keeps kind git for an explicit-subpath source even with a root manifest (bypass path, US-18)', () => {
+    const git = materializingGit(marketplaceUpstream());
+    const checkout = service(git).checkout('https://github.com/owner/repo/tree/main/plugins/foo');
+    expect(checkout.kind).toBe('git');
+    expect(checkout.baseSubpath).toBe('plugins/foo');
+  });
+});
+
+describe('marketplace discovery (source-formats ticket 06)', () => {
+  const MANIFEST = {
+    name: 'test-mp',
+    plugins: [
+      { name: 'core', source: './plugins/core', description: 'core plugin', skills: ['./skills/alpha', './skills/beta'] },
+      { name: 'linked', source: { source: 'git-subdir', repo: 'other/repo', path: 'skills' } },
+      { name: 'remote', source: { source: 'url', url: 'https://example.com/plugin' } },
+      { name: 'bare', source: './plugins/bare' },
+      { name: 'commands-only', source: './plugins/commands-only', commands: ['./commands'] },
+    ],
+  };
+
+  function marketplaceUpstream(): string {
+    const upstream = path.join(root, 'mp-discovery');
+    mkdirSync(path.join(upstream, '.claude-plugin'), { recursive: true });
+    writeFileSync(path.join(upstream, '.claude-plugin', 'marketplace.json'), JSON.stringify(MANIFEST));
+    for (const skill of ['alpha', 'beta']) {
+      const dir = path.join(upstream, 'plugins', 'core', 'skills', skill);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${skill}\ntitle: ${skill} title\ndescription: ${skill} desc\n---\n# ${skill}\n`);
+    }
+    mkdirSync(path.join(upstream, 'plugins', 'bare'), { recursive: true });
+    mkdirSync(path.join(upstream, 'plugins', 'commands-only', 'commands'), { recursive: true });
+    return upstream;
+  }
+
+  function checkoutOf(upstream: string) {
+    const git = materializingGit(upstream);
+    return { git, checkout: service(git).checkout('https://github.com/owner/repo.git') };
+  }
+
+  it('expands form-1 plugins into discovered skills tagged with their plugin', () => {
+    const { git, checkout } = checkoutOf(marketplaceUpstream());
+    expect(checkout.kind).toBe('marketplace');
+    const discovered = service(git).discover(checkout);
+    expect(discovered.map((skill) => ({ name: skill.name, plugin: skill.plugin, subpath: skill.subpath })))
+      .toEqual([
+        { name: 'alpha', plugin: 'core', subpath: 'plugins/core/skills/alpha' },
+        { name: 'beta', plugin: 'core', subpath: 'plugins/core/skills/beta' },
+      ]);
+  });
+
+  it('ignores plugins without a skills[] entry and non-skill content entirely', () => {
+    const { git, checkout } = checkoutOf(marketplaceUpstream());
+    const names = service(git).discover(checkout).map((skill) => skill.plugin);
+    expect(names).toEqual(['core', 'core']);
+  });
+
+  it('exposes a two-level marketplace view: consumable plugin with its skills, unsupported forms with a reason', () => {
+    const { git, checkout } = checkoutOf(marketplaceUpstream());
+    const view = service(git).marketplaceView(checkout, service(git).discover(checkout));
+    expect(view).not.toBeNull();
+    expect(view!.plugins).toContainEqual({ name: 'core', skills: [{ name: 'alpha', subpath: 'plugins/core/skills/alpha' }, { name: 'beta', subpath: 'plugins/core/skills/beta' }] });
+    expect(view!.plugins).toContainEqual({ name: 'linked', skills: [], unsupported: 'git-subdir' });
+    expect(view!.plugins).toContainEqual({ name: 'remote', skills: [], unsupported: 'url' });
+    expect(view!.plugins.map((plugin) => plugin.name)).not.toContain('bare');
+  });
+
+  it('returns a null view for ordinary git checkouts', () => {
+    const upstream = path.join(root, 'plain-mp');
+    mkdirSync(upstream, { recursive: true });
+    const { git, checkout } = checkoutOf(upstream);
+    expect(service(git).marketplaceView(checkout, [])).toBeNull();
+  });
+
+  it('refuses manifest skill paths that escape the repo (untrusted manifest)', () => {
+    const upstream = path.join(root, 'mp-escape');
+    mkdirSync(path.join(upstream, '.claude-plugin'), { recursive: true });
+    writeFileSync(
+      path.join(upstream, '.claude-plugin', 'marketplace.json'),
+      JSON.stringify({ plugins: [{ name: 'evil', source: './plugins/evil', skills: ['../../../outside'] }] }),
+    );
+    mkdirSync(path.join(upstream, 'plugins', 'evil'), { recursive: true });
+    const { git, checkout } = checkoutOf(upstream);
+    expect(() => service(git).discover(checkout)).toThrow(/Path escape blocked/);
+  });
+
+  it('drops plugins whose source path is stale instead of poisoning the whole marketplace', () => {
+    const upstream = path.join(root, 'mp-stale');
+    mkdirSync(path.join(upstream, '.claude-plugin'), { recursive: true });
+    mkdirSync(path.join(upstream, 'plugins', 'alive', 'skills', 'ok'), { recursive: true });
+    writeFileSync(path.join(upstream, 'plugins', 'alive', 'skills', 'ok', 'SKILL.md'), '---\nname: ok\n---\n# ok\n');
+    writeFileSync(
+      path.join(upstream, '.claude-plugin', 'marketplace.json'),
+      JSON.stringify({
+        plugins: [
+          { name: 'ghost', source: './plugins/ghost', skills: ['./skills/x'] },
+          { name: 'half', source: './plugins/alive', skills: ['./skills/ok', './skills/vanished'] },
+        ],
+      }),
+    );
+    const { git, checkout } = checkoutOf(upstream);
+    const discovered = service(git).discover(checkout);
+    expect(discovered.map((skill) => skill.name)).toEqual(['ok']);
+    expect(discovered[0].plugin).toBe('half');
+  });
+
+  it('scans an explicit-subpath source as an ordinary git source inside the subtree (US-18 bypass)', () => {
+    const upstream = marketplaceUpstream();
+    mkdirSync(path.join(upstream, 'plugins', 'bare', 'skills', 'deep'), { recursive: true });
+    writeFileSync(path.join(upstream, 'plugins', 'bare', 'skills', 'deep', 'SKILL.md'), '---\nname: deep\n---\n# deep\n');
+    const git = materializingGit(upstream);
+    const checkout = service(git).checkout('https://github.com/owner/repo/tree/main/plugins/bare');
+    expect(checkout.kind).toBe('git');
+    const discovered = service(git).discover(checkout);
+    expect(discovered.map((skill) => skill.name)).toEqual(['deep']);
+    expect(service(git).marketplaceView(checkout, discovered)).toBeNull();
   });
 });
 

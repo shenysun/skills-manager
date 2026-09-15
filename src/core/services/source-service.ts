@@ -12,9 +12,19 @@ import { type ArchiveLimits, DEFAULT_ARCHIVE_LIMITS } from './archive-safety.js'
 import { extractZipArchive } from './archive-extract.js';
 import { extractTarArchive } from './tar-extract.js';
 import { judgeUrlPayload, predictFromContentType, predictFromUrlPath, type UrlPayloadFormat } from './url-payload.js';
+import { parseMarketplacePlugins, type MarketplaceView, type ParsedMarketplacePlugin } from './marketplace-manifest.js';
 
 const OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?$/;
+
+/** Shared discovery output order: name, then subpath — stable across kinds. */
+function byDiscoveryOrder(a: DiscoveredSkill, b: DiscoveredSkill): number {
+  return a.name.localeCompare(b.name) || a.subpath.localeCompare(b.subpath);
+}
+
+/** Root manifest that marks a git repo as a Claude Code plugin marketplace
+ *  (source-formats ticket 06). Detected after clone on subpath-free sources. */
+export const MARKETPLACE_MANIFEST = '.claude-plugin/marketplace.json';
 
 /** Hosts whose http(s) URLs keep the git-clone transport — the npx skills
  *  exclusion table (spec source-formats): every other http(s) URL is a
@@ -232,7 +242,14 @@ export class SourceService {
       // Every git source downloads shallow; the adapter maps the ref intent to --branch / init+fetch and lands HEAD there (ADR-0013).
       this.git.clone(normalized.repoUrl, repoDir, { ref: tree.ref });
       const commit = this.git.revParseHead(repoDir);
-      return { ...normalized, ...tree, repoDir, commit };
+      // A repo whose root carries the plugin-marketplace manifest enters the
+      // plugin discovery flow automatically (US-15) — unless the source names
+      // an explicit subpath, which bypasses the manifest and scans SKILL.md
+      // as an ordinary git source (US-18).
+      const kind = tree.baseSubpath === undefined && this.fs.kind(path.join(repoDir, MARKETPLACE_MANIFEST)) === 'file'
+        ? 'marketplace'
+        : 'git';
+      return { ...normalized, ...tree, repoDir, commit, kind };
     });
   }
 
@@ -369,34 +386,95 @@ export class SourceService {
   }
 
   discover(source: SourceCheckout): DiscoveredSkill[] {
+    if (source.kind === 'marketplace') return this.discoverMarketplace(source);
     const baseDir = source.baseSubpath ? path.join(source.repoDir, source.baseSubpath) : source.repoDir;
     if (this.fs.kind(baseDir) !== 'directory') throw new SkillsManagerError('source_path_missing', `Discovery path does not exist: ${baseDir}`);
     assertPathInside(baseDir, source.repoDir);
-    const found: DiscoveredSkill[] = [];
-    const walk = (dir: string) => {
-      assertPathInside(dir, source.repoDir);
-      const skillFile = path.join(dir, 'SKILL.md');
-      if (this.fs.kind(skillFile) === 'file') {
-        const metadata = parseSkillMarkdownMetadata(this.fs.readText(skillFile));
-        const fallbackName = path.basename(dir);
-        const name = String(metadata.name || fallbackName).trim();
-        assertSafeSkillName(name);
-        found.push({
-          name,
-          title: metadata.title || name,
-          description: metadata.description || '',
-          subpath: path.relative(source.repoDir, dir).split(path.sep).join('/'),
-          absoluteDir: dir,
-        });
-        return;
-      }
-      for (const entry of this.fs.readDirectory(dir)) {
-        if (entry.kind !== 'directory' || this.shouldSkipDiscoverDir(entry.name)) continue;
-        walk(path.join(dir, entry.name));
-      }
+    return this.collectSkillsFromTree(baseDir, source, undefined).sort(byDiscoveryOrder);
+  }
+
+  /**
+   * Two-level marketplace presentation (US-15/17): every plugin in the
+   * manifest appears either with its discovered skills (form 1) or with the
+   * reason it cannot be consumed (forms 2/3) — nothing vanishes silently.
+   * Non-marketplace checkouts have no second level; null.
+   */
+  marketplaceView(checkout: SourceCheckout, discovered: DiscoveredSkill[]): MarketplaceView | null {
+    if (checkout.kind !== 'marketplace') return null;
+    return {
+      plugins: this.readMarketplaceManifest(checkout).map((plugin) => plugin.form === 'form1'
+        ? {
+            name: plugin.name,
+            skills: discovered
+              .filter((skill) => skill.plugin === plugin.name)
+              .map((skill) => ({ name: skill.name, subpath: skill.subpath })),
+          }
+        : { name: plugin.name, skills: [], unsupported: plugin.reason }),
     };
-    walk(baseDir);
-    return found.sort((a, b) => a.name.localeCompare(b.name) || a.subpath.localeCompare(b.subpath));
+  }
+
+  /** Why a manifest plugin cannot be consumed, or null when the name is not
+   *  an unsupported plugin — the control-flow query behind selector
+   *  resolution (`marketplaceView` is the presentation shape of the same
+   *  parse). */
+  unsupportedMarketplacePlugin(checkout: SourceCheckout, name: string): 'git-subdir' | 'url' | 'external-source' | null {
+    if (checkout.kind !== 'marketplace') return null;
+    const plugin = this.readMarketplaceManifest(checkout).find((entry) => entry.name === name);
+    return plugin?.form === 'unsupported' ? plugin.reason : null;
+  }
+
+  /**
+   * The marketplace discovery flow (source-formats ticket 06): form-1 plugins
+   * expand their manifest-declared `skills[]` paths into SKILL.md discovery.
+   * The "filter down to consumable plugins" step (US-15) tolerates upstream
+   * data errors — a plugin whose source dir or a skill path is missing from
+   * the repo drops out, exactly like entries without skills[]; one stale path
+   * must not poison the rest of the marketplace. Unsupported forms 2/3 are
+   * also skipped here — they surface through `marketplaceView` and fail
+   * loudly when named by a selector. Paths come from the untrusted manifest,
+   * so containment stays a hard error at every join.
+   */
+  private discoverMarketplace(source: SourceCheckout): DiscoveredSkill[] {
+    const found: DiscoveredSkill[] = [];
+    for (const plugin of this.readMarketplaceManifest(source)) {
+      if (plugin.form !== 'form1') continue;
+      const pluginDir = path.join(source.repoDir, plugin.sourcePath);
+      assertPathInside(pluginDir, source.repoDir);
+      if (this.fs.kind(pluginDir) !== 'directory') continue;
+      for (const skillPath of plugin.skillPaths) {
+        const skillDir = path.join(pluginDir, skillPath);
+        assertPathInside(skillDir, source.repoDir);
+        if (this.fs.kind(skillDir) !== 'directory') continue;
+        found.push(...this.collectSkillsFromTree(skillDir, source, plugin.name));
+      }
+    }
+    return found.sort(byDiscoveryOrder);
+  }
+
+  private readMarketplaceManifest(checkout: SourceCheckout): ParsedMarketplacePlugin[] {
+    return parseMarketplacePlugins(this.fs.readText(path.join(checkout.repoDir, MARKETPLACE_MANIFEST)));
+  }
+
+  private collectSkillsFromTree(dir: string, source: SourceCheckout, plugin: string | undefined): DiscoveredSkill[] {
+    assertPathInside(dir, source.repoDir);
+    const skillFile = path.join(dir, 'SKILL.md');
+    if (this.fs.kind(skillFile) === 'file') {
+      const metadata = parseSkillMarkdownMetadata(this.fs.readText(skillFile));
+      const fallbackName = path.basename(dir);
+      const name = String(metadata.name || fallbackName).trim();
+      assertSafeSkillName(name);
+      return [{
+        name,
+        title: metadata.title || name,
+        description: metadata.description || '',
+        subpath: path.relative(source.repoDir, dir).split(path.sep).join('/'),
+        absoluteDir: dir,
+        ...(plugin !== undefined ? { plugin } : {}),
+      }];
+    }
+    return this.fs.readDirectory(dir)
+      .filter((entry) => entry.kind === 'directory' && !this.shouldSkipDiscoverDir(entry.name))
+      .flatMap((entry) => this.collectSkillsFromTree(path.join(dir, entry.name), source, plugin));
   }
 
   assertUniqueSkillDestinations(skills: DiscoveredSkill[]) {

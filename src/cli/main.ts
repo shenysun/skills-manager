@@ -391,7 +391,15 @@ program.command('add')
     if (opts.list) {
       return s.source.withCheckout(source, undefined, (checkout) => {
         const discovered = s.source.discover(checkout);
-        return print({ source: redactCheckout(checkout), discovered: discovered.map(redactDiscovered) });
+        // Marketplace sources present the two-level plugin → skills structure
+        // (US-15/17): every manifest plugin shows either its skills or why it
+        // cannot be consumed. Ordinary sources have no second level.
+        const view = s.source.marketplaceView(checkout, discovered);
+        return print({
+          source: redactCheckout(checkout),
+          ...(view ? { plugins: view.plugins } : {}),
+          discovered: discovered.map(redactDiscovered),
+        });
       }, { allowInsecureHttp, format });
     }
     if (!opts.all && (opts.skill || []).length === 0) throw new Error('Use --all or --skill <name-or-subpath> to choose skills in this non-interactive CLI.');
@@ -544,8 +552,8 @@ program.command('migrate-consumers')
   });
 
 program.command('rebuild-collections').description('Regenerate category collections').action((_opts, cmd) => { services(cmd).views.rebuildCollections(); print('collections rebuilt'); });
-program.command('archive').description('Archive canonical skills without permanent deletion').argument('<skills...>').action((skills, cmd) => print(services(cmd).archive.archiveSkills(skills)));
-program.command('adopt').description('Adopt a real directory from a generated view into canonical skills').argument('<view>').argument('<skill>').argument('[alsoConsumers...]').action((view, skill, alsoConsumers, cmd) => print(services(cmd).adopt.adopt(view, skill, alsoConsumers || [])));
+program.command('archive').description('Archive canonical skills without permanent deletion').argument('<skills...>').action((skills, _opts, cmd) => print(services(cmd).archive.archiveSkills(skills)));
+program.command('adopt').description('Adopt a real directory from a generated view into canonical skills').argument('<view>').argument('<skill>').argument('[alsoConsumers...]').action((view, skill, alsoConsumers, _opts, cmd) => print(services(cmd).adopt.adopt(view, skill, alsoConsumers || [])));
 program.parseAsync(process.argv).catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

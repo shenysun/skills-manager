@@ -20,7 +20,7 @@ export class InstallService {
   ) {}
 
   planInstall(sourceCheckout: SourceCheckout, discovered: DiscoveredSkill[], selectors: readonly string[], consumerValues?: readonly string[], options: { overwrite?: boolean } = {}): InstallPlan {
-    const selected = this.selectDiscovered(discovered, selectors);
+    const selected = this.selectDiscovered(discovered, selectors, sourceCheckout);
     this.source.assertUniqueSkillDestinations(selected);
     // No legacy default: installs stop tagging 'agents'/'claude' (see ADR-0004;
     // registry tags are catalog ids, migrated by `migrate-consumers`).
@@ -52,12 +52,36 @@ export class InstallService {
     }, { allowInsecureHttp: input.allowInsecureHttp, format: input.format });
   }
 
-  private selectDiscovered(discovered: DiscoveredSkill[], selectors: readonly string[]) {
+  /**
+   * Selector resolution, most specific match wins: skill subpath, then skill
+   * name, then — marketplace checkouts only — a plugin name expanding to all
+   * of that plugin's discovered skills (source-formats ticket 06, US-16). A
+   * selector naming a manifest plugin whose source form is not consumable
+   * (forms 2/3) fails with an explicit not-supported error instead of the
+   * generic not-discovered one — silent no-ops never happen (US-17).
+   */
+  private selectDiscovered(discovered: DiscoveredSkill[], selectors: readonly string[], checkout: SourceCheckout) {
     if (selectors.length === 0) return discovered;
-    const requested = new Set(selectors);
-    const selected = discovered.filter((skill) => requested.has(skill.subpath) || requested.has(skill.name));
-    const missing = [...requested].filter((value) => !selected.some((skill) => skill.subpath === value || skill.name === value));
-    if (missing.length > 0) throw new SkillsManagerError('skill_not_discovered', `Requested skills were not discovered: ${missing.join(', ')}`, { missing });
+    const selected: DiscoveredSkill[] = [];
+    const missing: string[] = [];
+    for (const value of new Set(selectors)) {
+      const byNameOrPath = discovered.filter((skill) => skill.subpath === value || skill.name === value);
+      const matches = byNameOrPath.length > 0 ? byNameOrPath : discovered.filter((skill) => skill.plugin === value);
+      if (matches.length > 0) {
+        for (const match of matches) if (!selected.includes(match)) selected.push(match);
+      } else {
+        missing.push(value);
+      }
+    }
+    if (missing.length > 0) {
+      for (const value of missing) {
+        const reason = this.source.unsupportedMarketplacePlugin(checkout, value);
+        if (reason) {
+          throw new SkillsManagerError('marketplace_plugin_unsupported', `Marketplace plugin "${value}" references an external repository (${reason}) — not supported yet. Add it from its own repository instead.`);
+        }
+      }
+      throw new SkillsManagerError('skill_not_discovered', `Requested skills were not discovered: ${missing.join(', ')}`, { missing });
+    }
     return selected;
   }
 

@@ -124,6 +124,9 @@ export type DiscoveredSkill = {
   description: string;
   subpath: string;
   absoluteDir: string;
+  /** Marketplace sources only (source-formats ticket 06): the plugin whose
+   *  manifest entry declared this skill. Undefined for every other kind. */
+  plugin?: string;
 };
 
 export type InstallPlan = {
