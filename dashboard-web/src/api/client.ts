@@ -111,12 +111,24 @@ export function refreshSkill(skill: string) {
   return api<RefreshResult>('/api/distribute/refresh', { method: 'POST', body: JSON.stringify({ skill }) });
 }
 
-export type DiscoveredSkill = { name: string; title: string; description: string; subpath: string };
+export type DiscoveredSkill = { name: string; title: string; description: string; subpath: string; plugin?: string };
 
-export function discover(source: string) {
-  return api<{ discovered: DiscoveredSkill[]; existing: string[] }>('/api/discover', {
+/** Wire shape of the discover response's marketplace half (source-formats
+ *  ticket 08): one entry per manifest plugin — either its skills or why it
+ *  cannot be consumed. null for every non-marketplace source. */
+export type MarketplacePlugin = {
+  name: string;
+  skills: Array<{ name: string; subpath: string }>;
+  unsupported?: 'git-subdir' | 'url' | 'external-source';
+};
+
+export type UrlPayloadFormat = 'md' | 'zip' | 'tar';
+
+export function discover(source: string, options?: { format?: UrlPayloadFormat; allowInsecureHttp?: boolean }) {
+  const body = { source, ...(options?.format ? { format: options.format } : {}), ...(options?.allowInsecureHttp ? { allowInsecureHttp: true } : {}) };
+  return api<{ discovered: DiscoveredSkill[]; existing: string[]; plugins: MarketplacePlugin[] | null }>('/api/discover', {
     method: 'POST',
-    body: JSON.stringify({ source }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -158,7 +170,7 @@ export function initApply(body: InitRequest = {}) {
   return api<InitRunResult>('/api/init/apply', { method: 'POST', body: JSON.stringify(body) });
 }
 
-export function installFromSource(body: { source: string; subpaths: string[]; overwrite?: boolean }) {
+export function installFromSource(body: { source: string; subpaths: string[]; overwrite?: boolean; format?: UrlPayloadFormat; allowInsecureHttp?: boolean }) {
   return api<{ installed: string[] }>('/api/install', { method: 'POST', body: JSON.stringify(body) });
 }
 

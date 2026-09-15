@@ -15,6 +15,7 @@ import { HttpDownloadClient } from '../../infra/http-download-client.js';
 import type { GitHubApiPort } from '../../core/ports/github-api.js';
 import type { HttpDownloadPort } from '../../core/ports/http-download.js';
 import { DetectionService, gitLsRemoteHead, type RemoteHeadResolver } from '../../core/services/detection-service.js';
+import type { UrlPayloadFormat } from '../../core/services/url-payload.js';
 import { previewFileEntries, previewSkillDir, readSkillFile } from './skill-file.js';
 
 export type { RemoteHeadResolver } from '../../core/services/detection-service.js';
@@ -69,7 +70,15 @@ const sourceBody = {
   type: 'object',
   required: ['source'],
   additionalProperties: false,
-  properties: { source: { type: 'string', minLength: 1 } },
+  properties: {
+    source: { type: 'string', minLength: 1 },
+    // The add-wizard's format-selector channel (source-formats ticket 08):
+    // the same escape hatch the CLI's --format provides, schema-validated.
+    format: { type: 'string', enum: ['md', 'zip', 'tar'] },
+    // The US-12 confirmation the wizard collects in-band when the server
+    // refuses a plain-http url source — the web counterpart of --yes.
+    allowInsecureHttp: { type: 'boolean' },
+  },
 } as const;
 
 const initBody = {
@@ -90,6 +99,8 @@ const installBody = {
     subpaths: { type: 'array', items: { type: 'string' } },
     consumers: { type: 'array', items: { type: 'string' } },
     overwrite: { type: 'boolean' },
+    format: { type: 'string', enum: ['md', 'zip', 'tar'] },
+    allowInsecureHttp: { type: 'boolean' },
   },
 } as const;
 
@@ -340,10 +351,21 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   });
 
   app.post('/api/discover', { schema: { body: sourceBody } }, async (request) => {
-    const body = request.body as { source: string };
+    const body = request.body as { source: string; format?: UrlPayloadFormat; allowInsecureHttp?: boolean };
     const services = getServices();
-    return services.source.withCheckout(body.source, undefined, (source) =>
-      data({ sourceInfo: redactCheckout(source), discovered: services.source.discover(source).map(redactDiscovered), existing: services.registry.listCanonicalSkills() }));
+    return services.source.withCheckout(body.source, undefined, (source) => {
+      const discovered = services.source.discover(source);
+      // Marketplace checkouts carry the two-level plugin view (US-15/17) so the
+      // wizard can group by plugin and surface unsupported ones; every other
+      // kind answers plugins: null — the wizard skips its marketplace step.
+      const view = services.source.marketplaceView(source, discovered);
+      return data({
+        sourceInfo: redactCheckout(source),
+        plugins: view ? view.plugins : null,
+        discovered: discovered.map(redactDiscovered),
+        existing: services.registry.listCanonicalSkills(),
+      });
+    }, { format: body.format, allowInsecureHttp: body.allowInsecureHttp });
   });
 
   // Reverse import (ADR-0006 / ADR-0009): dashboard prefer + resolve are the
@@ -363,9 +385,9 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   });
 
   app.post('/api/install', { schema: { body: installBody } }, async (request) => {
-    const body = request.body as { source: string; subpaths: string[]; consumers?: string[]; overwrite?: boolean };
+    const body = request.body as { source: string; subpaths: string[]; consumers?: string[]; overwrite?: boolean; format?: UrlPayloadFormat; allowInsecureHttp?: boolean };
     const services = getServices();
-    const result = services.install.installFromSourceSelection({ source: body.source, selectors: body.subpaths, consumers: body.consumers, overwrite: body.overwrite ?? false });
+    const result = services.install.installFromSourceSelection({ source: body.source, selectors: body.subpaths, consumers: body.consumers, overwrite: body.overwrite ?? false, format: body.format, allowInsecureHttp: body.allowInsecureHttp });
     services.activity.record({ action: 'install', summary: `Installed ${result.installed.join(', ')}`, details: { source: body.source, installed: result.installed } });
     return data(result);
   });
