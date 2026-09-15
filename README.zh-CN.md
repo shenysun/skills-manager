@@ -4,6 +4,16 @@
 
 在**对话里**管理你的 agent skills：一条 `npx` 命令装上 manager skill，之后一切都直接吩咐你的 agent——安装、导入、分发、更新、补齐来源。任何会加载 skills 的 agent 都能用（Claude Code、Codex、Cursor、…）。
 
+> **CLI 优先、对话驱动。** 本项目是 `skills-manager-cli`——终端/npm 工具，附带可选的本地 web dashboard。它**不是**桌面应用；如果你找的是同名的桌面版，那是另一个项目（[xingkongliang/skills-manager](https://github.com/xingkongliang/skills-manager)）。
+
+**差异化在哪：**
+
+- **一个库，所有 agent**——单一内容库（`~/.skills-manager`）把任意子集分发到 catalog 里的 70+ agent，按目标选软链接或拷贝，带副本过期检测与回滚。
+- **五类源**——git 仓库与 URL、直下 URL（单个 `SKILL.md` / zip / tar）、本地 zip 归档、Claude 插件市场、well-known 发现索引。
+- **更新不误报**——更新锚点是 skill 自身子目录的 git tree SHA，上游动了 skill 之外的文件不会点亮「可更新」。
+- **来源可回填**——没有来源的导入 skill，经锁文件证据采纳、agent 搜索、你批准三层流程补齐 provenance。
+- **manager skill**——所有管理动作都在 agent 对话里完成（[ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)）；底层 CLI 是纯 JSON 引擎。
+
 ## 快速开始
 
 ```sh
@@ -99,7 +109,7 @@ skills-manager categories status                  # 已应用集合 + 漂移
 skills-manager archive old-skill
 ```
 
-来源（source）支持 GitHub 简写（`owner/repo`）、Git URL、GitHub tree URL 或本地路径。
+来源（source）：GitHub 简写（`owner/repo`）、Git URL、GitHub tree URL、本地路径、直下 URL（单个 `SKILL.md` / zip / tar）、本地 zip 归档、插件市场（`.claude-plugin/marketplace.json`）、well-known 发现索引——详见 [CLI 参考](docs/CLI.zh-CN.md)。
 
 ## 可选：全局安装与 dashboard
 

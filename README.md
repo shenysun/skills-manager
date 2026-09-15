@@ -4,6 +4,16 @@
 
 Manage your agent skills **from the conversation**: one `npx` command installs the manager skill, and from then on you just ask your agent — install, import, distribute, update, backfill provenance. Works with any skill-loading agent (Claude Code, Codex, Cursor, …).
 
+> **CLI-first, conversation-driven.** This is `skills-manager-cli` — a terminal/npm tool with an optional local web dashboard. It is not a desktop app; if you were looking for the desktop application of the same name, that is a different project ([xingkongliang/skills-manager](https://github.com/xingkongliang/skills-manager)).
+
+**What makes it different:**
+
+- **One hub, every agent** — a single content library (`~/.skills-manager`) distributes any subset to any of the 70+ catalog agents, symlink or copy per target, with stale-copy detection and rollback.
+- **Five source types** — git repos and URLs, direct download URLs (SKILL.md / zip / tar), local zip archives, Claude plugin marketplaces, and well-known discovery indexes.
+- **Updates that don't cry wolf** — the update anchor is the git tree SHA of the skill's own subdirectory, so upstream commits outside the skill never light up an update.
+- **Provenance backfill** — imported skills without a source get one through lockfile-evidence adoption, agent-driven search, and your approval.
+- **The manager skill** — every management action happens in agent conversation ([ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)); the CLI underneath is a plain JSON engine.
+
 ## Quick Start
 
 ```sh
@@ -99,7 +109,7 @@ skills-manager categories status                  # applied sets + drift
 skills-manager archive old-skill
 ```
 
-Sources can be GitHub shorthand (`owner/repo`), Git URLs, GitHub tree URLs, or local paths.
+Sources: GitHub shorthand (`owner/repo`), Git URLs, GitHub tree URLs, local paths, direct download URLs (single `SKILL.md` / zip / tar), local zip archives, plugin marketplaces (`.claude-plugin/marketplace.json`), and well-known discovery indexes — see the [CLI reference](docs/CLI.md).
 
 ## Optional: global install & dashboard
 

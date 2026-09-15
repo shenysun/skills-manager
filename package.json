@@ -2,7 +2,7 @@
   "name": "skills-manager-cli",
   "version": "2026.9.15",
   "packageManager": "pnpm@10.33.0",
-  "description": "Local-first CLI and dashboard for managing agent, Claude, and Codex skills",
+  "description": "CLI-first agent skill hub: one npx bootstrap, then manage skills in agent conversation — install from git/URL/archive/marketplace/well-known sources, distribute symlink-or-copy to 70+ agents, tree-SHA update anchors, provenance backfill, optional local dashboard",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shenysun/skills-manager.git"
@@ -26,14 +26,23 @@
   },
   "keywords": [
     "skills",
+    "skills-manager",
     "agent",
     "agents",
+    "agent-skills",
+    "skill-hub",
     "claude",
     "claude-code",
     "codex",
     "cursor",
+    "gemini-cli",
+    "opencode",
     "cli",
-    "dashboard"
+    "dashboard",
+    "distribute",
+    "provenance",
+    "marketplace",
+    "SKILL.md"
   ],
   "author": "shenysun <shenysun@163.com>",
   "license": "MIT",
