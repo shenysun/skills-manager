@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCli } from './cli-runner.js';
 import { skillMarkdown } from '../fixtures/archives.js';
-import { closeWireServers, serveWire } from '../fixtures/wire-http.js';
+import { closeWireServers, serveMutableWire, serveWire } from '../fixtures/wire-http.js';
 
 /**
  * CLI surface for single-SKILL.md URL sources (source-formats ticket 03): the
@@ -63,14 +63,14 @@ describe('add with a single-SKILL.md URL', () => {
     expect(result.stderr).toMatch(/--yes/);
   });
 
-  it('shows the url skill as not updatable in list --brief', async () => {
+  it('shows the url skill as updatable in list --brief (ticket 05: url joins the update flow)', async () => {
     const baseUrl = await serveWire({ kind: 'file', body: skillMarkdown('alpha') });
     run(['add', `${baseUrl}/SKILL.md`, '--all', '--yes']);
     const row = JSON.parse(run(['list', '--brief']).stdout).find((skill: { name: string }) => skill.name === 'alpha');
-    expect(row.updatable).toBe(false);
+    expect(row.updatable).toBe(true);
   });
 
-  it('update --plan excludes the url skill while a local source stays a candidate', async () => {
+  it('update --plan lists the url skill alongside a local-source candidate', async () => {
     const baseUrl = await serveWire({ kind: 'file', body: skillMarkdown('alpha') });
     run(['add', `${baseUrl}/SKILL.md`, '--all', '--yes']);
     const localSource = path.join(root, 'local-repo');
@@ -81,7 +81,7 @@ describe('add with a single-SKILL.md URL', () => {
     const plan = JSON.parse(run(['update', '--plan']).stdout);
     const candidates = plan.groups.flatMap((group: { skills: Array<{ skill: string }> }) => group.skills.map((skill) => skill.skill));
     expect(candidates).toContain('gamma');
-    expect(candidates).not.toContain('alpha');
+    expect(candidates).toContain('alpha');
   });
 
   it('surfaces the download size limit through SKILLS_MANAGER_DOWNLOAD_MAX_BYTES', async () => {
@@ -89,5 +89,17 @@ describe('add with a single-SKILL.md URL', () => {
     const result = run(['add', `${baseUrl}/SKILL.md`, '--all', '--yes'], { SKILLS_MANAGER_DOWNLOAD_MAX_BYTES: '16' });
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/exceeds the maximum/);
+  });
+
+  it('update --check judges a url source: upToDate until the payload changes, then stale (US-23/24)', async () => {
+    const server = await serveMutableWire(skillMarkdown('alpha', 'from the wire'));
+    run(['add', server.url, '--all', '--yes']);
+
+    const fresh = JSON.parse(run(['update', '--check']).stdout);
+    expect(fresh.upToDate).toContain('alpha');
+
+    await server.set(skillMarkdown('alpha', 'from the wire, renewed'));
+    const stale = JSON.parse(run(['update', '--check']).stdout);
+    expect(stale.stale.map((item: { skill: string }) => item.skill)).toContain('alpha');
   });
 });

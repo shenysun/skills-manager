@@ -3,8 +3,10 @@ import { execFile as execFileCb } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { GitHubApiError, type GitHubApiPort, type RepoTree } from '../ports/github-api.js';
+import { DEFAULT_DOWNLOAD_REQUEST, unconfiguredHttpDownload, type DownloadHeaders, type HttpDownloadPort, type ProbeResult } from '../ports/http-download.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
-import { parseGitHubRepoRef } from './source-service.js';
+import type { SkillSource, SourceCheckout } from '../model/index.js';
+import { REGISTERED_SOURCE_RECHECK, parseGitHubRepoRef, type CheckoutOptions } from './source-service.js';
 import { appendDetectionFailure } from './detection-log.js';
 export { detectionLogPath } from './detection-log.js';
 
@@ -34,16 +36,30 @@ export type DetectionOutcome = { detection: DetectionStatus; hasUpdate: boolean 
  *  registry.listSkills returns — CLI and dashboard both satisfy it). */
 export type DetectionSkillRow = {
   name: string;
-  source: { type?: string; url?: string | null; subpath?: string | null; ref?: string | null; upstream_tree?: string | null; upstream_commit?: string | null };
+  source: SkillSource;
 };
 
 /** Core services detection touches (a structural slice of the runtime bundle). */
 export type DetectionServices = {
   update: { plan(): { groups: Array<{ skills: Array<{ skill: string }> }> } };
-  registry: { editSafeFields(skill: string, patch: { source: { upstream_tree: string } }): unknown };
+  registry: { editSafeFields(skill: string, patch: { source: SkillSource }): unknown };
   distribute: { fingerprint(skill: string): string | null };
   resolution: { root: string };
+  source: {
+    withCheckout<T>(source: string, forcedRef: string | undefined, use: (checkout: SourceCheckout) => T, options?: CheckoutOptions): T;
+  };
 };
+
+/** The US-24 pre-check verdict: an ETag present on both sides compares —
+ *  equal means skip, anything else cannot skip (the ETag is the strong
+ *  validator, so a Last-Modified never overrides it). Only when neither side
+ *  carries an ETag does Last-Modified speak. No validators at all means the
+ *  content hash must decide, i.e. re-download. */
+export function urlValidatorsUnchanged(stored: DetectionSkillRow['source'], current: DownloadHeaders): boolean {
+  if (stored.upstream_etag && current.etag) return stored.upstream_etag === current.etag;
+  if (stored.upstream_etag || current.etag) return false;
+  return Boolean(stored.upstream_last_modified && current.lastModified && stored.upstream_last_modified === current.lastModified);
+}
 
 type GitHubDetectionGroup = {
   owner: string;
@@ -57,6 +73,9 @@ export type DetectionDeps = {
   githubApi: GitHubApiPort;
   /** Non-GitHub head resolution; defaults to real `git ls-remote`. */
   remoteHead?: RemoteHeadResolver;
+  /** Direct-download transport for the url-source pre-check probe; defaults
+   *  to the explicit-failure stub, like SourceService. */
+  http?: HttpDownloadPort;
   /** Filesystem for local-source tree hashing and the detection log. */
   fs: FileSystemPort;
   /** Clock driving the remote-head TTL cache; injectable for tests. */
@@ -76,8 +95,11 @@ const REMOTE_HEAD_TTL_MS = 5 * 60 * 1000;
 export class DetectionService {
   private readonly remoteHeads = new Map<string, { sha: string; fetchedAt: number }>();
   private readonly remoteHeadsInFlight = new Map<string, Promise<string | null>>();
+  private readonly http: HttpDownloadPort;
 
-  constructor(private readonly deps: DetectionDeps) {}
+  constructor(private readonly deps: DetectionDeps) {
+    this.http = deps.http ?? unconfiguredHttpDownload();
+  }
 
   async detect(services: DetectionServices, skills: readonly DetectionSkillRow[]): Promise<Map<string, DetectionOutcome>> {
     const fs = this.deps.fs;
@@ -99,6 +121,10 @@ export class DetectionService {
           outcomes.set(skill.name, { detection: 'failed', hasUpdate: false });
           this.recordDetectionFailure(fs, homeRoot, [skill.name], source.url, error, 'local');
         }
+        continue;
+      }
+      if (source.type === 'url') {
+        this.detectUrlSource(services, skill.name, source, homeRoot, outcomes);
         continue;
       }
       const github = parseGitHubRepoRef(source.url);
@@ -167,6 +193,58 @@ export class DetectionService {
       .finally(() => this.remoteHeadsInFlight.delete(key));
     this.remoteHeadsInFlight.set(key, request);
     return request;
+  }
+
+  /** url-source freshness (US-23/24, ADR-0016): a headers-only probe compares
+   *  ETag / Last-Modified against the validators the last confirmed sync
+   *  recorded — unchanged headers skip the payload download and judge "no
+   *  update"; changed or absent headers force a re-download through the very
+   *  same source dispatch install uses, where the extracted content hash vs
+   *  the installed fingerprint is the only verdict that matters (the ETag is
+   *  a bandwidth economy, never an anchor). A probe failure is not a verdict:
+   *  it falls through to the re-download (some servers refuse HEAD), whose own
+   *  failure keeps the failed visibility. Validators recalibrate only when the
+   *  content hash confirms "no update" — a detected update must stay detected
+   *  on every later probe until an install actually moves the content. */
+  private detectUrlSource(
+    services: DetectionServices,
+    name: string,
+    source: DetectionSkillRow['source'],
+    homeRoot: string,
+    outcomes: Map<string, DetectionOutcome>,
+  ) {
+    const fs = this.deps.fs;
+    try {
+      let probe: ProbeResult | null = null;
+      try {
+        probe = this.http.probe(source.url!, DEFAULT_DOWNLOAD_REQUEST);
+      } catch {
+        // Not a verdict: some servers refuse HEAD. Fall through to the full
+        // download, whose own failure keeps the failed visibility.
+      }
+      if (probe && urlValidatorsUnchanged(source, probe.headers)) {
+        outcomes.set(name, { detection: 'ok', hasUpdate: false });
+        return;
+      }
+      services.source.withCheckout(source.url!, undefined, (checkout) => {
+        const upstreamHash = this.hashTree(fs, path.join(checkout.repoDir, source.subpath!));
+        if (upstreamHash === null) throw new Error(`url source no longer materializes ${source.subpath}`);
+        const hasUpdate = upstreamHash !== services.distribute.fingerprint(name);
+        if (!hasUpdate) this.calibrateHttpValidators(services, name, checkout.httpHeaders);
+        outcomes.set(name, { detection: 'ok', hasUpdate });
+      }, REGISTERED_SOURCE_RECHECK);
+    } catch (error) {
+      outcomes.set(name, { detection: 'failed', hasUpdate: false });
+      this.recordDetectionFailure(fs, homeRoot, [name], source.url!, error, 'url');
+    }
+  }
+
+  /** Detection-as-calibration, url flavor: the re-download's validators become
+   *  the next probe's comparison side — but only once the content hash agreed
+   *  (see detectUrlSource); installs recalibrate their own headers. Idempotent,
+   *  and only the skill's own row is touched. */
+  private calibrateHttpValidators(services: DetectionServices, skill: string, headers?: DownloadHeaders) {
+    services.registry.editSafeFields(skill, { source: { upstream_etag: headers?.etag ?? null, upstream_last_modified: headers?.lastModified ?? null } });
   }
 
   /** Mirrors DistributeService.fingerprint's tree hashing so equal trees compare equal.

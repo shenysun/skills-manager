@@ -80,6 +80,10 @@ export class InstallService {
         ref: source.ref || null,
         upstream_commit: source.commit,
         upstream_tree: this.source.upstreamTree(source, skill.subpath),
+        // url sources record the download's validators (US-24); every other
+        // kind has no http download and stays null.
+        upstream_etag: source.httpHeaders?.etag ?? null,
+        upstream_last_modified: source.httpHeaders?.lastModified ?? null,
       },
       description: skill.description,
     });

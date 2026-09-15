@@ -10,6 +10,7 @@ import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
 import { NodeFileSystem } from '../infra/fs-skill-home.js';
 import { GitHubApiClient } from '../infra/github-api-client.js';
+import { HttpDownloadClient } from '../infra/http-download-client.js';
 import { DetectionService, detectionLogPath } from '../core/services/detection-service.js';
 import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
@@ -411,7 +412,7 @@ program.command('update')
   .action(async (opts, cmd) => {
     const s = services(cmd);
     if (opts.check) {
-      const detection = new DetectionService({ githubApi: new GitHubApiClient(), fs: new NodeFileSystem() });
+      const detection = new DetectionService({ githubApi: new GitHubApiClient(), http: new HttpDownloadClient(), fs: new NodeFileSystem() });
       const listed = s.registry.listSkills({ includeArchived: false });
       const outcomes = await detection.detect(s, listed);
       const detectionLog = detectionLogPath(s.resolution.root);

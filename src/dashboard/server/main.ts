@@ -11,7 +11,9 @@ import { createRuntimeServices } from '../../infra/runtime.js';
 import type { RuntimeOptions } from '../../infra/runtime.js';
 import { NodeFileSystem } from '../../infra/fs-skill-home.js';
 import { GitHubApiClient } from '../../infra/github-api-client.js';
+import { HttpDownloadClient } from '../../infra/http-download-client.js';
 import type { GitHubApiPort } from '../../core/ports/github-api.js';
+import type { HttpDownloadPort } from '../../core/ports/http-download.js';
 import { DetectionService, gitLsRemoteHead, type RemoteHeadResolver } from '../../core/services/detection-service.js';
 import { previewFileEntries, previewSkillDir, readSkillFile } from './skill-file.js';
 
@@ -29,6 +31,8 @@ export type DashboardServerOptions = RuntimeOptions & {
   githubApi?: GitHubApiPort;
   /** Remote-head resolver for non-GitHub git sources; tests inject a fake, production runs ls-remote. */
   remoteHead?: RemoteHeadResolver;
+  /** Direct-download transport for the url-source detection probe; tests inject a fake, production gets one long-lived client. */
+  http?: HttpDownloadPort;
 };
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -149,6 +153,7 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
   const detection = new DetectionService({
     githubApi: options.githubApi ?? new GitHubApiClient(),
     remoteHead: options.remoteHead ?? gitLsRemoteHead,
+    http: options.http ?? new HttpDownloadClient(),
     fs: new NodeFileSystem(),
   });
 

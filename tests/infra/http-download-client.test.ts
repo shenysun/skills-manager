@@ -111,3 +111,43 @@ describe('HttpDownloadClient (real adapter, local servers)', () => {
     );
   });
 });
+
+describe('HttpDownloadClient probe — headers-only pre-check (US-24)', () => {
+  it('fetches the response headers without transferring the payload', async () => {
+    const baseUrl = await serveWire({ kind: 'file', body: SKILL_BODY });
+    const result = new HttpDownloadClient().probe(`${baseUrl}/SKILL.md`, LOOSE);
+    expect(result.headers).toEqual({ contentType: 'text/markdown', etag: '"v1"', lastModified: 'Wed, 09 Sep 2026 10:00:00 GMT' });
+    expect(result.finalUrl).toBe(`${baseUrl}/SKILL.md`);
+  });
+
+  it('follows redirects and reports the final URL', async () => {
+    const baseUrl = await serveWire({
+      kind: 'chain',
+      routes: { '/start': { status: 302, location: '/SKILL.md' } },
+      body: SKILL_BODY,
+    });
+    const result = new HttpDownloadClient().probe(`${baseUrl}/start`, LOOSE);
+    expect(result.finalUrl).toBe(`${baseUrl}/SKILL.md`);
+    expect(result.headers.contentType).toBe('text/markdown');
+  });
+
+  it('surfaces a non-2xx outcome as a transport failure naming the status', async () => {
+    const baseUrl = await serveWire({ kind: 'status', status: 404 });
+    expect(() => new HttpDownloadClient().probe(`${baseUrl}/SKILL.md`, LOOSE)).toThrow(
+      expect.objectContaining({ code: 'download_failed' }),
+    );
+  });
+
+  it('refuses the sixth redirect like a download', async () => {
+    const baseUrl = await serveWire({ kind: 'loop-redirect' });
+    expect(() => new HttpDownloadClient().probe(`${baseUrl}/0`, LOOSE)).toThrow(
+      expect.objectContaining({ code: 'download_redirect_limit' }),
+    );
+  });
+
+  it('works over https with the injected CA', async () => {
+    const baseUrl = await serveWire({ kind: 'file', body: SKILL_BODY }, { tls: true });
+    const result = new HttpDownloadClient({ ca: TEST_CA_PEM }).probe(`${baseUrl}/SKILL.md`, LOOSE);
+    expect(result.headers.etag).toBe('"v1"');
+  });
+});

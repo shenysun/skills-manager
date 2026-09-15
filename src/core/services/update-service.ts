@@ -2,16 +2,18 @@ import path from 'node:path';
 import type { SourceUpdateGroup, UpdateCandidate, UpdatePlan } from '../model/index.js';
 import type { RegistryService } from './registry-service.js';
 import type { SourceService } from './source-service.js';
+import { REGISTERED_SOURCE_RECHECK } from './source-service.js';
 import type { InstallService } from './install-service.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { parseAgentTags } from '../../shared/validation.js';
 
 /** Whether a source type can re-check upstream — one ruling shared by the
- *  update plan and the CLI's brief table (source-formats): archive installs
- *  are one-shot snapshots (ADR-0016), url installs await freshness detection
- *  (ticket 05). */
+ *  update plan and the CLI's brief table (source-formats, ADR-0016): archive
+ *  installs are one-shot snapshots with no upstream to re-query; url installs
+ *  re-download (ticket 05); wellknown compares digests; git-like kinds anchor
+ *  on the tree SHA. */
 export function isUpdatableSourceType(type: string | undefined): boolean {
-  return type !== 'archive' && type !== 'url';
+  return type !== 'archive';
 }
 
 export class UpdateService {
@@ -91,7 +93,7 @@ export class UpdateService {
           const plan = this.installer.planInstall(sourceCheckout, discovered, [candidate.subpath], candidate.consumers, { overwrite: true });
           installed.push(...this.installer.installPlan(plan).installed);
         }
-      });
+      }, REGISTERED_SOURCE_RECHECK);
     }
     return { updated: installed };
   }

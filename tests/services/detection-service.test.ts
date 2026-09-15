@@ -1,10 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GitHubApiPort } from '../../src/core/ports/github-api.js';
-import { DetectionService, type DetectionSkillRow } from '../../src/core/services/detection-service.js';
+import type { HttpDownloadPort } from '../../src/core/ports/http-download.js';
+import { SkillsManagerError } from '../../src/shared/errors.js';
+import { DetectionService, detectionLogPath, type DetectionSkillRow } from '../../src/core/services/detection-service.js';
+import { createCoreServices } from '../../src/core/services/index.js';
 import { createNodeFileSystem } from '../../src/infra/index.js';
+import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
+import { skillMarkdown } from '../fixtures/archives.js';
+import { fakeHttp, type FakeHttpRoutes } from '../fixtures/fake-http.js';
 
 const GITLAB_URL = 'https://gitlab.com/acme/skills.git';
 
@@ -115,3 +121,180 @@ describe('DetectionService remote-head cache (adversary L8/L9)', () => {
     expect(outcomeB.get('alpha')).toEqual({ detection: 'ok', hasUpdate: true });
   });
 });
+
+/** A url-source row must never fall through to the ls-remote fallback. */
+const remoteHeadNever = async () => {
+  throw new Error('url rows must never reach ls-remote');
+};
+
+describe('DetectionService url sources — ETag pre-check, content-hash verdict (source-formats ticket 05, ADR-0016)', () => {
+  let serving: { body: string; headers: Record<string, string> };
+
+  beforeEach(() => {
+    serving = { body: skillMarkdown('alpha', 'a url skill'), headers: { etag: '"v1"', lastModified: 'Wed, 09 Sep 2026 10:00:00 GMT' } };
+  });
+
+  function urlServices() {
+    const routes: FakeHttpRoutes = () => [{ kind: 'bytes', body: serving.body, headers: serving.headers }];
+    const http = fakeHttp(routes);
+    const s = createCoreServices({
+      skillHomeRoot: path.join(root, 'home'),
+      projectRoot: root,
+      fs: createNodeFileSystem(),
+      git: {
+        clone: () => {},
+        revParseHead: () => 'sha',
+        revParseTree: () => 'tree',
+        listRemoteHeads: () => [],
+        statusShort: () => '',
+        log: () => [],
+      } as never,
+      processRunner: { run: () => ({ status: 0, stdout: '', stderr: '' }) } as never,
+      tempRoot: path.join(root, 'tmp'),
+      userHome: path.join(root, 'user'),
+      env: {},
+      catalogSnapshot: fixtureSnapshot(),
+      http,
+    });
+    s.skillHome.ensure();
+    const detection = new DetectionService({ githubApi: githubApiNever, fs: createNodeFileSystem(), remoteHead: remoteHeadNever, http });
+    const bundle = { ...s, resolution: { root: path.join(root, 'home') } };
+    return { s, detection, bundle, http };
+  }
+
+  function detectUrl(detection: DetectionService, bundle: ReturnType<typeof urlServices>['bundle']) {
+    return detection.detect(bundle, bundle.registry.listSkills({ includeArchived: false }));
+  }
+
+  function installUrl(s: ReturnType<typeof urlServices>['s']) {
+    s.install.installFromSourceSelection({ source: 'https://example.com/SKILL.md', selectors: ['alpha'] });
+  }
+
+  it('ETag unchanged since install — the probe alone decides, no payload download, no update', async () => {
+    const { s, detection, bundle, http } = urlServices();
+    installUrl(s);
+
+    const outcomes = await detectUrl(detection, bundle);
+
+    expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
+    expect(http.calls).toEqual(['GET https://example.com/SKILL.md', 'HEAD https://example.com/SKILL.md']);
+  });
+
+  it('a refused probe is not a verdict — detection falls through to the full download (HEAD-405 servers)', async () => {
+    const { s, detection, bundle, http } = urlServices();
+    installUrl(s);
+    serving.body = skillMarkdown('alpha', 'a url skill, renewed');
+    serving.headers = { etag: '"v2"' };
+    const refusedHead: HttpDownloadPort = {
+      download: (url, request) => http.download(url, request),
+      probe: () => {
+        throw new SkillsManagerError('download_failed', 'HEAD https://example.com/SKILL.md failed with HTTP 405');
+      },
+    };
+    const headless = new DetectionService({ githubApi: githubApiNever, fs: createNodeFileSystem(), remoteHead: remoteHeadNever, http: refusedHead });
+
+    const outcomes = await detectUrl(headless, bundle);
+
+    // The full download decided on the content hash; had the URL been dead the
+    // download's own failure would keep the failed visibility.
+    expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: true });
+    expect(http.calls).toEqual(['GET https://example.com/SKILL.md', 'GET https://example.com/SKILL.md']);
+  });
+
+  it('ETag changed and content changed — re-download, content hash flags the update, validators hold until an install', async () => {
+    const { s, detection, bundle, http } = urlServices();
+    installUrl(s);
+    serving.body = skillMarkdown('alpha', 'a url skill, renewed');
+    serving.headers = { etag: '"v2"', lastModified: 'Thu, 10 Sep 2026 10:00:00 GMT' };
+
+    const outcomes = await detectUrl(detection, bundle);
+
+    expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: true });
+    expect(http.calls).toEqual(['GET https://example.com/SKILL.md', 'HEAD https://example.com/SKILL.md', 'GET https://example.com/SKILL.md']);
+    // The stale signal must survive later checks (the ETag is a pre-check, never
+    // an anchor): the row keeps the installed validators until an install moves
+    // the content, so the next probe still reports "changed" instead of silently
+    // skipping to upToDate.
+    expect(s.registry.load().skills.alpha?.source?.upstream_etag).toBe('"v1"');
+    http.calls.length = 0;
+    const again = await detectUrl(detection, bundle);
+    expect(again.get('alpha')).toEqual({ detection: 'ok', hasUpdate: true });
+  });
+
+  it('ETag changed but content identical — the hash verdict wins: no update', async () => {
+    const { s, detection, bundle } = urlServices();
+    installUrl(s);
+    serving.headers = { etag: '"rotated"' };
+
+    const outcomes = await detectUrl(detection, bundle);
+
+    expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
+  });
+
+  it('server sends no validators — every round re-downloads and compares the hash', async () => {
+    const { s, detection, bundle, http } = urlServices();
+    installUrl(s);
+    serving.headers = {};
+
+    const outcomes = await detectUrl(detection, bundle);
+
+    expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
+    expect(http.calls.filter((call) => call.startsWith('GET'))).toHaveLength(2);
+  });
+
+  it('Last-Modified only — unchanged skips the download, changed re-downloads and compares', async () => {
+    const { s, detection, bundle, http } = urlServices();
+    serving.headers = { lastModified: 'Wed, 09 Sep 2026 10:00:00 GMT' };
+    installUrl(s);
+    const unchanged = await detectUrl(detection, bundle);
+    expect(unchanged.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
+    expect(http.calls.filter((call) => call.startsWith('GET'))).toHaveLength(1);
+
+    serving.headers = { lastModified: 'Fri, 11 Sep 2026 10:00:00 GMT' };
+    const changed = await detectUrl(detection, bundle);
+    expect(changed.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
+    expect(http.calls.filter((call) => call.startsWith('GET'))).toHaveLength(2);
+  });
+
+  it('a failed probe is a failed row with a detection-log line, never silence (AC6)', async () => {
+    const routes: FakeHttpRoutes = () => [{ kind: 'connect-timeout' }];
+    const http = fakeHttp(routes);
+    const s = createCoreServices({
+      skillHomeRoot: path.join(root, 'home'),
+      projectRoot: root,
+      fs: createNodeFileSystem(),
+      git: { clone: () => {}, revParseHead: () => 'sha', revParseTree: () => 'tree', listRemoteHeads: () => [], statusShort: () => '', log: () => [] } as never,
+      processRunner: { run: () => ({ status: 0, stdout: '', stderr: '' }) } as never,
+      tempRoot: path.join(root, 'tmp'),
+      userHome: path.join(root, 'user'),
+      env: {},
+      catalogSnapshot: fixtureSnapshot(),
+      http,
+    });
+    s.skillHome.ensure();
+    writeUpstreamSkillManually(s);
+    const bundle = { ...s, resolution: { root: path.join(root, 'home') } };
+    const detection = new DetectionService({ githubApi: githubApiNever, fs: createNodeFileSystem(), remoteHead: remoteHeadNever, http });
+
+    const outcomes = await detection.detect(bundle, s.registry.listSkills({ includeArchived: false }));
+
+    expect(outcomes.get('alpha')).toEqual({ detection: 'failed', hasUpdate: false });
+    const log = readFileSync(detectionLogPath(path.join(root, 'home')), 'utf8');
+    expect(log).toContain('"kind":"url"');
+    expect(log).toContain('timed out');
+    expect(log).toContain('https://example.com/SKILL.md');
+  });
+});
+
+/** Seed a url-source registry row + hub skill without a successful download,
+ *  for the failure-visibility case. */
+function writeUpstreamSkillManually(s: ReturnType<typeof createCoreServices>) {
+  const dir = path.join(root, 'home', 'skills', 'alpha');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, 'SKILL.md'), skillMarkdown('alpha', 'a url skill'));
+  s.registry.ensureEntry('alpha', {
+    title: 'alpha',
+    description: 'a url skill',
+    source: { type: 'url', url: 'https://example.com/SKILL.md', subpath: 'skills/alpha', ref: null, upstream_commit: null, upstream_tree: null, upstream_etag: '"v1"', upstream_last_modified: null },
+  });
+}

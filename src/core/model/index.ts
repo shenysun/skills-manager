@@ -1,3 +1,5 @@
+import type { DownloadHeaders } from '../ports/http-download.js';
+
 export type SkillName = string;
 
 /**
@@ -37,6 +39,14 @@ export type SkillSource = {
    * `upstream_tree`. Absent/null for every other kind.
    */
   upstream_digest?: string | null;
+  /**
+   * ETag / Last-Modified the server sent with the last full download of a url
+   * source (spec US-24, ADR-0016) — the cheap pre-check's comparison side.
+   * Deliberately NOT an update anchor: the content hash decides, these only
+   * gate whether the download happens at all. Absent/null for every other kind.
+   */
+  upstream_etag?: string | null;
+  upstream_last_modified?: string | null;
   /** Upstream Git tree SHA captured at install/import — the baseline update compares against (ADR-0011). */
   baseline_hash?: string | null;
   imported_from?: string[];
@@ -102,6 +112,10 @@ export type SourceSpec = {
 export type SourceCheckout = SourceSpec & {
   repoDir: string;
   commit: string | null;
+  /** url sources only: the response headers the full download observed (US-24)
+   *  — the validators install and update re-download runs record for the
+   *  cheap ETag/Last-Modified pre-check. Every other kind omits it. */
+  httpHeaders?: DownloadHeaders;
 };
 
 export type DiscoveredSkill = {

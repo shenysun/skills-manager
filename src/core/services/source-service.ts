@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { DiscoveredSkill, SourceCheckout, SourceSpec } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
-import type { DownloadRequest, HttpDownloadPort } from '../ports/http-download.js';
+import type { DownloadRequest, DownloadResult, HttpDownloadPort } from '../ports/http-download.js';
 import { DEFAULT_DOWNLOAD_REQUEST, unconfiguredHttpDownload } from '../ports/http-download.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, parseSkillMarkdownMetadata } from '../../shared/validation.js';
@@ -103,6 +103,12 @@ export type CheckoutOptions = {
 export function isInsecureHttpSource(spec: SourceSpec): boolean {
   return spec.kind === 'url' && spec.repoUrl.startsWith('http://');
 }
+
+/** Checkout options for re-fetching a source the operator already registered
+ *  (detection's re-download, update's reinstall): the US-12 confirmation
+ *  happened when the source was introduced (add's `--yes`), so the re-check
+ *  carries it forward instead of asking again. */
+export const REGISTERED_SOURCE_RECHECK: CheckoutOptions = { allowInsecureHttp: true };
 
 /** Swap the temp checkout path out of an error message before it reaches the
  *  conversation layer (adversary H1): the diagnostic value lives in git's
@@ -241,7 +247,7 @@ export class SourceService {
     const prediction = extensionPrediction ?? predictFromContentType(downloaded.headers.contentType);
     const format = options.format ?? judgeUrlPayload(downloaded.bytes, prediction);
     if (format === 'zip' || format === 'tar') {
-      return this.checkoutArchivePayload(normalized, downloaded.bytes, format, repoDir);
+      return this.checkoutArchivePayload(normalized, downloaded, format, repoDir);
     }
     const payload = downloaded.bytes.toString('utf8');
     const metadata = singleSkillMarkdownMetadata(payload, options.format === undefined);
@@ -250,7 +256,7 @@ export class SourceService {
     const skillDir = path.join(repoDir, 'skills', metadata.name);
     this.fs.makeDirectory(skillDir);
     this.fs.writeText(path.join(skillDir, 'SKILL.md'), payload);
-    return { ...normalized, repoDir, commit: null };
+    return { ...normalized, repoDir, commit: null, httpHeaders: downloaded.headers };
   }
 
   /** An archive payload lands beside repo/ inside the minted temp dir, so the
@@ -258,12 +264,12 @@ export class SourceService {
    *  sweeps the whole dir — no separate cleanup path. The full archive-safety
    *  policy applies to downloaded archives exactly as to local ones (no trust
    *  exemption for either). */
-  private checkoutArchivePayload(normalized: SourceSpec, bytes: Buffer, format: 'zip' | 'tar', repoDir: string): SourceCheckout {
+  private checkoutArchivePayload(normalized: SourceSpec, downloaded: DownloadResult, format: 'zip' | 'tar', repoDir: string): SourceCheckout {
     const payloadPath = path.join(path.dirname(repoDir), 'payload.bin');
-    this.fs.writeBytes(payloadPath, bytes);
+    this.fs.writeBytes(payloadPath, downloaded.bytes);
     if (format === 'zip') extractZipArchive(this.fs, payloadPath, repoDir, this.archiveLimits);
     else extractTarArchive(this.fs, payloadPath, repoDir, this.archiveLimits);
-    return { ...normalized, repoDir, commit: null };
+    return { ...normalized, repoDir, commit: null, httpHeaders: downloaded.headers };
   }
 
   /** Shared temp-checkout scaffold for transport-based sources: mint a fresh

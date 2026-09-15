@@ -44,7 +44,17 @@ export type DownloadFailureCode =
 
 export interface HttpDownloadPort {
   download(url: string, request: DownloadRequest): DownloadResult;
+  /** Headers-only pre-check request for update detection (spec US-24): the
+   *  same transport contract as `download` — redirects, timeouts, failure
+   *  codes — minus the payload; a headers verdict is all the ETag /
+   *  Last-Modified pre-check consumes. */
+  probe(url: string, request: DownloadRequest): ProbeResult;
 }
+
+export type ProbeResult = {
+  headers: DownloadHeaders;
+  finalUrl: string;
+};
 
 /** Ruled transport bounds (spec source-formats): 100MB download / 5 redirects
  *  / 10s connect / 30s idle-no-progress, no total cap. */
@@ -71,12 +81,14 @@ export function downloadRequestFromEnv(env: Record<string, string | undefined> |
  *  to download, instead of silently skipping. Production wiring (runtime.ts)
  *  always injects the real adapter. */
 export function unconfiguredHttpDownload(): HttpDownloadPort {
+  const missing = () => {
+    throw new SkillsManagerError(
+      'download_transport_missing',
+      'No HTTP download transport is configured for this service — a url source needs an HttpDownloadPort injection.',
+    );
+  };
   return {
-    download() {
-      throw new SkillsManagerError(
-        'download_transport_missing',
-        'No HTTP download transport is configured for this service — a url source needs an HttpDownloadPort injection.',
-      );
-    },
+    download: missing,
+    probe: missing,
   };
 }

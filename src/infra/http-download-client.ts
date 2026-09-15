@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { SkillsManagerError } from '../shared/errors.js';
-import type { DownloadFailureCode, DownloadRequest, DownloadResult, HttpDownloadPort } from '../core/ports/http-download.js';
+import type { DownloadFailureCode, DownloadRequest, DownloadResult, HttpDownloadPort, ProbeResult } from '../core/ports/http-download.js';
 
 /**
  * HttpDownloadPort adapter over a child node process (the GitPort precedent:
@@ -24,12 +24,24 @@ export class HttpDownloadClient implements HttpDownloadPort {
   constructor(private readonly options: HttpDownloadClientOptions = {}) {}
 
   download(url: string, request: DownloadRequest): DownloadResult {
-    const execution = spawnSync(process.execPath, ['-e', CHILD_SCRIPT, JSON.stringify({ url, ...request, ca: this.options.ca })], {
+    const { bytes, headers, finalUrl } = this.runChild(url, request, 'GET', request.maxBytes);
+    return { bytes, headers, finalUrl };
+  }
+
+  probe(url: string, request: DownloadRequest): ProbeResult {
+    const { headers, finalUrl } = this.runChild(url, request, 'HEAD', 0);
+    return { headers, finalUrl };
+  }
+
+  /** One child-process round trip; `method` selects GET (payload back) or
+   *  HEAD (envelope only, so the buffer carries no body budget). */
+  private runChild(url: string, request: DownloadRequest, method: 'GET' | 'HEAD', bodyBudget: number) {
+    const execution = spawnSync(process.execPath, ['-e', CHILD_SCRIPT, JSON.stringify({ url, ...request, ca: this.options.ca, method })], {
       encoding: 'buffer',
       stdio: ['ignore', 'pipe', 'pipe'],
       // The child never emits more than the envelope plus maxBytes of payload;
       // a buffer over that budget means the child's own enforcement failed.
-      maxBuffer: request.maxBytes + ENVELOPE_HEADROOM_BYTES,
+      maxBuffer: bodyBudget + ENVELOPE_HEADROOM_BYTES,
     });
     const stdout = execution.stdout || Buffer.alloc(0);
     const newline = stdout.indexOf(0x0a);
@@ -37,16 +49,16 @@ export class HttpDownloadClient implements HttpDownloadPort {
       const cause = execution.error?.message
         || (execution.stderr ? Buffer.from(execution.stderr).toString('utf8').trim() : '')
         || `download process exited with status ${execution.status ?? 'unknown'}`;
-      throw new SkillsManagerError('download_failed', `Downloading ${url} failed: ${cause.split('\n')[0]}`);
+      throw new SkillsManagerError('download_failed', `${method} ${url} failed: ${cause.split('\n')[0]}`);
     }
     let envelope: { ok: boolean; code?: DownloadFailureCode; message?: string; headers?: DownloadResult['headers']; finalUrl?: string };
     try {
       envelope = JSON.parse(stdout.subarray(0, newline).toString('utf8'));
     } catch {
-      throw new SkillsManagerError('download_failed', `Downloading ${url} failed: the download process produced an unreadable result.`);
+      throw new SkillsManagerError('download_failed', `${method} ${url} failed: the download process produced an unreadable result.`);
     }
     if (!envelope.ok) {
-      throw new SkillsManagerError(envelope.code || 'download_failed', envelope.message || `Downloading ${url} failed.`);
+      throw new SkillsManagerError(envelope.code || 'download_failed', envelope.message || `${method} ${url} failed.`);
     }
     return {
       bytes: stdout.subarray(newline + 1),
@@ -84,7 +96,7 @@ function fetchOnce(url) {
     }
     const lib = parsed.protocol === 'https:' ? https : http;
     let phase = 'connecting';
-    const request = lib.request(parsed, { method: 'GET', ca: req.ca }, (response) => {
+    const request = lib.request(parsed, { method: req.method || 'GET', ca: req.ca }, (response) => {
       phase = 'body';
       resolve({ status: response.statusCode, headers: response.headers, stream: response });
     });
@@ -111,7 +123,7 @@ function fetchOnce(url) {
       });
     });
     request.on('error', (error) => {
-      reject({ code: 'download_failed', message: 'GET ' + url + ' failed: ' + (error && error.message ? error.message : String(error)) });
+      reject({ code: 'download_failed', message: req.method + ' ' + url + ' failed: ' + (error && error.message ? error.message : String(error)) });
     });
     request.end();
   });
@@ -163,7 +175,22 @@ function readBody(stream) {
     }
     if (hop.status < 200 || hop.status >= 300) {
       hop.stream.resume();
-      fail('download_failed', 'GET ' + current.href + ' failed with HTTP ' + hop.status);
+      fail('download_failed', req.method + ' ' + current.href + ' failed with HTTP ' + hop.status);
+    }
+    if (req.method === 'HEAD') {
+      // A HEAD response has no body by definition — the headers are the whole
+      // verdict; drain whatever a misbehaving server sent anyway.
+      hop.stream.resume();
+      emit({
+        ok: true,
+        headers: {
+          contentType: hop.headers['content-type'],
+          etag: hop.headers.etag,
+          lastModified: hop.headers['last-modified'],
+        },
+        finalUrl: current.href,
+      });
+      process.exit(0);
     }
     const body = await readBody(hop.stream);
     emit({

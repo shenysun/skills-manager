@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -128,6 +128,36 @@ describe('checkout downloads a single SKILL.md URL into a temp checkout (source-
     expect(entry?.upstream_tree).toBeNull();
     expect(entry && 'upstream_digest' in entry).toBe(false);
     expect(createNodeFileSystem().kind(path.join(root, 'home', 'skills', 'alpha', 'SKILL.md'))).toBe('file');
+  });
+
+  it('records the download response headers as the update pre-check validators (US-24, ADR-0016)', () => {
+    const s = coreServices(() => [{
+      kind: 'bytes',
+      body: skillMarkdown('alpha', 'a url skill'),
+      headers: { etag: '"v1"', lastModified: 'Wed, 09 Sep 2026 10:00:00 GMT' },
+    }]);
+    s.install.installFromSourceSelection({ source: 'https://example.com/SKILL.md', selectors: ['alpha'] });
+
+    const source = s.registry.load().skills.alpha?.source;
+    expect(source?.upstream_etag).toBe('"v1"');
+    expect(source?.upstream_last_modified).toBe('Wed, 09 Sep 2026 10:00:00 GMT');
+  });
+
+  it('records null validators when the server sends none, and none for non-url sources either', () => {
+    const s = coreServices(() => [{ kind: 'bytes', body: skillMarkdown('alpha', 'a url skill') }]);
+    s.install.installFromSourceSelection({ source: 'https://example.com/SKILL.md', selectors: ['alpha'] });
+    const urlSource = s.registry.load().skills.alpha?.source;
+    expect(urlSource?.upstream_etag).toBeNull();
+    expect(urlSource?.upstream_last_modified).toBeNull();
+
+    const localDir = path.join(root, 'local-src', 'skills', 'beta');
+    mkdirSync(localDir, { recursive: true });
+    writeFileSync(path.join(localDir, 'SKILL.md'), '---\nname: beta\ndescription: local\n---\n');
+    s.install.installFromSourceSelection({ source: path.join(root, 'local-src'), selectors: ['beta'] });
+    const localSource = s.registry.load().skills.beta?.source;
+    expect(localSource?.type).toBe('local');
+    expect(localSource?.upstream_etag).toBeNull();
+    expect(localSource?.upstream_last_modified).toBeNull();
   });
 });
 

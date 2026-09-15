@@ -17,7 +17,8 @@ export type WireScenario =
   | { kind: 'status'; status: number }
   | { kind: 'silent' }
   | { kind: 'drip'; ticks: number; everyMs: number }
-  | { kind: 'blob'; size: number };
+  | { kind: 'blob'; size: number }
+  | { kind: 'mutable'; body: string };
 
 /** A throwaway self-signed certificate for 127.0.0.1 (test asset only). */
 const TEST_KEY_PEM = `-----BEGIN PRIVATE KEY-----
@@ -74,6 +75,14 @@ const { parentPort, workerData } = require('node:worker_threads');
 const http = require('node:http');
 const https = require('node:https');
 const scenario = workerData.scenario;
+const state = { body: scenario.kind === 'mutable' ? scenario.body : undefined, revision: 0 };
+parentPort.on('message', (message) => {
+  if (message.kind === 'set-body') {
+    state.body = message.body;
+    state.revision += 1;
+    parentPort.postMessage({ kind: 'body-set', revision: state.revision });
+  }
+});
 const lib = workerData.tls ? https : http;
 const server = lib.createServer(workerData.tls ? { key: workerData.tls.key, cert: workerData.tls.cert } : {}, (request, response) => {
   if (scenario.kind === 'file') {
@@ -134,6 +143,11 @@ const server = lib.createServer(workerData.tls ? { key: workerData.tls.key, cert
     response.end(Buffer.alloc(scenario.size, 1));
     return;
   }
+  if (scenario.kind === 'mutable') {
+    response.writeHead(200, { 'content-type': 'text/markdown', etag: '"r' + state.revision + '"' });
+    response.end(state.body);
+    return;
+  }
   response.writeHead(500, { 'content-type': 'text/plain' });
   response.end('unknown scenario');
 });
@@ -161,6 +175,35 @@ export async function serveWire(scenario: WireScenario, options: { tls?: boolean
     worker.once('error', reject);
   });
   return `${options.tls ? 'https' : 'http'}://127.0.0.1:${port}`;
+}
+
+/** A 'mutable' server whose payload changes only when `set` says so — the
+ *  stable-URL, rotating-ETag shape the update pre-check assumes. The body
+ *  travels as a worker message because workerData was cloned at startup. */
+export async function serveMutableWire(initial: string): Promise<{ url: string; set(body: string): Promise<void> }> {
+  const worker = new Worker(WORKER_SOURCE, {
+    eval: true,
+    workerData: { scenario: { kind: 'mutable', body: initial }, tls: undefined },
+  });
+  workers.push(worker);
+  const port = await new Promise<number>((resolve, reject) => {
+    worker.once('message', (message: { port?: number }) => {
+      if (typeof message.port === 'number') resolve(message.port);
+      else reject(new Error('the wire server reported no port'));
+    });
+    worker.once('error', reject);
+  });
+  return {
+    url: `http://127.0.0.1:${port}/SKILL.md`,
+    set(body: string) {
+      return new Promise<void>((resolve) => {
+        worker.once('message', (message: { kind?: string }) => {
+          if (message.kind === 'body-set') resolve();
+        });
+        worker.postMessage({ kind: 'set-body', body });
+      });
+    },
+  };
 }
 
 export async function closeWireServers(): Promise<void> {

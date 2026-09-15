@@ -84,7 +84,7 @@ export function validateRegistrySafePatch(patch: Partial<RegistrySafePatch>): Pa
     const nextSource: Record<string, unknown> = { ...source };
     // Convert only the keys the caller actually provided; untouched keys stay absent
     // so the merge preserves what the entry already records.
-    for (const key of ['url', 'subpath', 'ref', 'upstream_commit', 'upstream_tree', 'baseline_hash'] as const) {
+    for (const key of ['url', 'subpath', 'ref', 'upstream_commit', 'upstream_tree', 'baseline_hash', 'upstream_etag', 'upstream_last_modified'] as const) {
       if (source[key] !== undefined) nextSource[key] = source[key] ? String(source[key]) : null;
     }
     next.source = nextSource as RegistrySafePatch['source'];
