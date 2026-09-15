@@ -12,6 +12,7 @@ import {
   type UrlPayloadFormat,
 } from '../api/client';
 import { toggleAgent } from '../domain/picker';
+import { shouldAskFormat } from '../domain/formatAsk';
 import { groupFullySelected, pluginGroups, toggleGroup, unsupportedReasonKey } from '../domain/wizardGroup';
 import { useNotice } from '../composables/useNotice';
 import Check from './Check.vue';
@@ -65,9 +66,10 @@ async function runDiscover() {
     selected.value = result.discovered.map((skill) => skill.subpath);
     step.value = 'pick';
   } catch (cause) {
-    // A payload the auto-judgment cannot identify is the one state where the
-    // wizard asks for a format (US-5/30) — any other failure explains itself.
-    if (cause instanceof ApiError && cause.code === 'url_payload_mismatch' && forcedFormat.value === null) {
+    // A payload the auto-judgment cannot identify — contradiction (mismatch)
+    // or no verdict at all (invalid) — is the one state where the wizard asks
+    // for a format (US-5/30); any other failure explains itself.
+    if (cause instanceof ApiError && shouldAskFormat(cause.code, forcedFormat.value)) {
       formatAsk.value = true;
       return;
     }
