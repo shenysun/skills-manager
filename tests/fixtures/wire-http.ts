@@ -11,6 +11,7 @@ import { Worker } from 'node:worker_threads';
 
 export type WireScenario =
   | { kind: 'file'; body: string | Buffer; contentType?: string }
+  | { kind: 'routes'; routes: Record<string, string | Buffer> }
   | { kind: 'chain'; routes: Record<string, { status: number; location?: string }>; body: string }
   | { kind: 'loop-redirect' }
   | { kind: 'downgrade' }
@@ -92,6 +93,19 @@ const server = lib.createServer(workerData.tls ? { key: workerData.tls.key, cert
       'last-modified': 'Wed, 09 Sep 2026 10:00:00 GMT',
     });
     response.end(scenario.body);
+    return;
+  }
+  if (scenario.kind === 'routes') {
+    const body = scenario.routes[request.url];
+    if (body === undefined) {
+      response.writeHead(404, { 'content-type': 'text/plain' });
+      response.end('not found');
+      return;
+    }
+    // content-type stays opaque on purpose: the well-known probe JSON-parses
+    // bytes and never sniffs the header, so per-route types would be noise.
+    response.writeHead(200, { 'content-type': 'application/octet-stream' });
+    response.end(body);
     return;
   }
   if (scenario.kind === 'chain') {
