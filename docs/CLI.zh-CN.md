@@ -88,7 +88,7 @@ apply 是显式快照——之后的打标或更新不会自动推送。`categor
 
 ### provenance（来源补齐）
 
-`provenance list` 列出所有仍缺可用来源的技能，分为 **imported-without-source**（经 init 进入、无证据也无补录来源）与 **本地自建**（从未导入、无上游记录）两类；已归档技能不列入。`provenance adopt` 对该存量导入队列重跑 ADR-0011 的锁文件证据采纳 —— 与 init 导入时同一套门禁，仅去掉「本轮新导入」条件，让 ADR-0011 之前导入的技能也能补上锁文件证据。它从不猜测：锁中无条目的技能直接跳过（`no_lock_evidence`）。`--dry-run` 仅预览；`--skill` 限定范围。搜索得来的候选不归这个命令管 —— 猜测性来源属于 agent 会话，经用户逐条拍板后才能通过 `edit` 写入（ADR-0012）。见 [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md)。
+`provenance list` 列出所有仍缺可用来源的技能，分为 **imported-without-source**（经 init 进入、无证据也无补录来源）与 **本地自建**（从未导入、无上游记录）两类；已归档技能不列入。`provenance adopt` 对该存量导入队列重跑导入时的证据采纳 —— 与 init 同一套门禁，仅去掉「本轮新导入」条件。两条证据通道、frontmatter 优先（ADR-0017）：SKILL.md 自身的 `metadata:` 镜像覆盖 gh skill 装的与 skills-manager 自己写的；`npx skills` 锁文件（ADR-0011）覆盖其余。它从不猜测：两条通道都无证据的技能直接跳过（`no_evidence`）。`--dry-run` 仅预览；`--skill` 限定范围。搜索得来的候选不归这个命令管 —— 猜测性来源属于 agent 会话，经用户逐条拍板后才能通过 `edit` 写入（ADR-0012）。见 [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md)。
 
 ### init（反向导入）
 

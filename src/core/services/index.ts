@@ -20,6 +20,7 @@ import { BackupService } from './backup-service.js';
 import { SkillLockService } from './skill-lock-service.js';
 import { ProvenanceService } from './provenance-service.js';
 import { FrontmatterMirrorService } from './frontmatter-mirror.js';
+import { FrontmatterEvidenceService } from './frontmatter-evidence.js';
 import { ManagerSkillService } from './manager-skill-service.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
@@ -72,8 +73,11 @@ export function createCoreServices(options: CoreServicesOptions) {
   const migration = new MigrationService(options.fs, home, distribute, catalog);
   const backups = new BackupService(options.fs, home, registry, distribute);
   const skillLock = new SkillLockService(options.fs, { env: options.env, userHomeDir: options.userHome });
-  const init = new InitService(options.fs, home, skillHome, registry, distribute, catalog, backups, skillLock);
-  const provenance = new ProvenanceService(registry, skillLock);
+  // The mirror's reverse half (ADR-0017): a SKILL.md's own metadata is import/
+  // adopt evidence, prioritized over the lockfile.
+  const frontmatterEvidence = new FrontmatterEvidenceService(options.fs);
+  const init = new InitService(options.fs, home, skillHome, registry, distribute, catalog, backups, skillLock, frontmatterEvidence);
+  const provenance = new ProvenanceService(registry, skillLock, frontmatterEvidence);
   const managerSkill = new ManagerSkillService(options.fs, registry, distribute, views);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
   return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, package: packageService };
@@ -99,6 +103,7 @@ export type { InitRunRequest, InitRunResult, InitDiscoveredSkill, InitConflict, 
 export { SkillLockService, lockEntryToSource } from './skill-lock-service.js';
 export type { SkillLockEntry, SkillLockOptions } from './skill-lock-service.js';
 export { ProvenanceService } from './provenance-service.js';
+export { FrontmatterEvidenceService, frontmatterToSource } from './frontmatter-evidence.js';
 export { ManagerSkillService, MANAGER_SKILL_NAME, compareDateVersions } from './manager-skill-service.js';
 export type { ManagerSkillBundle, ManagerSkillSeedStatus, ManagerSkillSeedResult } from './manager-skill-service.js';
 export { BackupService } from './backup-service.js';

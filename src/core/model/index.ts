@@ -209,11 +209,11 @@ export type ProvenancePending = {
   locallyAuthored: SkillName[];
 };
 
-/** One `provenance adopt` run: which skills got lockfile evidence, which stayed source-less and why. */
+/** One `provenance adopt` run: which skills got evidence adopted (frontmatter first, ADR-0017), which stayed source-less and why. */
 export type ProvenanceAdoptResult = {
   dryRun: boolean;
   adopted: Array<{ skill: SkillName; source: SkillSource }>;
-  skipped: Array<{ skill: SkillName; reason: 'no_lock_evidence' | 'not_pending' }>;
+  skipped: Array<{ skill: SkillName; reason: 'no_evidence' | 'not_pending' }>;
 };
 
 /**

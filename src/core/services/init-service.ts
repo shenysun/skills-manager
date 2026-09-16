@@ -9,6 +9,7 @@ import type { RegistryService } from './registry-service.js';
 import type { SkillHomeService } from './skill-home-service.js';
 import type { BackupService } from './backup-service.js';
 import { lockEntryToSource, type SkillLockEntry, type SkillLockService } from './skill-lock-service.js';
+import type { FrontmatterEvidenceService } from './frontmatter-evidence.js';
 
 export type InitRunRequest = {
   /** Catalog agent ids to scan; omitted = the detected set on this machine. */
@@ -93,6 +94,7 @@ export class InitService {
     private readonly catalog: CatalogService,
     private readonly backups: BackupService,
     private readonly skillLock: SkillLockService,
+    private readonly frontmatterEvidence: FrontmatterEvidenceService,
   ) {}
 
   run(request: InitRunRequest = {}): InitRunResult {
@@ -191,9 +193,9 @@ export class InitService {
    * moves into the hub now; the registry write and the back-symlinking are
    * returned for the batch commit. `choice` is a runtime dir (or any agent id
    * sharing it) whose copy wins, or 'hub' to keep the hub copy and only
-   * back-symlink origins. Lock evidence (when the skill name matches an `npx
-   * skills` entry) upgrades the import from snapshot to update-managed in the
-   * same write (ADR-0011).
+   * back-symlink origins. Evidence upgrades the import from snapshot to
+   * update-managed in the same write: the winning copy's frontmatter mirror
+   * first (ADR-0017), the `npx skills` lockfile behind it (ADR-0011).
    */
   private stageImport(skill: InitDiscoveredSkill, groups: EntityGroup[], choice: string | undefined, lockEntries: ReadonlyMap<SkillName, SkillLockEntry>): StagedImport {
     assertSafeSkillName(skill.name);
@@ -210,7 +212,7 @@ export class InitService {
       const hubDir = this.registry.skillDir(skill.name);
       // Copy through symlinks: the hub needs the entity's contents, not a link to it.
       this.fs.copyDirectoryContents(this.entityPathOf(winnerGroup[0].path), hubDir);
-      const evidence = lockEntryToSource(lockEntries.get(skill.name));
+      const evidence = this.importEvidence(skill.name, winnerGroup, lockEntries);
       registryPatch = {
         skill: skill.name,
         patch: {
@@ -233,6 +235,15 @@ export class InitService {
     }
     const agents = this.agentsForLocations(locations);
     return { skill: skill.name, registryPatch, applyRequest: { to: 'user', skills: [skill.name], agents, mode: 'symlink' } };
+  }
+
+  /** Evidence priority (ADR-0017): the winning copy's own frontmatter mirror
+   *  first — it travelled with the content, gh skill and skills-manager both
+   *  speak it (US8/US10) — then the `npx skills` lockfile (ADR-0011). Broken
+   *  or absent frontmatter evidence falls through to the lock silently. */
+  private importEvidence(skill: SkillName, winnerGroup: EntityGroup, lockEntries: ReadonlyMap<SkillName, SkillLockEntry>) {
+    const winnerMd = path.join(this.entityPathOf(winnerGroup[0].path), 'SKILL.md');
+    return this.frontmatterEvidence.forSkillMd(winnerMd) ?? lockEntryToSource(lockEntries.get(skill));
   }
 
   private assertPrefer(prefer: readonly string[] | undefined, scannedDirs: readonly string[]) {

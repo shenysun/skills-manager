@@ -541,3 +541,92 @@ describe('init conversational output (manager-skill-first ticket 04)', () => {
     expect(descriptions).toContain('cursor side');
   });
 });
+
+describe('init frontmatter evidence adoption (ADR-0017, provenance-get ticket 05)', () => {
+  const writeUserLock = (skills: Record<string, unknown>) => {
+    const file = path.join(userHome, '.agents', '.skill-lock.json');
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ version: 3, skills }));
+  };
+
+  const GH_METADATA = [
+    'metadata:',
+    '    github-repo: https://github.com/monalisa/octocat-skills',
+    '    github-ref: refs/tags/v1.0.0',
+    '    github-tree-sha: tree456',
+    '    github-path: skills/alpha',
+    '    local-path: /home/monalisa/skills/alpha', // gh-written key we must not own
+  ].join('\n');
+
+  /** A runtime skill as gh skill leaves it: provenance travels in the file itself. */
+  const ghInstalledSkill = (name: string) =>
+    `---\nname: ${name}\ntitle: ${name} title\ndescription: ${name} description\n${GH_METADATA}\n---\n# ${name}\n`;
+
+  it('imports a gh-skill install already update-managed: fields in place, tree-sha is the anchor, no calibration debt (US8)', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha', ghInstalledSkill('alpha'));
+    const s = services();
+
+    s.init.run();
+
+    expect(s.registry.getEntry('alpha')).toMatchObject({
+      imported: true,
+      source: {
+        type: 'github',
+        url: 'https://github.com/monalisa/octocat-skills',
+        subpath: 'skills/alpha',
+        ref: 'refs/tags/v1.0.0',
+        // Evidence-is-calibration: the tree-sha read from the file is the
+        // upstream_tree anchor — the first detection compares, it never calibrates.
+        upstream_tree: 'tree456',
+      },
+    });
+    // The import is update-eligible the moment it lands, with no source to backfill.
+    expect(s.update.plan().groups.flatMap((group) => group.skills.map((skill) => skill.skill))).toEqual(['alpha']);
+    expect(s.doctor.check().importedWithoutSource).toEqual([]);
+    // The mirror reprojection lands in the same write: owned keys normalized
+    // beside our identity keys, gh's own local-path preserved untouched.
+    const hubSkillMd = readFileSync(path.join(home, 'skills', 'alpha', 'SKILL.md'), 'utf8');
+    expect(hubSkillMd).toContain('github-tree-sha: tree456');
+    expect(hubSkillMd).toContain('skills-manager-written-by: skills-manager-cli');
+    expect(hubSkillMd).toContain('local-path: /home/monalisa/skills/alpha');
+  });
+
+  it('prefers the file own evidence when both channels exist and conflict (US10)', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha', ghInstalledSkill('alpha'));
+    writeUserLock({
+      alpha: {
+        sourceType: 'github',
+        sourceUrl: 'https://github.com/someone/elsewhere.git',
+        skillPath: 'other/alpha/SKILL.md',
+        skillFolderHash: 'lockfile-sha',
+      },
+    });
+    const s = services();
+
+    s.init.run();
+
+    const source = s.registry.getEntry('alpha')?.source;
+    expect(source).toMatchObject({
+      type: 'github',
+      url: 'https://github.com/monalisa/octocat-skills',
+      subpath: 'skills/alpha',
+      upstream_tree: 'tree456',
+    });
+    // The losing lockfile channel contributes nothing — not even its anchor.
+    expect(source).not.toHaveProperty('baseline_hash');
+  });
+
+  it('still falls back to lockfile evidence when the copy carries no frontmatter evidence', () => {
+    makeRuntimeSkill('.claude/skills', 'alpha');
+    writeUserLock({ alpha: { sourceType: 'github', sourceUrl: 'https://github.com/owner/repo.git', skillPath: 'skills/alpha/SKILL.md', skillFolderHash: 'tree-sha-lock' } });
+    const s = services();
+
+    s.init.run();
+
+    expect(s.registry.getEntry('alpha')?.source).toMatchObject({
+      type: 'git',
+      url: 'https://github.com/owner/repo.git',
+      baseline_hash: 'tree-sha-lock',
+    });
+  });
+});

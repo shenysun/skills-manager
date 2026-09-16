@@ -1,18 +1,26 @@
 import type { ProvenanceAdoptResult, ProvenancePending, SkillName, SkillSource } from '../model/index.js';
 import type { RegistryService } from './registry-service.js';
 import { lockEntryToSource, type SkillLockService } from './skill-lock-service.js';
+import type { FrontmatterEvidenceService } from './frontmatter-evidence.js';
 
 /**
  * Provenance backfill for skills that entered the hub without a usable source
- * (ADR-0012). `adopt` re-runs the ADR-0011 lockfile-evidence adoption over the
- * legacy imported queue — the same evidence gate init applies at import time,
- * minus the "must be a fresh import this run" condition, which is exactly the
- * gap that left pre-ADR-0011 imports source-less. Guessed sources are out of
- * scope here: guessing happens in an agent session and only ever lands through
- * `edit` after the user approves each skill.
+ * (ADR-0012). `adopt` re-runs the import-time evidence adoption over the
+ * legacy imported queue — the same evidence gate init applies, minus the
+ * "must be a fresh import this run" condition, which is exactly the gap that
+ * left pre-ADR-0011 imports source-less. Two evidence channels, frontmatter
+ * first (ADR-0017): the hub copy's own `metadata:` mirror covers gh-skill
+ * installs (frontmatter-only) as well as our own writes; the `npx skills`
+ * lockfile (ADR-0011) covers the rest. Guessed sources are out of scope here:
+ * guessing happens in an agent session and only ever lands through `edit`
+ * after the user approves each skill.
  */
 export class ProvenanceService {
-  constructor(private readonly registry: RegistryService, private readonly lock: SkillLockService) {}
+  constructor(
+    private readonly registry: RegistryService,
+    private readonly lock: SkillLockService,
+    private readonly frontmatterEvidence: FrontmatterEvidenceService,
+  ) {}
 
   pending(): ProvenancePending {
     const importedWithoutSource: ProvenancePending['importedWithoutSource'] = [];
@@ -40,9 +48,9 @@ export class ProvenanceService {
         skipped.push({ skill, reason: 'not_pending' });
         continue;
       }
-      const source: SkillSource | null = lockEntryToSource(entries.get(skill));
+      const source: SkillSource | null = this.frontmatterEvidence.forSkillMd(this.registry.skillMdPath(skill)) ?? lockEntryToSource(entries.get(skill));
       if (!source) {
-        skipped.push({ skill, reason: 'no_lock_evidence' });
+        skipped.push({ skill, reason: 'no_evidence' });
         continue;
       }
       adopted.push({ skill, source });

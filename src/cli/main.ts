@@ -297,15 +297,15 @@ categories.command('status')
     }
   });
 
-const provenance = program.command('provenance').description('Backfill provenance for source-less skills (lockfile evidence adoption, ADR-0011/0012)');
+const provenance = program.command('provenance').description('Backfill provenance for source-less skills (frontmatter & lockfile evidence adoption, ADR-0011/0012/0017)');
 provenance.command('adopt')
-  .description('Adopt npx skills lockfile evidence onto legacy imported skills that have no source yet')
+  .description('Adopt frontmatter/lockfile evidence onto legacy imported skills that have no source yet')
   .option('--dry-run', 'print what would be adopted without touching the registry')
   .option('-s, --skill <skill...>', 'limit adoption to specific skills')
   .action((opts, cmd) => {
     const s = services(cmd);
     const result = s.provenance.adopt({ dryRun: Boolean(opts.dryRun), skills: opts.skill });
-    if (!opts.dryRun) s.activity.record({ action: 'cli-provenance-adopt', summary: `Adopted lockfile evidence for ${result.adopted.map((item) => item.skill).join(', ') || 'nothing'}`, details: { adopted: result.adopted.map((item) => item.skill), skipped: result.skipped } });
+    if (!opts.dryRun) s.activity.record({ action: 'cli-provenance-adopt', summary: `Adopted provenance evidence for ${result.adopted.map((item) => item.skill).join(', ') || 'nothing'}`, details: { adopted: result.adopted.map((item) => item.skill), skipped: result.skipped } });
     print(result);
   });
 provenance.command('list')

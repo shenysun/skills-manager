@@ -110,7 +110,7 @@ describe('provenance adopt', () => {
 
   it('skips imported skills with no lock entry and leaves them untouched', () => {
     const result = run(['provenance', 'adopt']);
-    expect(JSON.parse(result.stdout).skipped).toEqual([{ skill: 'lockless', reason: 'no_lock_evidence' }]);
+    expect(JSON.parse(result.stdout).skipped).toEqual([{ skill: 'lockless', reason: 'no_evidence' }]);
     const listed = run(['list']);
     const lockless = JSON.parse(listed.stdout).find((skill: { name: string }) => skill.name === 'lockless');
     expect(lockless.source.url).toBeNull();
@@ -133,5 +133,72 @@ describe('provenance adopt', () => {
     expect(output.adopted.map((item: { skill: string }) => item.skill)).toEqual(['legacy']);
     expect(output.skipped).toEqual([{ skill: 'authored', reason: 'not_pending' }]);
     expect(JSON.parse(run(['provenance', 'list', '--json']).stdout).importedWithoutSource.map((item: { skill: string }) => item.skill)).toEqual(['lockless', 'snapshot']);
+  });
+});
+
+describe('provenance adopt: frontmatter evidence channel (ADR-0017, provenance-get ticket 05)', () => {
+  /** gh skill's writer output: provenance travels in the file, no lockfile involved. */
+  const ghMetadata = (repoUrl: string) =>
+    `---\nname: PLACEHOLDER\ntitle: fixture\ndescription: fixture\nmetadata:\n    github-repo: ${repoUrl}\n    github-ref: refs/tags/v1.0.0\n    github-tree-sha: tree456\n    github-path: skills/lockless\n---\n# fixture\n`;
+
+  function giveFrontmatterEvidence(skill: string, repoUrl: string) {
+    writeFileSync(path.join(home, 'skills', skill, 'SKILL.md'), ghMetadata(repoUrl).replace('PLACEHOLDER', skill));
+  }
+
+  it('adopts frontmatter-only evidence — a gh skill install with no lockfile entry at all (US9)', () => {
+    giveFrontmatterEvidence('lockless', 'https://github.com/monalisa/octocat-skills');
+    const result = run(['provenance', 'adopt']);
+    expect(result.status).toBe(0);
+
+    const adopted = JSON.parse(result.stdout).adopted;
+    expect(adopted.map((item: { skill: string }) => item.skill)).toEqual(['legacy', 'lockless', 'snapshot']);
+    // The frontmatter-only skill adopts exactly the file's own evidence:
+    // tree-sha lands as the upstream_tree anchor, host github.com as type github.
+    expect(adopted.find((item: { skill: string }) => item.skill === 'lockless').source).toEqual({
+      type: 'github',
+      url: 'https://github.com/monalisa/octocat-skills',
+      subpath: 'skills/lockless',
+      ref: 'refs/tags/v1.0.0',
+      upstream_tree: 'tree456',
+    });
+    expect(JSON.parse(result.stdout).skipped).toEqual([]);
+
+    // The adopted evidence survives the safe-patch whitelist (type included) and lands in the registry.
+    const listed = JSON.parse(run(['list']).stdout);
+    const lockless = listed.find((skill: { name: string }) => skill.name === 'lockless');
+    expect(lockless.source).toMatchObject({ type: 'github', url: 'https://github.com/monalisa/octocat-skills', upstream_tree: 'tree456' });
+    // The mirror write point rides the same registry write (ticket 02): the file
+    // grows our identity keys beside the gh-written evidence.
+    const skillMd = readFileSync(path.join(home, 'skills', 'lockless', 'SKILL.md'), 'utf8');
+    expect(skillMd).toContain('skills-manager-written-by: skills-manager-cli');
+    expect(skillMd).toContain('github-repo: https://github.com/monalisa/octocat-skills');
+  });
+
+  it('prefers the file own evidence when both channels exist and conflict (US10)', () => {
+    giveFrontmatterEvidence('legacy', 'https://github.com/monalisa/octocat-skills');
+    const result = run(['provenance', 'adopt']);
+    expect(result.status).toBe(0);
+
+    const legacy = JSON.parse(result.stdout).adopted.find((item: { skill: string }) => item.skill === 'legacy');
+    expect(legacy.source).toMatchObject({
+      type: 'github',
+      url: 'https://github.com/monalisa/octocat-skills', // the lockfile said owner/repo.git — the file wins
+      subpath: 'skills/lockless',
+      upstream_tree: 'tree456',
+    });
+    expect(legacy.source.baseline_hash).toBeUndefined();
+  });
+
+  it('still adopts pure lockfile evidence for files carrying none', () => {
+    const result = run(['provenance', 'adopt']);
+    const legacy = JSON.parse(result.stdout).adopted.find((item: { skill: string }) => item.skill === 'legacy');
+    expect(legacy.source).toMatchObject({ type: 'git', url: 'https://github.com/owner/repo.git', baseline_hash: 'tree-sha-legacy' });
+  });
+
+  it('maps a *.ghe.com repo to the generic git kind (ADR-0017 host ruling)', () => {
+    giveFrontmatterEvidence('lockless', 'https://acme.ghe.com/monalisa/octocat-skills');
+    const result = run(['provenance', 'adopt']);
+    const lockless = JSON.parse(result.stdout).adopted.find((item: { skill: string }) => item.skill === 'lockless');
+    expect(lockless.source).toMatchObject({ type: 'git', url: 'https://acme.ghe.com/monalisa/octocat-skills' });
   });
 });

@@ -83,8 +83,10 @@ export function validateRegistrySafePatch(patch: Partial<RegistrySafePatch>): Pa
     const source = patch.source || {};
     const nextSource: Record<string, unknown> = { ...source };
     // Convert only the keys the caller actually provided; untouched keys stay absent
-    // so the merge preserves what the entry already records.
-    for (const key of ['url', 'subpath', 'ref', 'upstream_commit', 'upstream_tree', 'upstream_digest', 'upstream_content_sha', 'baseline_hash', 'upstream_etag', 'upstream_last_modified'] as const) {
+    // so the merge preserves what the entry already records. `type` joined with
+    // the frontmatter evidence reader (ADR-0017): its github.com→`github` host
+    // mapping is the first evidence path that distinguishes it from `git`.
+    for (const key of ['type', 'url', 'subpath', 'ref', 'upstream_commit', 'upstream_tree', 'upstream_digest', 'upstream_content_sha', 'baseline_hash', 'upstream_etag', 'upstream_last_modified'] as const) {
       if (source[key] !== undefined) nextSource[key] = source[key] ? String(source[key]) : null;
     }
     next.source = nextSource as RegistrySafePatch['source'];

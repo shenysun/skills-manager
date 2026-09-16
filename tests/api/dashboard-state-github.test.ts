@@ -173,6 +173,23 @@ describe('GET /api/state GitHub update detection (ADR-0013: tree SHA anchor + pe
     expect(readRegistry().skills.alpha.source?.upstream_tree).toBe('t-alpha');
   });
 
+  it('treats frontmatter-evidence imports as pre-calibrated: the imported tree-sha anchors the first detection (ADR-0017, ticket 05)', async () => {
+    // Row shape exactly what the evidence reader produces for a gh-metadata
+    // import: type github, tree-sha already in place — no calibration debt.
+    setGitSource('alpha', { type: 'github', url: REPO_URL, subpath: 'skills/alpha', ref: null, upstream_commit: null, upstream_tree: 't-imported' });
+    const before = readFileSync(registryFile(), 'utf8');
+    responder = () => repoTree('c0', { 'skills/alpha': 't-imported' });
+    const same = await getState();
+    expect(rowOf(same, 'alpha').hasUpdate).toBe(false);
+    // No calibration write: the evidence-supplied anchor already IS the anchor.
+    expect(readFileSync(registryFile(), 'utf8')).toBe(before);
+
+    responder = () => repoTree('c1', { 'skills/alpha': 't-moved' });
+    const moved = await getState();
+    expect(rowOf(moved, 'alpha').hasUpdate).toBe(true);
+    expect(readRegistry().skills.alpha.source?.upstream_tree).toBe('t-imported');
+  });
+
   it('is idempotent after calibration: an unchanged tree rewrites nothing', async () => {
     setGitSource('alpha', { type: 'git', url: REPO_URL, subpath: 'skills/alpha', ref: null, upstream_commit: 'c0', upstream_tree: null });
     responder = () => repoTree('c0', { 'skills/alpha': 't-alpha' });
