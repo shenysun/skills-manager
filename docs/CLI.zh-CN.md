@@ -33,6 +33,8 @@ skills-manager doctor --home ./my-skill-home
 skills-manager catalog info --home ./my-skill-home
 skills-manager catalog refresh --home ./my-skill-home
 skills-manager list --home ./my-skill-home
+skills-manager get my-skill
+skills-manager get my-skill --path
 skills-manager add <source> --all --yes
 skills-manager update --plan
 skills-manager update --skill my-skill
@@ -85,6 +87,28 @@ apply 是显式快照——之后的打标或更新不会自动推送。`categor
 - `skills-manager redistribute --refresh`（`--outdated` 的别名）刷新全部过期副本目标，可用 `--to` / `--project` 过滤；输出 `Refreshed N, errored M.`
 - `add` / `update` 在仍有其他过期目标时，末尾追加一行提醒。
 - 仪表盘的技能行显示带数量的过期徽标和一键刷新按钮。
+
+### get（引用层，ADR-0017）
+
+```sh
+skills-manager get <skill>            # 完整 SKILL.md（frontmatter + 正文）打到 stdout
+skills-manager get <skill> --path     # canonical 技能库目录（绝对路径），用于只读借用
+```
+
+`get` 是零留存读取通道：技能库里的技能不分发也能读。它把 SKILL.md 原样打到 stdout —— 纯文本而非 JSON（沿用 `status` 的人类可读先例），agent 可直接管道取用正文；frontmatter 携带 provenance 镜像（见下节），读取顺带获得来源可信度。不要求也不查看任何分发状态。`--path` 改为打印技能库目录的绝对路径——canonical 的 `skills/<name>/` 目录，已归档技能则是 `.skills/archive/…` 目录——作为 stdout 首行，随后附一行只读提示。它用于读取附属文件（scripts、参考资料）：只读借用——技能库是唯一权威，改动走 skills-manager 命令，绝不向该目录写入。已归档技能仍可读取（archive 退出的是管理面——更新、分发——不是可读性）：正文原样输出，归档提示走 stderr，stdout 保持逐字节不变。名字未命中时报错并给出近似名建议（复用既有编辑距离逻辑）。
+
+### frontmatter provenance 镜像（ADR-0017）
+
+registry 保持唯一 source of truth；SKILL.md frontmatter 的 `metadata:` 块是来源证据的**单向便携镜像**——证据随文件行走：进项目副本、给同事、被其他工具读取。镜像在每个 registry 来源写入点刷新：`add`（安装）、`update`、`edit --source-*`、`provenance adopt`、更新检测校准（顺带幂等补写存量技能——无迁移命令）。手改或过期的镜像会在下一个写入点被静默覆盖；改源的正门是 `edit --source-*`。重投影保留其余全部 frontmatter 键——包括其他工具写入的键。
+
+按源类型的键位：
+
+- **git / github / marketplace** 源逐字镜像 gh skill 的四个键——`github-repo`（完整 HTTPS URL）、`github-ref`、`github-tree-sha`、`github-path`。这是有意的键位对齐：`gh skill update` 凭这些键直接互认并更新 skills-manager 装的技能，携带镜像的项目副本同样可被识别。反方向也成立：`gh skill` 装的技能带同样的键，`init` / `provenance adopt` 把它们反读为证据（frontmatter 优先、lockfile 其次），且 `github-tree-sha` 直写更新锚点——证据即校准。
+- **wellknown** 源镜像 `skills-manager-source-url`（索引 URL）+ `skills-manager-digest`；**url**（直下）源镜像 `skills-manager-source-url` + `skills-manager-content-sha` —— 自有命名空间键，绝不发明假的 `github-*` 名。
+- 每个镜像都带工具签名：`skills-manager-written-by`（+ `skills-manager-version`）。
+- **archive / local** 源不写镜像（无更新资格，无假证据）；内置种入的 manager skill 同样豁免。
+
+镜像写入与任何编辑一样计入内容指纹——过期副本目标走既有 auto-refresh 收敛（ADR-0008）。skills-manager 永不写 `~/.agents/.skill-lock.json`（ADR-0011）。见 [ADR-0017](adr/0017-frontmatter-portable-provenance-mirror.md)。
 
 ### provenance（来源补齐）
 

@@ -15,7 +15,7 @@ Key vocabulary you will need when reading output:
 - **Detected agents**: the agent set `npx skills` would target on this machine, resolved locally from the bundled catalog snapshot.
 - **Domain category / category set**: a skill's free-form `categories: []` (前端 / 金融 / backend — the user's own vocabulary, orthogonal to the frozen legacy `category`); a **category set** is the per-runtime-path applied filter state that `categories status` reports.
 
-The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. Commands print JSON — except `status` (a human-readable summary) and `--help`. Parse stdout; don't guess the shape.
+The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. Commands print JSON — except `status` (a human-readable summary), `get` (the skill file itself), and `--help`. Parse stdout; don't guess the shape.
 
 ## First run / empty hub
 
@@ -36,12 +36,16 @@ Keep the first turn short: report state, propose one action, wait. Deeper workfl
 ```bash
 skills-manager list [--category <c>] [--include-archived]
 skills-manager list --brief           # compact rows — use this in conversation first; full rows are tens of KB
+skills-manager get <name>             # zero-retention read: full SKILL.md (frontmatter + body) on stdout
+skills-manager get <name> --path      # absolute hub dir, for read-only borrowing of sibling files
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source queue
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
 ```
+
+**`get` is the reference layer** — the zero-cost alternative to distributing. When you need a skill once (this conversation only), `get <name>` prints its complete SKILL.md to stdout — raw text, not JSON — and the frontmatter carries the provenance mirror (where the skill came from), so the read doubles as a trust check. Use it, then move on: nothing stays loaded. `--path` prints the hub directory instead — first stdout line, followed by a read-only notice (an archived skill resolves to its `.skills/archive/…` directory) — for reading sibling files (scripts/, references). **Read-only**: the hub is canonical, changes go through skills-manager commands. No distribution state is required; archived skills stay readable (in body mode an archived notice rides stderr, stdout stays the file body), and a miss suggests near names.
 
 ### Install from a source (source-first)
 

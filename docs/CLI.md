@@ -33,6 +33,8 @@ skills-manager doctor --home ./my-skill-home
 skills-manager catalog info --home ./my-skill-home
 skills-manager catalog refresh --home ./my-skill-home
 skills-manager list --home ./my-skill-home
+skills-manager get my-skill
+skills-manager get my-skill --path
 skills-manager add <source> --all --yes
 skills-manager update --plan
 skills-manager update --skill my-skill
@@ -85,6 +87,28 @@ Apply is an explicit snapshot — later tag edits or updates never auto-push. `c
 - `skills-manager redistribute --refresh` (alias of `--outdated`) refreshes every stale copy target, optionally filtered by `--to` / `--project`; it prints `Refreshed N, errored M.`
 - `add` / `update` print a one-line trailing reminder when other stale targets remain.
 - The dashboard shows a stale badge with a count and a one-click refresh button per skill row.
+
+### get (the reference layer, ADR-0017)
+
+```sh
+skills-manager get <skill>            # full SKILL.md (frontmatter + body) on stdout
+skills-manager get <skill> --path     # canonical hub directory (absolute), for read-only borrowing
+```
+
+`get` is the zero-retention read channel: a hub skill can be read without being distributed. It prints the skill's SKILL.md verbatim to stdout — raw text, not JSON (the `status` human-readable precedent), so agents can pipe the body directly; the frontmatter carries the provenance mirror (below), so the read doubles as a trust check. No distribution state is required or consulted. `--path` prints the hub directory's absolute path instead — the canonical `skills/<name>/` directory, or `.skills/archive/…` for an archived skill — as the first stdout line, followed by a read-only notice. It exists for reading sibling files (scripts, references): read-only borrowing — the hub is canonical, and changes go through skills-manager commands, never by writing into that directory. Archived skills remain readable (archive exits the management plane — updates, distribution — not readability): the body prints unchanged, with an archived notice on stderr so stdout stays byte-exact. An unknown name fails with near-name suggestions (reusing the edit-distance logic).
+
+### Frontmatter provenance mirror (ADR-0017)
+
+The registry stays the single source of truth; the SKILL.md frontmatter `metadata:` block is a **one-way portable projection** of the source evidence, so evidence travels with the file — into project copies, to teammates, and into other tools. The mirror is refreshed at every registry source write point: `add` (install), `update`, `edit --source-*`, `provenance adopt`, and update-detection calibration (which backfills legacy skills idempotently along the way — no migration command). A hand-edited or stale mirror is silently overwritten at the next write point; the front door for changing a source is `edit --source-*`. All other frontmatter keys — including keys written by other tools — are preserved through reprojection.
+
+Keys by source kind:
+
+- **git / github / marketplace** mirror gh skill's four keys verbatim — `github-repo` (full HTTPS URL), `github-ref`, `github-tree-sha`, `github-path`. This is deliberate key alignment: `gh skill update` recognizes a skills-manager install through those keys and can update it directly, and project copies carrying the mirror are equally recognizable. The reverse direction works too: skills installed by `gh skill` carry the same keys, and `init` / `provenance adopt` read them back as evidence (frontmatter first, lockfile second), with `github-tree-sha` written straight to the update anchor — evidence is calibration.
+- **wellknown** sources mirror `skills-manager-source-url` (the index URL) + `skills-manager-digest`; **url** (direct download) sources mirror `skills-manager-source-url` + `skills-manager-content-sha` — own-namespace keys, never invented `github-*` names.
+- Every mirror carries the tool signature: `skills-manager-written-by` (+ `skills-manager-version`).
+- **archive / local** sources write no mirror (no update eligibility, no fake evidence); the seeded manager skill is likewise exempt.
+
+Mirror writes count toward the content fingerprint like any edit — stale copy targets converge through the existing auto-refresh (ADR-0008). skills-manager never writes `~/.agents/.skill-lock.json` (ADR-0011). See [ADR-0017](adr/0017-frontmatter-portable-provenance-mirror.md).
 
 ### provenance (source backfill)
 
