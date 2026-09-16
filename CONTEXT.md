@@ -203,6 +203,8 @@ Distribute targets the **full agent catalog** (all 73 ids), not the legacy `agen
 
 ## Current product direction
 
+**Next-step queue:** candidate directions and their priority live in [docs/ROADMAP.md](docs/ROADMAP.md) (based on the 2026-09 competitor research under `docs/research/`). Check it before proposing new feature work.
+
 The project is evolving from a local skill repository into a publishable npm package whose **primary interface is the manager skill** (ADR-0014): a no-arg npx bootstrap installs it, and management happens in agent conversation, on top of:
 
 - the `skills-manager` CLI — the engine the manager skill drives,
