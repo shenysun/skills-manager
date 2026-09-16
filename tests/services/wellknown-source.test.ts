@@ -416,6 +416,8 @@ describe('update detection keys on the index digest (ticket AC, ADR-0016)', () =
 
   it('updateSkills reinstalls from the index and moves the registry anchor to the new digest', async () => {
     const { s, site, setIndex, detect } = mutableSite();
+    const previousDigest = s.registry.load().skills.alpha?.source?.upstream_digest;
+    expect(previousDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
     site.alpha = skillMarkdown('alpha', 'an indexed skill, renewed');
     setIndex();
     await detect();
@@ -424,7 +426,12 @@ describe('update detection keys on the index digest (ticket AC, ADR-0016)', () =
 
     expect(updated.updated).toEqual(['alpha']);
     expect(s.registry.load().skills.alpha?.source?.upstream_digest).toBe(sha256(site.alpha));
-    expect(createNodeFileSystem().readText(path.join(root, 'home', 'skills', 'alpha', 'SKILL.md'))).toContain('renewed');
+    // The mirror refreshes with the same write (ADR-0017): the new digest the
+    // registry anchored on is the one the SKILL.md carries.
+    const skillMd = createNodeFileSystem().readText(path.join(root, 'home', 'skills', 'alpha', 'SKILL.md'));
+    expect(skillMd).toContain('renewed');
+    expect(skillMd).toContain(`skills-manager-digest: ${sha256(site.alpha)}\n`);
+    expect(skillMd).not.toContain(previousDigest!);
   });
 
   it('an entry that vanished from the index is skipped, not a false update', async () => {

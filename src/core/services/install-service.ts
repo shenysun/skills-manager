@@ -8,6 +8,7 @@ import type { SourceService } from './source-service.js';
 import type { ViewService } from './view-service.js';
 import type { DistributeService } from './distribute-service.js';
 import type { UrlPayloadFormat } from './url-payload.js';
+import { treeContentSha } from './tree-content-hash.js';
 import { wellknownEntryNameOfSubpath } from './wellknown-index.js';
 
 export class InstallService {
@@ -110,6 +111,15 @@ export class InstallService {
         // dir, so the first segment names the entry.
         ...(source.wellknownDigests
           ? { upstream_digest: source.wellknownDigests[wellknownEntryNameOfSubpath(skill.subpath)] ?? null }
+          : {}),
+        // The url anchor (ADR-0016 content-hash verdict, persisted): hashed
+        // over the checkout's extracted tree — before the mirror projection
+        // legitimately modifies the hub copy (ADR-0017) — so url detection
+        // compares upstream content against upstream content. The mirror
+        // projects this same value into the SKILL.md (US12). Computed here
+        // because reprojectMirrors runs inside ensureEntry below.
+        ...(source.kind === 'url'
+          ? { upstream_content_sha: treeContentSha(this.fs, skill.absoluteDir) }
           : {}),
         // url sources record the download's validators (US-24); every other
         // kind has no http download and stays null.

@@ -14,7 +14,7 @@ import type { SkillSource } from '../../src/core/model/index.js';
 
 const CLI_VERSION = '0.0.0-test';
 
-const gitSource = (patch: Partial<SkillSource> = {}): SkillSource => ({
+const aSource = (patch: Partial<SkillSource> = {}): SkillSource => ({
   type: 'git',
   url: 'https://github.com/monalisa/octocat-skills',
   subpath: 'skills/my-skill',
@@ -26,7 +26,7 @@ const gitSource = (patch: Partial<SkillSource> = {}): SkillSource => ({
 
 describe('mirrorFieldsForSource', () => {
   it('projects the four gh-aligned keys plus the tool identity keys for a git source', () => {
-    expect(mirrorFieldsForSource(gitSource(), CLI_VERSION)).toEqual({
+    expect(mirrorFieldsForSource(aSource(), CLI_VERSION)).toEqual({
       'github-repo': 'https://github.com/monalisa/octocat-skills',
       'github-ref': 'refs/tags/v1.0.0',
       'github-tree-sha': 'tree456',
@@ -38,26 +38,65 @@ describe('mirrorFieldsForSource', () => {
 
   it('mirrors github and marketplace sources with the same shape', () => {
     for (const type of ['github', 'marketplace'] as const) {
-      const fields = mirrorFieldsForSource(gitSource({ type }), CLI_VERSION);
+      const fields = mirrorFieldsForSource(aSource({ type }), CLI_VERSION);
       expect(Object.keys(fields).filter((key) => key.startsWith('github-'))).toHaveLength(4);
     }
   });
 
   it('omits keys whose registry value is null instead of writing empty anchors', () => {
-    const fields = mirrorFieldsForSource(gitSource({ ref: null, upstream_tree: null }), CLI_VERSION);
+    const fields = mirrorFieldsForSource(aSource({ ref: null, upstream_tree: null }), CLI_VERSION);
     expect(fields).not.toHaveProperty('github-ref');
     expect(fields).not.toHaveProperty('github-tree-sha');
     expect(fields['github-repo']).toBeDefined();
   });
 
   it('returns null for source kinds that carry no mirror (ADR-0016 parity)', () => {
-    for (const type of ['local', 'archive', 'url', 'wellknown'] as const) {
-      expect(mirrorFieldsForSource(gitSource({ type }), CLI_VERSION)).toBeNull();
+    for (const type of ['local', 'archive'] as const) {
+      expect(mirrorFieldsForSource(aSource({ type }), CLI_VERSION)).toBeNull();
     }
   });
 
+  it('projects a wellknown source onto own keys: index URL + declared digest, never github-* (US12)', () => {
+    const fields = mirrorFieldsForSource(aSource({
+      type: 'wellknown',
+      url: 'https://example.com/.well-known/agent-skills/index.json',
+      upstream_digest: 'sha256:abc',
+      upstream_tree: null,
+      ref: null,
+    }), CLI_VERSION);
+    expect(fields).toEqual({
+      'skills-manager-source-url': 'https://example.com/.well-known/agent-skills/index.json',
+      'skills-manager-digest': 'sha256:abc',
+      'skills-manager-written-by': 'skills-manager-cli',
+      'skills-manager-version': CLI_VERSION,
+    });
+  });
+
+  it('projects a url source onto own keys: URL + content sha, never github-* (US12)', () => {
+    const fields = mirrorFieldsForSource(aSource({
+      type: 'url',
+      url: 'https://example.com/SKILL.md',
+      upstream_content_sha: 'sha256:def',
+      upstream_tree: null,
+      ref: null,
+    }), CLI_VERSION);
+    expect(fields).toEqual({
+      'skills-manager-source-url': 'https://example.com/SKILL.md',
+      'skills-manager-content-sha': 'sha256:def',
+      'skills-manager-written-by': 'skills-manager-cli',
+      'skills-manager-version': CLI_VERSION,
+    });
+  });
+
+  it('omits non-git anchors whose registry value is null — no empty or fake evidence', () => {
+    const wellknown = mirrorFieldsForSource(aSource({ type: 'wellknown', upstream_digest: null }), CLI_VERSION);
+    expect(wellknown).not.toHaveProperty('skills-manager-digest');
+    const url = mirrorFieldsForSource(aSource({ type: 'url', upstream_content_sha: null }), CLI_VERSION);
+    expect(url).not.toHaveProperty('skills-manager-content-sha');
+  });
+
   it('omits the version identity key when the composition root could not read the version', () => {
-    const fields = mirrorFieldsForSource(gitSource(), null);
+    const fields = mirrorFieldsForSource(aSource(), null);
     expect(fields).not.toHaveProperty('skills-manager-version');
     expect(fields?.['skills-manager-written-by']).toBe('skills-manager-cli');
   });
@@ -85,7 +124,7 @@ describe('injectFrontmatterMirror', () => {
     // ("injects metadata without pin"): our projected block must match them
     // verbatim, including yaml.v3's four-space nesting indent.
     const input = '---\nname: my-skill\ndescription: desc\n---\n# Body\n';
-    const output = injectFrontmatterMirror(input, mirrorFieldsForSource(gitSource(), CLI_VERSION));
+    const output = injectFrontmatterMirror(input, mirrorFieldsForSource(aSource(), CLI_VERSION));
     expect(output).toContain('metadata:\n    github-path: skills/my-skill\n    github-ref: refs/tags/v1.0.0\n    github-repo: https://github.com/monalisa/octocat-skills\n    github-tree-sha: tree456\n');
     expect(output).toContain('# Body');
     expect(output).not.toContain('github-owner');
@@ -94,7 +133,7 @@ describe('injectFrontmatterMirror', () => {
   });
 
   it('matches the repo URL regardless of a .git suffix or tree-rest normalization — the registry value passes through verbatim', () => {
-    const fields = mirrorFieldsForSource(gitSource({ url: 'https://github.com/monalisa/octocat-skills.git' }), CLI_VERSION);
+    const fields = mirrorFieldsForSource(aSource({ url: 'https://github.com/monalisa/octocat-skills.git' }), CLI_VERSION);
     expect(fields['github-repo']).toBe('https://github.com/monalisa/octocat-skills.git');
   });
 
@@ -111,7 +150,7 @@ describe('injectFrontmatterMirror', () => {
       '# Body',
       '',
     ].join('\n');
-    const output = injectFrontmatterMirror(input, mirrorFieldsForSource(gitSource(), CLI_VERSION));
+    const output = injectFrontmatterMirror(input, mirrorFieldsForSource(aSource(), CLI_VERSION));
     expect(output).toContain('allowed-tools: Bash, Read');
     expect(output).toContain('local-path: /home/monalisa/skills/my-skill');
     expect(output).toContain('version: 3');
@@ -125,15 +164,15 @@ describe('injectFrontmatterMirror', () => {
 
   it('replaces owned keys wholesale on reprojection and is idempotent (no diff noise)', () => {
     const input = '---\nname: my-skill\ndescription: desc\n---\n# Body\n';
-    const first = injectFrontmatterMirror(input, mirrorFieldsForSource(gitSource(), CLI_VERSION));
+    const first = injectFrontmatterMirror(input, mirrorFieldsForSource(aSource(), CLI_VERSION));
     const dirtied = first.replace('tree456', 'tampered');
-    const reprojected = injectFrontmatterMirror(dirtied, mirrorFieldsForSource(gitSource(), CLI_VERSION));
+    const reprojected = injectFrontmatterMirror(dirtied, mirrorFieldsForSource(aSource(), CLI_VERSION));
     expect(reprojected).toBe(first);
-    expect(injectFrontmatterMirror(first, mirrorFieldsForSource(gitSource(), CLI_VERSION))).toBe(first);
+    expect(injectFrontmatterMirror(first, mirrorFieldsForSource(aSource(), CLI_VERSION))).toBe(first);
   });
 
   it('creates frontmatter for body-only content the way gh skill does', () => {
-    const output = injectFrontmatterMirror('# Body only\n', mirrorFieldsForSource(gitSource({ ref: 'refs/heads/main' }), CLI_VERSION));
+    const output = injectFrontmatterMirror('# Body only\n', mirrorFieldsForSource(aSource({ ref: 'refs/heads/main' }), CLI_VERSION));
     expect(output.startsWith('---\n')).toBe(true);
     expect(output).toContain('github-ref: refs/heads/main');
     expect(output).toContain('# Body only');
@@ -164,7 +203,7 @@ describe('gh skill contract fixture', () => {
   };
 
   it('projects the four keys onto the fixture, byte-aligned with gh skill (forward contract)', () => {
-    const output = injectFrontmatterMirror(loadFixture(), mirrorFieldsForSource(gitSource(), CLI_VERSION));
+    const output = injectFrontmatterMirror(loadFixture(), mirrorFieldsForSource(aSource(), CLI_VERSION));
     for (const line of GH_WANT_CONTAINS) expect(output).toContain(line);
     expect(output).not.toContain('github-owner');
     expect(output).not.toContain('github-sha');
@@ -172,7 +211,7 @@ describe('gh skill contract fixture', () => {
   });
 
   it('feeds the same projection back through the parser (reverse contract, reader itself is ticket 05)', () => {
-    const output = injectFrontmatterMirror(loadFixture(), mirrorFieldsForSource(gitSource(), CLI_VERSION));
+    const output = injectFrontmatterMirror(loadFixture(), mirrorFieldsForSource(aSource(), CLI_VERSION));
     const reparsed = parseSkillFrontmatter(output);
     const metadata = reparsed.data.metadata as Record<string, string>;
     expect(metadata['github-repo']).toBe('https://github.com/monalisa/octocat-skills');

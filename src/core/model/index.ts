@@ -40,6 +40,16 @@ export type SkillSource = {
    */
   upstream_digest?: string | null;
   /**
+   * Content sha of the url source's extracted tree at install (ADR-0016's
+   * content-hash verdict made an explicit anchor) — the third parallel to
+   * `upstream_tree`/`upstream_digest`. The hub tree legitimately differs from
+   * the upstream tree by the frontmatter mirror bytes (ADR-0017), so the
+   * hub-side fingerprint can no longer serve as the comparison side; url
+   * detection compares against this anchor instead, and legacy rows adopt it
+   * on their first no-update re-check. Absent/null for every other kind.
+   */
+  upstream_content_sha?: string | null;
+  /**
    * ETag / Last-Modified the server sent with the last full download of a url
    * source (spec US-24, ADR-0016) — the cheap pre-check's comparison side.
    * Deliberately NOT an update anchor: the content hash decides, these only

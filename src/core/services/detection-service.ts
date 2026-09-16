@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { execFile as execFileCb } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -7,6 +6,7 @@ import { DEFAULT_DOWNLOAD_REQUEST, unconfiguredHttpDownload, type DownloadHeader
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { SkillSource, SourceCheckout } from '../model/index.js';
 import { REGISTERED_SOURCE_RECHECK, parseGitHubRepoRef, type CheckoutOptions } from './source-service.js';
+import { treeContentSha } from './tree-content-hash.js';
 import { wellknownEntryNameOfSubpath, type FetchedWellknownIndex } from './wellknown-index.js';
 import { appendDetectionFailure } from './detection-log.js';
 export { detectionLogPath } from './detection-log.js';
@@ -116,7 +116,7 @@ export class DetectionService {
       if (source.type === 'local') {
         try {
           const sourceDir = path.resolve(source.url, source.subpath);
-          const sourceHash = this.hashTree(fs, sourceDir);
+          const sourceHash = treeContentSha(fs, sourceDir);
           if (sourceHash === null) throw new Error(`local source directory is missing: ${sourceDir}`);
           outcomes.set(skill.name, { detection: 'ok', hasUpdate: sourceHash !== services.distribute.fingerprint(skill.name) });
         } catch (error) {
@@ -205,13 +205,18 @@ export class DetectionService {
    *  ETag / Last-Modified against the validators the last confirmed sync
    *  recorded — unchanged headers skip the payload download and judge "no
    *  update"; changed or absent headers force a re-download through the very
-   *  same source dispatch install uses, where the extracted content hash vs
-   *  the installed fingerprint is the only verdict that matters (the ETag is
-   *  a bandwidth economy, never an anchor). A probe failure is not a verdict:
-   *  it falls through to the re-download (some servers refuse HEAD), whose own
-   *  failure keeps the failed visibility. Validators recalibrate only when the
-   *  content hash confirms "no update" — a detected update must stay detected
-   *  on every later probe until an install actually moves the content. */
+   *  same source dispatch install uses, where the extracted content hash is
+   *  the only verdict that matters (the ETag is a bandwidth economy, never an
+   *  anchor). The comparison side is the persisted `upstream_content_sha`
+   *  anchor — the hub tree legitimately differs from upstream by the
+   *  frontmatter mirror bytes (ADR-0017), so the hub fingerprint no longer
+   *  compares; rows predating the anchor (no mirror ever written) keep the
+   *  fingerprint verdict. A probe failure is not a verdict: it falls through
+   *  to the re-download (some servers refuse HEAD), whose own failure keeps
+   *  the failed visibility. Validators — and a missing anchor — recalibrate
+   *  only when the content hash confirms "no update": a detected update must
+   *  stay detected on every later probe until an install actually moves the
+   *  content. */
   private detectUrlSource(
     services: DetectionServices,
     name: string,
@@ -233,10 +238,18 @@ export class DetectionService {
         return;
       }
       services.source.withCheckout(source.url!, undefined, (checkout) => {
-        const upstreamHash = this.hashTree(fs, path.join(checkout.repoDir, source.subpath!));
+        const upstreamHash = treeContentSha(fs, path.join(checkout.repoDir, source.subpath!));
         if (upstreamHash === null) throw new Error(`url source no longer materializes ${source.subpath}`);
-        const hasUpdate = upstreamHash !== services.distribute.fingerprint(name);
-        if (!hasUpdate) this.calibrateHttpValidators(services, name, checkout.httpHeaders);
+        const hasUpdate = source.upstream_content_sha
+          ? upstreamHash !== source.upstream_content_sha
+          : upstreamHash !== services.distribute.fingerprint(name);
+        if (!hasUpdate) {
+          this.calibrateHttpValidators(services, name, checkout.httpHeaders);
+          // Evidence-is-calibration (ADR-0013 posture): a legacy row that just
+          //  proved "no update" adopts the observed hash as its anchor — and
+          //  the registry write lands the mirror with it. No migration command.
+          if (!source.upstream_content_sha) services.registry.editSafeFields(name, { source: { upstream_content_sha: upstreamHash } });
+        }
         outcomes.set(name, { detection: 'ok', hasUpdate });
       }, REGISTERED_SOURCE_RECHECK);
     } catch (error) {
@@ -288,31 +301,6 @@ export class DetectionService {
    *  and only the skill's own row is touched. */
   private calibrateHttpValidators(services: DetectionServices, skill: string, headers?: DownloadHeaders) {
     services.registry.editSafeFields(skill, { source: { upstream_etag: headers?.etag ?? null, upstream_last_modified: headers?.lastModified ?? null } });
-  }
-
-  /** Mirrors DistributeService.fingerprint's tree hashing so equal trees compare equal.
-   *  Drift is caught behaviourally: dashboard-state tests require hasUpdate=false
-   *  on a fresh install, which only holds while both algorithms agree. */
-  private hashTree(fs: FileSystemPort, root: string): string | null {
-    if (fs.kind(root) !== 'directory') return null;
-    const hash = createHash('sha256');
-    const walk = (prefix: string) => {
-      const dir = prefix ? path.join(root, prefix) : root;
-      for (const entry of fs.readDirectory(dir).sort((a, b) => a.name.localeCompare(b.name))) {
-        const relative = prefix ? path.join(prefix, entry.name) : entry.name;
-        const full = path.join(root, relative);
-        const kind = fs.kind(full);
-        hash.update(relative);
-        hash.update('\0');
-        hash.update(kind);
-        hash.update('\0');
-        if (kind === 'file') hash.update(fs.readText(full));
-        else if (kind === 'symlink') hash.update(fs.readlink(full));
-        if (entry.kind === 'directory') walk(relative);
-      }
-    };
-    walk('');
-    return `sha256:${hash.digest('hex')}`;
   }
 
   /** Detection-as-calibration (ADR-0013): an uncalibrated entry (`upstream_tree`

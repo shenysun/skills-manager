@@ -5,6 +5,7 @@ import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, isLegacyConsumer, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
 import type { FrontmatterMirrorService } from './frontmatter-mirror.js';
+import { treeContentSha } from './tree-content-hash.js';
 
 export class RegistryService {
   constructor(
@@ -97,9 +98,26 @@ export class RegistryService {
     for (const item of items) {
       skills[item.skill] = this.defaultEntry(item.skill, { ...(skills[item.skill] || {}), ...item.patch });
     }
+    this.captureUrlContentAnchors(skills, items);
     this.save({ skills });
     this.reprojectMirrors(skills, items);
     return items.map((item) => skills[item.skill]);
+  }
+
+  /** Pre-mirror anchor capture (ADR-0016/0017): a url-kind row's implicit
+   *  update anchor used to be the hub fingerprint — the frontmatter mirror
+   *  projection below changes the hub tree, so the anchor must be made
+   *  explicit BEFORE any write point projects. Rows that already carry an
+   *  anchor (every install/update since ADR-0017) pass through untouched;
+   *  installs provide the authoritative upstream hash themselves, so this only
+   *  heals legacy rows whose tree has not yet been mirrored. */
+  private captureUrlContentAnchors(skills: Registry['skills'], items: ReadonlyArray<{ skill: SkillName }>) {
+    for (const item of items) {
+      const entry = skills[item.skill];
+      if (entry.source?.type !== 'url' || entry.source.upstream_content_sha) continue;
+      const anchor = treeContentSha(this.fs, this.skillDir(item.skill));
+      if (anchor) entry.source = { ...entry.source, upstream_content_sha: anchor };
+    }
   }
 
   /** ADR-0017: the registry is the source of truth and the SKILL.md

@@ -238,6 +238,38 @@ describe('DetectionService url sources — ETag pre-check, content-hash verdict 
     expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
   });
 
+  it('a legacy row without the content-sha anchor adopts it on its first no-update re-check — and the registry write lands the mirror with it (ADR-0017)', async () => {
+    const { s, detection, bundle } = urlServices();
+    // Pre-mirror era row: hub skill + registry.yaml written by hand — going
+    // through ensureEntry would already reproject the mirror, so the row is
+    // laid down exactly as a pre-ADR-0017 install left it (no mirror, no anchor).
+    const dir = path.join(root, 'home', 'skills', 'alpha');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'SKILL.md'), skillMarkdown('alpha', 'a url skill'));
+    writeFileSync(path.join(root, 'home', 'registry.yaml'), [
+      'skills:',
+      '  alpha:',
+      '    path: skills/alpha',
+      '    title: alpha',
+      '    category: experimental',
+      '    tags: []',
+      '    consumers: []',
+      "    source: {type: url, url: 'https://example.com/SKILL.md', subpath: skills/alpha, ref: null, upstream_commit: null, upstream_tree: null, upstream_etag: '\"v1\"', upstream_last_modified: null}",
+      '    update_policy: manual',
+      '    description: a url skill',
+      '',
+    ].join('\n'));
+    serving.headers = { etag: '"rotated"' };
+
+    const outcomes = await detectUrl(detection, bundle);
+
+    expect(outcomes.get('alpha')).toEqual({ detection: 'ok', hasUpdate: false });
+    const source = s.registry.load().skills.alpha?.source;
+    expect(source?.upstream_content_sha).toMatch(/^sha256:[0-9a-f]{64}$/);
+    // The calibration is itself a write point: the mirror appears in the same motion.
+    expect(readFileSync(path.join(dir, 'SKILL.md'), 'utf8')).toContain('skills-manager-content-sha:');
+  });
+
   it('server sends no validators — every round re-downloads and compares the hash', async () => {
     const { s, detection, bundle, http } = urlServices();
     installUrl(s);

@@ -17,8 +17,10 @@ import { MANAGER_SKILL_NAME } from './manager-skill-service.js';
  */
 
 /** Registry source types whose evidence gets a mirror. ADR-0016 parity:
- *  archive/local stay mirror-free (no update eligibility, no fake evidence). */
-const MIRRORED_SOURCE_TYPES = new Set(['git', 'github', 'marketplace']);
+ *  archive/local stay mirror-free (no update eligibility, no fake evidence).
+ *  wellknown/url join with own-namespace keys (ADR-0017): their evidence is
+ *  portable exactly like git's, but never under fake `github-*` names. */
+const MIRRORED_SOURCE_TYPES = new Set(['git', 'github', 'marketplace', 'wellknown', 'url']);
 
 /** Skills that never mirror regardless of source. The seeded manager skill
  *  keys its ADR-0014 refresh protocol on the exact tree the bundle laid down
@@ -38,16 +40,26 @@ const TOOL_IDENTITY = 'skills-manager-cli';
 export type FrontmatterMirrorFields = Record<string, string>;
 
 /** The mirror fields a source's evidence projects to — null when the source
- *  kind carries no mirror at all. Null-valued registry fields are omitted
- *  rather than written as empty anchors; a null cliVersion (version unreadable
- *  at the composition root) omits the version identity key. */
+ *  kind carries no mirror at all. Git-like kinds speak gh skill's `github-*`
+ *  vocabulary; wellknown/url speak `skills-manager-*` only (index URL +
+ *  declared digest, download URL + content sha — US12). Null-valued registry
+ *  fields are omitted rather than written as empty anchors; a null cliVersion
+ *  (version unreadable at the composition root) omits the version identity
+ *  key. */
 export function mirrorFieldsForSource(source: SkillSource, cliVersion: string | null): FrontmatterMirrorFields | null {
-  if (!MIRRORED_SOURCE_TYPES.has(source.type ?? 'local')) return null;
+  const type = source.type ?? 'local';
+  if (!MIRRORED_SOURCE_TYPES.has(type)) return null;
   const fields: FrontmatterMirrorFields = {};
-  if (source.url) fields['github-repo'] = source.url;
-  if (source.ref) fields['github-ref'] = source.ref;
-  if (source.upstream_tree) fields['github-tree-sha'] = source.upstream_tree;
-  if (source.subpath) fields['github-path'] = source.subpath;
+  if (type === 'wellknown' || type === 'url') {
+    if (source.url) fields['skills-manager-source-url'] = source.url;
+    if (source.upstream_digest) fields['skills-manager-digest'] = source.upstream_digest;
+    if (source.upstream_content_sha) fields['skills-manager-content-sha'] = source.upstream_content_sha;
+  } else {
+    if (source.url) fields['github-repo'] = source.url;
+    if (source.ref) fields['github-ref'] = source.ref;
+    if (source.upstream_tree) fields['github-tree-sha'] = source.upstream_tree;
+    if (source.subpath) fields['github-path'] = source.subpath;
+  }
   fields['skills-manager-written-by'] = TOOL_IDENTITY;
   if (cliVersion) fields['skills-manager-version'] = cliVersion;
   return fields;

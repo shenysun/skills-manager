@@ -107,7 +107,14 @@ describe('url sources join the update flow (source-formats ticket 05)', () => {
     // compares against what this install actually downloaded).
     expect(entry?.description).toBe('a url skill');
     expect(entry?.source?.upstream_etag).toBe('"v2"');
-    expect(createNodeFileSystem().readText(path.join(root, 'home', 'skills', 'alpha', 'SKILL.md'))).toBe(skillMarkdown('alpha', 'a url skill, renewed'));
+    // The payload refreshes and carries the frontmatter mirror (ADR-0017): the
+    // served body plus the projected provenance block — the mirror rides the
+    // same install, never a second pass.
+    expect(entry?.source?.upstream_content_sha).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const skillMd = createNodeFileSystem().readText(path.join(root, 'home', 'skills', 'alpha', 'SKILL.md'));
+    expect(skillMd).toContain('a url skill, renewed');
+    expect(skillMd).toContain(`skills-manager-content-sha: ${entry?.source?.upstream_content_sha}\n`);
+    expect(skillMd).toContain('skills-manager-source-url: https://example.com/SKILL.md\n');
     expect(entry?.source?.type).toBe('url');
     expect(entry?.source?.subpath).toBe('skills/alpha');
   });
