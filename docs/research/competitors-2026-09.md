@@ -176,7 +176,7 @@
 - **每月一次**：扫 `vercel-labs/skills` release notes、`gh` release notes、`numman-ali/openskills` releases、Anthropic 官方 changelog。
 - **每季度一次**：重读本文件，校准第一对手 + 差异化护城河清单。
 - **触发性**：若 `obra/superpowers` 或 Anthropic 官方宣布「跨 agent distribute」特性，立即更新第 5 节。
-- **新进入者观察清单**（2026-08/09 密集出现，详见 deep-dive §9）：`withastro/rosie`（Astro 团队，「npm but for skills」，lockfile + typed JS API）、`loopdoop/skl`（闭源单二进制，多机精确重建）、`skillfish`（317★）、`TanStack/intent`（331★）、`skillcoffer`（save/restore 不可变存档 + 上游 diff 审查）、`skls-mgr`（集中目录 + skills.sh 命令替换兼容）、`skills.sh` 自建 CLI 动向、`Agent Skills` 规范的官方 reference tool 动向。
+- **新进入者观察清单**（2026-08/09 密集出现，详见 deep-dive §9）：`withastro/rosie`（Astro 团队，「npm but for skills」，lockfile + typed JS API）、`loopdoop/skl`（闭源单二进制，多机精确重建）、`skillfish`（317★）、`TanStack/intent`（331★）、`skillcoffer`（save/restore 不可变存档 + 上游 diff 审查）、`skls-mgr`（集中目录 + skills.sh 命令替换兼容）、`skills.sh` 自建 CLI 动向、`Agent Skills` 规范的官方 reference tool 动向。**2026-09-16 SEO 基线测量补充**（npm search 发现）：`@tc9011/skills-manager`（skills 备份/恢复到 GitHub，正对多机同步方向）、`skills-manager-mcp`（MCP server + CLI 双形态，v1.12.0）、`skills-npm`（antfu，npm 分发路线的实际 CLI，WIP）、`ai-skills-manager`（lwndev）、bluelibs `npm-skills`；另注意 npm 包名 `skills-manager` 被 0.0.7 占位包占据。
 
 ## 引用源
 
