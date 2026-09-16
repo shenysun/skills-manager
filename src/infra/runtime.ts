@@ -22,6 +22,22 @@ export function projectRootFromImportMeta(metaUrl: string) {
   return path.resolve(path.dirname(fileURLToPath(metaUrl)), '..', '..');
 }
 
+/**
+ * The version the frontmatter mirror stamps as its writer identity — read
+ * from THIS package's own root (src/infra or dist/infra both resolve two
+ * levels up to it), never from the operator's project: stamping a foreign
+ * version would corrupt the "who wrote this evidence" claim (US14). An
+ * unreadable package.json degrades to null (version key omitted), never a
+ * crash at the composition root.
+ */
+function ownCliVersion(fs: NodeFileSystem): string | null {
+  try {
+    return (JSON.parse(fs.readText(path.join(projectRootFromImportMeta(import.meta.url), 'package.json'))) as { version: string }).version;
+  } catch {
+    return null;
+  }
+}
+
 export function createRuntimeServices(options: RuntimeOptions = {}, projectRoot = process.cwd()) {
   const fs = new NodeFileSystem();
   const resolver = new SkillHomeResolver(fs);
@@ -30,7 +46,8 @@ export function createRuntimeServices(options: RuntimeOptions = {}, projectRoot 
   const processRunner = new ShellRunner();
   const env = options.env || process.env;
   const userHome = options.userHome || env.SKILLS_MANAGER_USER_HOME;
-  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome, env: options.env, catalogSnapshot: options.catalogSnapshot, http: new HttpDownloadClient() });
+  const cliVersion = ownCliVersion(fs);
+  const services = createCoreServices({ skillHomeRoot: resolution.root, projectRoot, fs, git, processRunner, userHome, env: options.env, catalogSnapshot: options.catalogSnapshot, http: new HttpDownloadClient(), cliVersion });
   if (options.ensureDefaultHub) services.skillHome.ensure();
   return { ...services, resolution } satisfies ReturnType<typeof createCoreServices> & { resolution: SkillHomeResolution };
 }

@@ -19,6 +19,7 @@ import { InitService } from './init-service.js';
 import { BackupService } from './backup-service.js';
 import { SkillLockService } from './skill-lock-service.js';
 import { ProvenanceService } from './provenance-service.js';
+import { FrontmatterMirrorService } from './frontmatter-mirror.js';
 import { ManagerSkillService } from './manager-skill-service.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
@@ -39,6 +40,9 @@ export type CoreServicesOptions = {
   catalogSnapshot?: CatalogSnapshot;
   /** Direct-download transport for url/wellknown sources; production wiring always injects the real adapter. */
   http?: HttpDownloadPort;
+  /** CLI version stamped into the frontmatter mirror's identity keys — null
+   *  when the composition root could not read it (version key omitted). */
+  cliVersion: string | null;
 };
 
 export function createCoreServices(options: CoreServicesOptions) {
@@ -56,7 +60,7 @@ export function createCoreServices(options: CoreServicesOptions) {
   const views = new ViewService(options.fs, home, registry);
   const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot, env: options.env, userHomeDir: options.userHome });
   const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);
-  const install = new InstallService(options.fs, home, registry, source, views, distribute);
+  const install = new InstallService(options.fs, home, registry, source, views, distribute, new FrontmatterMirrorService(options.fs, options.cliVersion));
   const update = new UpdateService(registry, source, install);
   const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog);
   const activity = new ActivityService(options.fs, options.git, home);
