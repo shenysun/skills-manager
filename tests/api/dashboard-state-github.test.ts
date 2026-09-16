@@ -291,3 +291,85 @@ describe('GET /api/state detection failure visibility (ticket 06: explicit state
     expect(state.updateCount).toBe(1);
   });
 });
+
+describe('calibration backfills the frontmatter mirror (provenance-get ticket 04, ADR-0017 / US5)', () => {
+  function installedSkillMd(name = 'alpha') {
+    return readFileSync(path.join(home, 'skills', name, 'SKILL.md'), 'utf8');
+  }
+
+  /** A pre-ADR-0017 legacy row: github source, no anchor, no mirror — the
+   *  hand-laid shape a pre-mirror install left behind (US5's 存量 skill). The
+   *  subpath derives from the skill name (skills/<name>) so the two can never
+   *  drift apart at a call site. */
+  function legacyGithubRow(skill = 'alpha') {
+    setGitSource(skill, { type: 'git', url: REPO_URL, subpath: `skills/${skill}`, ref: null, upstream_commit: 'c0', upstream_tree: null });
+  }
+
+  it('calibrates upstream_tree and lands the mirror in the same motion — registry and SKILL.md agree 1:1', async () => {
+    legacyGithubRow();
+    responder = () => repoTree('c0', { 'skills/alpha': 't-alpha' });
+
+    const state = await getState();
+
+    expect(rowOf(state, 'alpha').hasUpdate).toBe(false);
+    expect(readRegistry().skills.alpha.source?.upstream_tree).toBe('t-alpha');
+    const mirror = installedSkillMd();
+    expect(mirror).toContain(`github-repo: ${REPO_URL}\n`);
+    expect(mirror).toContain(`github-tree-sha: t-alpha\n`);
+    expect(mirror).toContain('github-path: skills/alpha\n');
+    expect(mirror).toContain('skills-manager-written-by: skills-manager-cli\n');
+  });
+
+  it('calibrates the whole legacy cohort in one detection round — one tree fetch, both mirrors land (wave compressed to a single batch)', async () => {
+    legacyGithubRow('alpha');
+    legacyGithubRow('beta');
+    responder = () => repoTree('c0', { 'skills/alpha': 't-alpha', 'skills/beta': 't-beta' });
+
+    const state = await getState();
+
+    // One fan-in fetch calibrated both rows in this single run.
+    expect(calls).toEqual([{ owner: 'acme', repo: 'skills', ref: 'HEAD' }]);
+    expect(readRegistry().skills.alpha.source?.upstream_tree).toBe('t-alpha');
+    expect(readRegistry().skills.beta.source?.upstream_tree).toBe('t-beta');
+    expect(installedSkillMd('alpha')).toContain('github-tree-sha: t-alpha\n');
+    expect(installedSkillMd('beta')).toContain('github-tree-sha: t-beta\n');
+    expect(state.updateCount).toBe(0);
+  });
+
+  it('never regresses an already-correct mirror: calibration only adds the missing tree-sha, then rewrites nothing', async () => {
+    legacyGithubRow();
+    responder = () => repoTree('c0', { 'skills/alpha': 't-alpha' });
+    // A previous write point projected the source before any anchor existed
+    // (the `edit --source-*` shape): a correct mirror minus the tree-sha.
+    const dir = path.join(home, 'skills', 'alpha');
+    writeFileSync(path.join(dir, 'SKILL.md'), [
+      '---',
+      'name: alpha',
+      'title: alpha',
+      'description: alpha',
+      'metadata:',
+      `    github-repo: ${REPO_URL}`,
+      '    github-path: skills/alpha',
+      '    skills-manager-written-by: skills-manager-cli',
+      '---',
+      '# alpha',
+      '',
+    ].join('\n'));
+
+    await getState();
+
+    const calibrated = installedSkillMd();
+    // The missing anchor grew; everything already correct stayed put.
+    expect(calibrated).toContain('github-tree-sha: t-alpha\n');
+    expect(calibrated).toContain(`github-repo: ${REPO_URL}\n`);
+    expect(calibrated).toContain('github-path: skills/alpha\n');
+    expect(calibrated.match(/skills-manager-written-by/g)).toHaveLength(1);
+
+    // Consecutive detections rewrite nothing: registry and SKILL.md are byte-stable.
+    const registryBefore = readFileSync(registryFile(), 'utf8');
+    const second = await getState();
+    expect(readFileSync(registryFile(), 'utf8')).toBe(registryBefore);
+    expect(installedSkillMd()).toBe(calibrated);
+    expect(rowOf(second, 'alpha').hasUpdate).toBe(false);
+  });
+});
