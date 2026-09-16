@@ -3,6 +3,17 @@ import YAML from 'yaml';
 import { SkillsManagerError } from './errors.js';
 import { LEGACY_CONSUMERS, type RegistryEntry } from '../core/model/index.js';
 
+/** Non-throwing twin of assertSafeSkillName — for callers that treat an unsafe
+ *  name as an ordinary miss (the reference layer's name resolution). */
+export function isSafeSkillName(name: string): boolean {
+  try {
+    assertSafeSkillName(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function assertSafeSkillName(name: string): asserts name is string {
   if (!name || name === '.' || name === '..') throw new SkillsManagerError('invalid_skill_name', `Invalid skill name: ${name}`);
   if (name.includes('/') || name.includes('\\')) throw new SkillsManagerError('invalid_skill_name', `Skill name must not contain path separators: ${name}`);

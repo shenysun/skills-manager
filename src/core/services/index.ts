@@ -21,6 +21,7 @@ import { SkillLockService } from './skill-lock-service.js';
 import { ProvenanceService } from './provenance-service.js';
 import { FrontmatterMirrorService } from './frontmatter-mirror.js';
 import { FrontmatterEvidenceService } from './frontmatter-evidence.js';
+import { GetService } from './get-service.js';
 import { ManagerSkillService } from './manager-skill-service.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
@@ -79,8 +80,9 @@ export function createCoreServices(options: CoreServicesOptions) {
   const init = new InitService(options.fs, home, skillHome, registry, distribute, catalog, backups, skillLock, frontmatterEvidence);
   const provenance = new ProvenanceService(registry, skillLock, frontmatterEvidence);
   const managerSkill = new ManagerSkillService(options.fs, registry, distribute, views);
+  const get = new GetService(options.fs, home, registry);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, package: packageService };
+  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, get, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
@@ -107,4 +109,6 @@ export { FrontmatterEvidenceService, frontmatterToSource } from './frontmatter-e
 export { ManagerSkillService, MANAGER_SKILL_NAME, compareDateVersions } from './manager-skill-service.js';
 export type { ManagerSkillBundle, ManagerSkillSeedStatus, ManagerSkillSeedResult } from './manager-skill-service.js';
 export { BackupService } from './backup-service.js';
+export { GetService } from './get-service.js';
+export type { GetTarget } from './get-service.js';
 export type { BackupInfo } from './backup-service.js';

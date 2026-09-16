@@ -371,6 +371,28 @@ program.command('list')
     })));
   });
 
+// The reference layer (ADR-0017): a zero-retention read channel. Raw stdout
+// under the `status` human-readable precedent — never JSON `print` — so agents
+// can pipe the skill body; the archived notice rides stderr to keep stdout
+// byte-exact. No borrow/cleanup lifecycle.
+program.command('get')
+  .description("Print a hub skill's full SKILL.md to stdout (zero-retention read; provenance evidence rides the frontmatter)")
+  .argument('<skill>')
+  .option('--path', 'print the canonical hub directory (absolute) for read-only borrowing of sibling files, instead of the file body')
+  .action((skill, opts, cmd) => {
+    const s = services(cmd);
+    const target = s.get.resolve(skill);
+    const archivedNotice = `Note: ${skill} is archived — still readable; it only left the management plane (updates, distribution).`;
+    if (opts.path) {
+      console.log(target.dir);
+      console.log('Read-only borrow: do not write into this directory — the hub is canonical; changes go through skills-manager commands.');
+      if (target.archived) console.log(archivedNotice);
+      return;
+    }
+    if (target.archived) console.error(archivedNotice);
+    process.stdout.write(s.get.read(target));
+  });
+
 program.command('add')
   .description('Discover from a source, then install selected skills')
   .argument('<source>', 'Git URL, GitHub owner/repo, GitHub tree URL, local path, local .zip archive, or http(s) URL of a single SKILL.md / zip / tar archive')
