@@ -7,11 +7,11 @@
 
 - **#1 SEO / 命名防御**（2026-09-16 完成）：README 双语定位区分（vs xingkongliang 桌面版）+ 五条差异化主张；package.json description/keywords 重写。
   - **待复测检查点**：npm 索引随下次发版生效后，`npm search skills-manager --searchlimit=10` 对比基线（2026-09-16 测得 **9/10**，根因旧 keywords 缺字面词）；`npm view skills-manager-cli keywords` 确认上线。
+- **#2 Frontmatter 便携 provenance + #3 引用层 `get`**（2026-09-17 完成，feature `provenance-get`）：打包一张特性票交付（7 张实施票，QA 27/27 场景 0 缺陷，commits c5d5669…bd44dad）。裁定见 **ADR-0017**（registry 是 SoT、frontmatter 单向投影、五写入点闭口、git 源逐字对齐 gh skill `metadata.github-*` 四键换互认、frontmatter 优先 lockfile 兜底、证据即校准、fingerprint 不豁免）；`get` v1 hub-only、完整 SKILL.md stdout、`--path` 只读借目录。遗留：marketplace 写入点无 install seam 实测（纯函数层已覆盖）。
 
 ## 第一梯队（下一个特性，建议打包一张票）
 
-- **#2 Frontmatter 便携 provenance**：把 tree-SHA 锚点（ADR-0013/0016）从 registry 镜像到 SKILL.md frontmatter，与 `gh skill` 装出的 skill 互认更新；import/provenance adopt 反向读取 frontmatter 证据（比 lockfile 更普适）。需要新 ADR 裁定「registry 是 source of truth，frontmatter 是便携镜像」的写入时机与字段。
-- **#3 引用层 `skills-manager get <name>`**：hub 内 skill 不分发也能被 agent 零留存读取（stdout / `--path` 借整目录），manager skill 直接暴露。参照 `asm get`（deep-dive §3）。
+（已清空——原 #2/#3 已完成，下一批从第二梯队 #4/#5 取。）
 
 ## 第二梯队
 
