@@ -48,7 +48,10 @@ export type CoreServicesOptions = {
 export function createCoreServices(options: CoreServicesOptions) {
   const home = createSkillHome(options.skillHomeRoot);
   const skillHome = new SkillHomeService(options.fs, home);
-  const registry = new RegistryService(options.fs, home);
+  // The mirror hangs off the registry: every registry write reprojects the
+  // persisted source evidence into SKILL.md frontmatter (ADR-0017).
+  const mirror = new FrontmatterMirrorService(options.fs, options.cliVersion);
+  const registry = new RegistryService(options.fs, home, mirror);
   const source = new SourceService(
     options.fs,
     options.git,
@@ -60,7 +63,7 @@ export function createCoreServices(options: CoreServicesOptions) {
   const views = new ViewService(options.fs, home, registry);
   const catalog = new CatalogService(options.fs, home, { snapshot: options.catalogSnapshot, env: options.env, userHomeDir: options.userHome });
   const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);
-  const install = new InstallService(options.fs, home, registry, source, views, distribute, new FrontmatterMirrorService(options.fs, options.cliVersion));
+  const install = new InstallService(options.fs, home, registry, source, views, distribute);
   const update = new UpdateService(registry, source, install);
   const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog);
   const activity = new ActivityService(options.fs, options.git, home);

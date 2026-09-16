@@ -4,9 +4,14 @@ import { type Registry, type RegistryEntry, type Skill, type SkillName, type Ski
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, isLegacyConsumer, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
+import type { FrontmatterMirrorService } from './frontmatter-mirror.js';
 
 export class RegistryService {
-  constructor(private readonly fs: FileSystemPort, private readonly home: SkillHome) {}
+  constructor(
+    private readonly fs: FileSystemPort,
+    private readonly home: SkillHome,
+    private readonly mirror: FrontmatterMirrorService,
+  ) {}
 
   load(): Registry {
     if (!this.fs.exists(this.home.registryFile)) return { skills: {} };
@@ -33,8 +38,12 @@ export class RegistryService {
     return dir;
   }
 
+  skillMdPath(skill: SkillName) {
+    return path.join(this.skillDir(skill), 'SKILL.md');
+  }
+
   skillExists(skill: SkillName) {
-    return this.fs.kind(path.join(this.skillDir(skill), 'SKILL.md')) === 'file';
+    return this.fs.kind(this.skillMdPath(skill)) === 'file';
   }
 
   listCanonicalSkills(): SkillName[] {
@@ -89,7 +98,26 @@ export class RegistryService {
       skills[item.skill] = this.defaultEntry(item.skill, { ...(skills[item.skill] || {}), ...item.patch });
     }
     this.save({ skills });
+    this.reprojectMirrors(skills, items);
     return items.map((item) => skills[item.skill]);
+  }
+
+  /** ADR-0017: the registry is the source of truth and the SKILL.md
+   *  frontmatter its portable one-way mirror — every entry persisted through
+   *  ensureEntries reprojects its source evidence into the skill file. This
+   *  is the single choke point behind all five source write points (install
+   *  / update / edit --source-* / provenance adopt / detection calibration),
+   *  and it also rides title/category edits, where an unchanged source makes
+   *  it an idempotent no-op. Reprojection follows save deliberately: if it
+   *  fails the SoT is intact and the mirror heals at the next write point.
+   *  Mirror-less kinds (archive/local), missing files, and the seeded
+   *  manager skill stay untouched; a dirty mirror never survives a write
+   *  (US11). */
+  private reprojectMirrors(skills: Registry['skills'], items: ReadonlyArray<{ skill: SkillName }>) {
+    for (const item of items) {
+      const source = skills[item.skill]?.source;
+      if (source) this.mirror.projectForSkill(item.skill, this.skillMdPath(item.skill), source);
+    }
   }
 
   removeEntry(skill: SkillName) {

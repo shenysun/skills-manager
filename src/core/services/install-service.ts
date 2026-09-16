@@ -8,7 +8,6 @@ import type { SourceService } from './source-service.js';
 import type { ViewService } from './view-service.js';
 import type { DistributeService } from './distribute-service.js';
 import type { UrlPayloadFormat } from './url-payload.js';
-import type { FrontmatterMirrorService } from './frontmatter-mirror.js';
 import { wellknownEntryNameOfSubpath } from './wellknown-index.js';
 
 export class InstallService {
@@ -19,7 +18,6 @@ export class InstallService {
     private readonly source: SourceService,
     private readonly views: ViewService,
     private readonly distribute?: DistributeService,
-    private readonly mirror?: FrontmatterMirrorService,
   ) {}
 
   planInstall(sourceCheckout: SourceCheckout, discovered: DiscoveredSkill[], selectors: readonly string[], consumerValues?: readonly string[], options: { overwrite?: boolean } = {}): InstallPlan {
@@ -120,9 +118,9 @@ export class InstallService {
       },
       description: skill.description,
     });
-    // Registry is the SoT: project the freshly persisted source evidence into
-    // the installed SKILL.md's frontmatter before anything fingerprints it
-    // (ADR-0017 — the mirror rides the same install, no second pass).
-    if (entry.source) this.mirror?.project(path.join(destination, 'SKILL.md'), entry.source);
+    // The mirror projection rides ensureEntry itself (ADR-0017): the registry
+    // write reprojects the SKILL.md frontmatter before anything fingerprints
+    // or redistributes it — install needs no second pass of its own.
+    return entry;
   }
 }

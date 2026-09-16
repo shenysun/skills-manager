@@ -1,6 +1,7 @@
 import YAML from 'yaml';
-import type { SkillSource } from '../model/index.js';
+import type { SkillName, SkillSource } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
+import { MANAGER_SKILL_NAME } from './manager-skill-service.js';
 
 /**
  * Frontmatter provenance mirror (ADR-0017): SKILL.md frontmatter `metadata:`
@@ -18,6 +19,13 @@ import type { FileSystemPort } from '../ports/filesystem.js';
 /** Registry source types whose evidence gets a mirror. ADR-0016 parity:
  *  archive/local stay mirror-free (no update eligibility, no fake evidence). */
 const MIRRORED_SOURCE_TYPES = new Set(['git', 'github', 'marketplace']);
+
+/** Skills that never mirror regardless of source. The seeded manager skill
+ *  keys its ADR-0014 refresh protocol on the exact tree the bundle laid down
+ *  (baseline_hash): a post-laydown mirror write would flip it to user-managed
+ *  at the next self-check. It is the tool itself on a bundle-version refresh
+ *  channel, not an operator install from a source. */
+const UNMIRRORED_SKILLS = new Set([MANAGER_SKILL_NAME]);
 
 /** Frontmatter namespaces this tool owns inside `metadata:` — reprojection
  *  replaces these wholesale and never touches any other key. */
@@ -101,13 +109,31 @@ export class FrontmatterMirrorService {
     private readonly cliVersion: string | null,
   ) {}
 
-  /** Reproject one skill file. Returns whether this source carries a mirror. */
+  /** Reproject one skill file. Returns whether this source carries a mirror.
+   *  A structurally broken frontmatter (hand-mangled YAML) is skipped, not
+   *  fatal: reprojection cannot reconstruct such a document safely, and the
+   *  registry write that triggered it must not die on the mirror's account —
+   *  the SoT stays saved and the mirror heals once the operator repairs the
+   *  file and any write point runs again. */
   project(skillMdPath: string, source: SkillSource): boolean {
     const fields = mirrorFieldsForSource(source, this.cliVersion);
     if (!fields || this.fs.kind(skillMdPath) !== 'file') return false;
     const text = this.fs.readText(skillMdPath);
-    const next = injectFrontmatterMirror(text, fields);
+    let next: string;
+    try {
+      next = injectFrontmatterMirror(text, fields);
+    } catch {
+      return false;
+    }
     if (next !== text) this.fs.writeText(skillMdPath, next);
     return true;
+  }
+
+  /** The registry-facing entry point: reprojection keyed by skill name so the
+   *  whole mirror policy (mirrored source kinds, unmirrored skills) stays
+   *  inside this module. */
+  projectForSkill(skill: SkillName, skillMdPath: string, source: SkillSource): boolean {
+    if (UNMIRRORED_SKILLS.has(skill)) return false;
+    return this.project(skillMdPath, source);
   }
 }
