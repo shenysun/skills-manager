@@ -14,7 +14,7 @@ import { HttpDownloadClient } from '../infra/http-download-client.js';
 import { DetectionService, detectionLogPath } from '../core/services/detection-service.js';
 import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
-import { renderCostLedger } from './cost-output.js';
+import { renderCostLedger, renderPresetCostLine } from './cost-output.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
@@ -317,6 +317,21 @@ preset.command('list')
     const presets = services(cmd).registry.listPresets();
     for (const { name, categories } of presets) console.log(`${name}: ${categories.join(', ')}`);
     if (presets.length === 0) console.log('No presets yet — save one with `preset set <name> <category...>`.');
+  });
+preset.command('apply')
+  .description("Rewrite the selected agents' runtime dirs to exactly the skills in the preset's categories (same strict semantics as `categories apply`: manager skill exempt, foreign untouched, uncategorized removed) and stamp the record with the preset name; success ends with the preset's resident-cost line")
+  .argument('<name>')
+  .option('-a, --agent <id...>', 'catalog agent ids (repeatable); defaults to the detected set')
+  .option('--json', 'machine-readable output for agents')
+  .action((name, opts, cmd) => {
+    const s = services(cmd);
+    const result = s.distribute.applyPreset(name, opts.agent);
+    const cost = s.cost.pathCost(result.paths.map((item) => item.runtimeDir));
+    const summary = `Applied preset ${name} [${result.categories.join(', ')}] to ${result.paths.length} runtime path(s)`;
+    s.activity.record({ action: 'cli-preset-apply', summary, details: { preset: name, categories: result.categories, agents: result.agents, costTokens: cost.tokens } });
+    if (opts.json) return print({ ...result, cost });
+    console.log(summary);
+    console.log(renderPresetCostLine(cost));
   });
 
 const provenance = program.command('provenance').description('Backfill provenance for source-less skills (frontmatter & lockfile evidence adoption, ADR-0011/0012/0017)');

@@ -204,6 +204,16 @@ export class RegistryService {
     return entry;
   }
 
+  /** One preset by exact name — `preset apply`'s lookup (ADR-0019). An absent
+   *  name is a hard error, never an empty apply. */
+  getPreset(name: string): PresetEntry {
+    const entry = this.load().presets?.[name];
+    if (!entry) {
+      throw new SkillsManagerError('preset_not_found', `No preset named "${name}". Save one with \`preset set ${name} <category...>\`.`);
+    }
+    return entry;
+  }
+
   listPresets(): Array<{ name: string; categories: string[] }> {
     return Object.entries(this.load().presets || {})
       .map(([name, entry]) => ({ name, categories: normalizeTags(entry?.categories || []) }))

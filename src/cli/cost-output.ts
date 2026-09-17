@@ -1,4 +1,4 @@
-import { formatApproxTokens, type CostLedger } from '../core/services/cost-ledger-service.js';
+import { formatApproxTokens, type CostLedger, type ScopedPathCost } from '../core/services/cost-ledger-service.js';
 
 /**
  * Human rendering for `skills-manager cost` (spec context-cost, Q10 shape):
@@ -58,4 +58,11 @@ export function renderCostLedger(ledger: CostLedger): string {
     }
   }
   return `${lines.join('\n')}\n`;
+}
+
+/** The one-line resident-cost tail of a `preset apply` success (ADR-0019
+ *  US20): ≈-prefixed char-approx tokens, the same magnitude convention as the
+ *  ledger above. */
+export function renderPresetCostLine(cost: ScopedPathCost): string {
+  return `Resident cost: ${formatApproxTokens(cost.tokens)} tokens per message (${cost.method})`;
 }

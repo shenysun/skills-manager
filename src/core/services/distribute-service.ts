@@ -77,6 +77,9 @@ export type CategoryApplyResult = {
   paths: CategoryApplyPathOutcome[];
 };
 
+/** A preset apply's outcome (ADR-0019): the kernel result plus the 档位 name it was run for. */
+export type PresetApplyResult = CategoryApplyResult & { preset: string };
+
 /** One physical runtime path's filter state (ADR-0015): the applied set and what has drifted since. */
 export type CategorySetStatusPath = {
   runtimeDir: string;
@@ -197,6 +200,37 @@ export class DistributeService {
    */
   applyAllCategories(agents?: readonly string[]): CategoryApplyResult {
     return this.rewriteToWanted(this.wantedSkills({ all: true }), { all: true }, agents);
+  }
+
+  /**
+   * Apply a named preset (ADR-0019): expand the preset's categories from the
+   * registry at apply time, run them through the same per-path rewrite kernel
+   * as `categories apply`, and stamp the category-set records with the preset
+   * name so `categories status` can answer which 档位 a path is on. Two hard
+   * gates protect the named object from silently emptying a runtime (spec
+   * US14/US15): a category absent from the hub vocabulary refuses before
+   * anything is written, and so does a set that resolves to zero managed
+   * skills. Bare `categories apply` passes through none of this.
+   */
+  applyPreset(name: string, agents?: readonly string[]): PresetApplyResult {
+    const set = normalizeTags(this.registry.getPreset(name).categories);
+    const vocabulary = new Set(this.registry.listCategoryCounts().map(({ category }) => category));
+    const unknown = set.filter((category) => !vocabulary.has(category));
+    if (unknown.length > 0) {
+      throw new SkillsManagerError(
+        'preset_category_unknown',
+        `Preset ${name} references unknown categor${unknown.length === 1 ? 'y' : 'ies'}: ${unknown.join(', ')} (categories: ${set.join(', ')}). Tag skills into them, or fix the preset with \`preset set ${name} <category...>\`. Nothing was changed.`,
+      );
+    }
+    const applied: AppliedCategorySet = { categories: set, preset: name };
+    const wanted = this.wantedSkills(applied);
+    if (wanted.size === 0) {
+      throw new SkillsManagerError(
+        'preset_resolves_empty',
+        `Preset ${name} resolves to 0 managed skills (categories: ${set.join(', ')}). Nothing was changed.`,
+      );
+    }
+    return { preset: name, ...this.rewriteToWanted(wanted, applied, agents) };
   }
 
   /** Managed hub skills every category apply draws from — the manager skill is never in the pool. */
@@ -788,16 +822,17 @@ export class DistributeService {
   private assertCategorySet(set: AppliedCategorySet) {
     const valid = 'all' in set
       ? set.all === true
-      : Array.isArray(set.categories) && set.categories.length > 0 && set.categories.every((value) => typeof value === 'string' && value.trim().length > 0);
+      : Array.isArray(set.categories) && set.categories.length > 0 && set.categories.every((value) => typeof value === 'string' && value.trim().length > 0)
+        && (set.preset === undefined || (typeof set.preset === 'string' && set.preset.trim().length > 0));
     if (!valid) {
       throw new SkillsManagerError('invalid_category_set', 'An applied category set is a non-empty category list or the { all: true } marker.');
     }
   }
 
-  /** Marker equality: `--all` matches only itself; category lists compare element-wise. */
+  /** Marker equality: `--all` matches only itself; category lists compare element-wise, preset stamp included — a bare apply over a stamped path rewrites the record, clearing the stamp (ADR-0019). */
   private sameAppliedSet(a: AppliedCategorySet, b: AppliedCategorySet) {
     if ('all' in a || 'all' in b) return 'all' in a && 'all' in b;
-    return a.categories.join('\n') === b.categories.join('\n');
+    return a.categories.join('\n') === b.categories.join('\n') && (a.preset ?? null) === (b.preset ?? null);
   }
 
   private replaceIndexRecord(record: DistributionIndexRecord, drop = false) {

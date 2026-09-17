@@ -36,6 +36,10 @@ export function charApproxTokens(text: string): number {
  *  other report type); re-exported here so the CLI's import surface stays put. */
 export type { CostSkillLine, CostPathGroup, CostLedgerError, CostSuggestion, CostScatteredSuggestion, CostSuggestions, CostLedger } from '../model/index.js';
 
+/** The ledger scoped to a set of physical runtime dirs — the preset apply's
+ *  tail-line shape (ADR-0019): one token count per applied path, summed. */
+export type ScopedPathCost = { method: 'char-approx'; tokens: number; paths: Array<{ runtimeDir: string; tokens: number }> };
+
 /** One counted distribution entry in flight: the index facts the suggestion
 
 /** One counted distribution entry in flight: the index facts the suggestion
@@ -102,6 +106,19 @@ export class CostLedgerService {
       suggestions: this.suggestions(counted, top),
       errors,
     };
+  }
+
+  /** The ledger's counting scoped to specific physical runtime dirs — the tail
+   *  line of a preset apply (ADR-0019 US20): what the 档位 just switched costs
+   *  per message. Read-only like the rest of the ledger; shared paths counted
+   *  once, per the ledger's grouping. */
+  pathCost(runtimeDirs: readonly string[]): ScopedPathCost {
+    const wanted = new Set(runtimeDirs.map((dir) => path.resolve(dir)));
+    // top=0: only the path groups are needed here, never the suggestion layers.
+    const paths = this.ledger(0).paths
+      .filter((group) => wanted.has(path.resolve(group.runtimeDir)))
+      .map(({ runtimeDir, tokens }) => ({ runtimeDir, tokens }));
+    return { method: 'char-approx', tokens: paths.reduce((total, group) => total + group.tokens, 0), paths };
   }
 
   /** One entry's cost from the runtime SKILL.md actually present — index says

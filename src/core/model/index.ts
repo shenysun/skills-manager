@@ -319,8 +319,9 @@ export type DistributionIndexEntry = {
   error?: DistributionIndexError;
 };
 
-/** The category set applied to one physical runtime dir (ADR-0015): a concrete tag list, or the `--all` restore marker. */
-export type AppliedCategorySet = { categories: string[] } | { all: true };
+/** The category set applied to one physical runtime dir (ADR-0015): a concrete tag list, or the `--all` restore marker.
+ *  The categories variant may carry the preset name that produced it (ADR-0019) — a 档位 stamp only; the content truth is always the categories list. */
+export type AppliedCategorySet = { categories: string[]; preset?: string } | { all: true };
 
 export type DistributionIndexRecord = {
   id: string;
