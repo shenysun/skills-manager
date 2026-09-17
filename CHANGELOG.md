@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-18 (hub git sync + skills.sh find)
+
+- **Hub git 化多机同步 MVP**（ADR-0020）：hub 本身成为 git 仓库，对用户自选远端 push/pull 即同步——不做 skill 级合并（git 已是合并工具）、不做设备码/token 代管（凭据留在用户自己的 git 里）。`skills/`、`collections/`、`registry.yaml` 进版本控制；`.backups/` 与 `.skills/`（分布索引、回滚快照、活动日志）为机器本地状态，canonical `.gitignore` 排除——分发是每机自己的事，新机 pull 后自行 distribute。
+- **`sync init [--remote <url>]`**：git init 或 **adopt** 既有 `.git/`（领先一步不是错误，历史保留）；`.gitignore` 只追加缺失行不改写用户条目；树上有未提交内容时做一次基线提交；`--remote` 挂 origin（已有不同 origin 拒绝改指）。幂等，输出零省略补齐清单 + 敏感信息推送提醒。bootstrap 保持不 git 化（ADR-0014 不变）。
+- **`sync push`**：add -A + 技能级汇总 commit（新增/更新/移除 skill 数 + registry 旗标；同 skill 内 rename 归并为 update、跨 skill rename 记一加一移）+ push。无变更且远端一致输出「已是同步状态」退出 0，绝不造空提交。硬闸全带指引非零退出：未 git 化 / 无 remote / 无 git 身份（绝不代配）/ 未出生 HEAD。
+- **`sync pull`**：干净工作树前置（脏树拒绝绝不 stash，指引先 push）；fetch + merge（允许 merge commit，不用 ff-only/rebase）；冲突透传 git 非零退出 + `git -C <hub>` 手工解决指引——绝不内置合并决策。新机首拉经 `--allow-unrelated-histories` 接纳基线根历史，merge 目标 `@{upstream}` 优先、远端 HEAD 分支兜底。结尾技能级拉取统计（与 push 同一计数规则）+ distribute 纯文案提示不自动执行。
+- **`sync status [--json]`**：只读零网络——git 化 / remote / 脏文件数 / ahead-behind（基于 remote-tracking ref，注明「上次 fetch」口径）/ 最近同步 commit；未 git 化友好提示退出 0（push/pull 则非零）。
+- **manager skill「查找与发现技能」工作流 + skills.sh 直连主通道**（ADR-0021）：「帮我找个 X skill」成为一等公民流程（需求 → 英文关键词提炼 → 三通道表搜索 → verify-before-presenting → 带据呈现 → 用户确认 → 既有 source-first install，装后 distribute 保持显式步骤）。共享三通道表一处定义两处引用（provenance backfill Step 3 改引用不重定义）：① `curl skills.sh/api/search`（主，结构化 JSON 含 installs）② `npx skills find`（二）③ `gh api search/code`（三兜底）；四条件降级矩阵（超时/非 200/解析失败/skills 空或缺）无声降级、结果注明通道；installs 标注为安装量信号非质量担保。CLI 不加 `find` 命令（ADR-0012 非目标维持）。
+- **manager skill「多机同步」章节**：三段式工作流（首次 `sync init --remote` → 变更后 push → 新机 pull 后自行 distribute）+ 纪律陈述与 CLI 硬闸逐字对齐（pull 不自动分发、冲突指引 `git -C <hub>`、脏树先处理、git 身份/remote/未 git 化绝不代决策）。
+- **落档**：ADR-0012 两条修订标注（网络措辞「git 传输（clone/fetch/push/pull）+ catalog refresh」、双通道 → 有序三通道，循 ADR-0006 先例）；ADR-0020 基线提交措辞对齐实现；CONTEXT 词条 **Hub sync** / **Find channels**；ROADMAP #6/#7 移入已完成；CLI 双语参考；升级分发走 ADR-0014 自刷新机制。
+- 测试：CLI seam 全场景 bare-repo 远端覆盖（init 全新/adopt/幂等、push 正常/空变更/无 remote/无身份、pull 正常/脏树/冲突、status 各维度 + `--json`、多机往返 tracer）+ manager-skill 服务三条薄断言（通道序 / 单一定义 / installs≠质量担保）。
+
 ## 2026-09-17 (named presets)
 
 - **命名预设（preset / 档位）**（ADR-0019）：把一份领域类别清单存成可反复 apply 的命名**档位**——`registry.yaml` 顶层新增 `presets:` map（对象形状，随 hub 走），独立 `preset` 命令组四子命令。supersede ADR-0015 _Avoid_ 中「named switchable profiles」条款；裸 `categories apply` 语义原封不动（回归锁）。

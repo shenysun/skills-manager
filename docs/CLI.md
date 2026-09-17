@@ -71,6 +71,10 @@ skills-manager preset list
 skills-manager preset remove web
 skills-manager preset apply web --agent claude-code
 skills-manager preset apply web --json
+skills-manager sync init --remote <url>
+skills-manager sync status [--json]
+skills-manager sync push
+skills-manager sync pull
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
@@ -90,6 +94,21 @@ Apply is an explicit snapshot — later tag edits or updates never auto-push. `c
 A **preset** is a named list of domain categories — a re-appliable loading set (预设 / 档位), not an install group — stored as a top-level `presets:` map in `registry.yaml`. `preset set <name> <cat...>` is replace semantics (overwrite-in-place when the name exists; preset names are safe-name validated, and categories need not exist in the hub yet — build the preset first, tag skills later). `preset list` shows each preset's member categories plus its mount footprint (how many physical runtime paths currently carry it, omitted when zero, drift reported as-is — never implied healthy). `preset remove` deletes the entry and cascade-clears the `preset` field off every category-set record referencing the name (categories kept, runtime untouched), reporting how many paths the name was detached from.
 
 `preset apply <name>` resolves the preset's categories at apply time through the unchanged ADR-0015 path-level strict rewrite — `--agent` repeatable (default = detected set), shared physical paths written once, manager skill exempt, foreign untouched, uncategorized removed, user scope only — and stamps the applied category-set record with the preset name, which `categories status` shows beside the applied set. A bare `categories apply` on a stamped path clears the field (manual overrides are never misreported as a named preset); `categories apply --all` dissolves it; `distribute rollback --to user` restores the runtime content and the stamped record together. Two hard errors protect the named object: a preset that resolves to zero managed skills, and one referencing a category absent from the hub vocabulary, both refuse at apply time naming the preset and its categories. Success output ends with the preset's resident-cost line (char-approx, `≈`-prefixed; `--json` carries the structured `cost` field). See [ADR-0019](adr/0019-named-presets-category-subsets.md).
+
+### sync (multi-machine hub sync, ADR-0020)
+
+```sh
+skills-manager sync init --remote <url>   # git init (or adopt), canonical .gitignore, baseline commit, attach origin
+skills-manager sync status [--json]       # read-only, zero-network posture probe
+skills-manager sync push                  # add -A + one skill-level summary commit + push
+skills-manager sync pull                  # fetch + merge (clean tree required)
+```
+
+The hub itself becomes a git repository; push/pull over any user-chosen remote (a local bare repo works) is the whole sync mechanism. `sync init` is idempotent and adopts an existing `.git/` (history kept; the user being a step ahead is not an error), appends only missing canonical `.gitignore` lines — `.backups/` and `.skills/` are machine-local (rollback snapshots, distribution index, activity log) and never sync; distribution is per machine — makes one baseline commit when the tree has anything to commit, and optionally attaches origin. Its output is a zero-omission report of exactly what was done, ending with a reminder to confirm the hub holds no secrets before pushing. Repointing an existing origin is refused with the manual command — never done silently.
+
+`sync push` stages everything and makes one summary commit (skill-level counts: added / updated / removed, a registry flag; same-skill renames count as updates) before pushing. A clean tree with an up-to-date remote reports "already in sync" and exits 0 — no empty commit is ever created. `sync pull` requires a clean working tree (dirty → nonzero exit pointing at `sync push` or manual handling; never stashes), then fetches and merges (merge commits allowed; no rebase, no ff-only). When the merge brings changes, pull ends with skill-level stats, and the plain-text reminder that newly pulled skills are not yet distributed prints only when skills actually arrived; an up-to-date pull says so in one line.
+
+Exit-code semantics: `push` / `pull` exit nonzero with guidance on every hard gate — an un-gitified hub (run `sync init`), no remote origin (`sync init --remote <url>` or the manual `git remote add`), no git identity (the tool never configures it for you), an unborn HEAD, or a merge conflict (the conflicted state is left exactly as git left it; resolution is yours via `git -C <hub>`). `sync status` is the exception: an un-gitified hub is a friendly hint plus exit 0. `status` reports git-ification, remote, dirty-file count, ahead/behind against the remote-tracking ref annotated as last-fetch (it never fetches), and the last sync commit; `--json` is the machine-readable form. Bootstrap never git-initializes the hub — sync is the user's explicit opt-in. See [ADR-0020](adr/0020-hub-git-sync-mvp.md).
 
 ### Stale copy targets and auto-refresh (ADR-0008)
 

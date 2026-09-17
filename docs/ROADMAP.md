@@ -10,6 +10,8 @@
 - **#2 Frontmatter 便携 provenance + #3 引用层 `get`**（2026-09-17 完成，feature `provenance-get`）：打包一张特性票交付（7 张实施票，QA 27/27 场景 0 缺陷，commits c5d5669…bd44dad）。裁定见 **ADR-0017**（registry 是 SoT、frontmatter 单向投影、五写入点闭口、git 源逐字对齐 gh skill `metadata.github-*` 四键换互认、frontmatter 优先 lockfile 兜底、证据即校准、fingerprint 不豁免）；`get` v1 hub-only、完整 SKILL.md stdout、`--path` 只读借目录。遗留：marketplace 写入点无 install seam 实测（纯函数层已覆盖）。
 - **#4 上下文成本可视化**（2026-09-17 完成，feature `context-cost`）：常驻成本账本（ADR-0018）——只读核心按物理 runtime 路径分组统计 frontmatter `name+description` 常驻 token（char-approx，`≈` 展示 + `method` 元数据），三个薄适配共享同一核心：`cost` CLI（人读 + `--json` 三层结构）、doctor `residentCost` 结构化字段（仅 scattered 告警）、dashboard `GET /api/cost`（顶部 inline 常驻线 + preview 接入足迹，懒加载）；建议只指向 `undistribute`、只报告不执行，manager skill 收录查账本→建议收回工作流。
 - **#5 命名预设（named presets）**（2026-09-17 完成，feature `preset-bundle`）：命名的类别清单档位（ADR-0019）——registry 顶层 `presets:` map + 独立 `preset` 命令组（set/list/remove/apply）。`preset apply` 复用 ADR-0015 路径级严格改写并盖档位戳（裸 `categories apply` 清戳、`remove` 级联清、rollback 随行恢复），空解析与类别不存在两道硬错闸，成功尾部带常驻成本行（复用 ADR-0018 核心）；可见面为 `preset list`（挂载足迹 + 漂移诚实暴露）+ `categories status`（档位名并列）。supersede ADR-0015 Avoid 条款「named switchable profiles」。
+- **#6 多机同步**（2026-09-18 完成，feature `sync-find`）：**hub git 化 MVP** 落地（ADR-0020）——hub 本身成为 git 仓库，push/pull 即同步；新增 `sync init/push/pull/status` 命令组（init adopt 语义 + 零省略补齐清单、push 快照式汇总提交不造空提交、pull 干净树前置 + 冲突透传 git 指引 `git -C <hub>`、status 只读零网络 + `--json`）；`.backups/` 与 `.skills/` 为机器本地状态 gitignore，分发是每机自己的事（新机 pull 后自行 distribute）。不与桌面对手的设备码/合并全功能正面拼——git 已是合并工具。修订 ADR-0012 网络措辞为「git 传输（clone/fetch/push/pull）+ catalog refresh」。
+- **#7 Find 接入 skills.sh**（2026-09-18 完成，feature `sync-find`）：skills.sh 直连 search API 成为 manager skill 搜索**主通道**（ADR-0021）——共享三通道表一处定义两处引用：① `curl skills.sh/api/search`（主，结构化 JSON 含 installs）② `npx skills find`（二，缓冲 API 漂移）③ `gh api search/code`（三兜底）；四条件降级矩阵无声降级、结果注明通道；新增一等公民「查找与发现技能」工作流（关键词提炼 → 搜索 → verify-before-presenting → 带据呈现 → 用户确认 → 既有 source-first install）。CLI 不加 `find` 命令（ADR-0012 非目标维持）。
 
 ## 第一梯队（下一个特性，建议打包一张票）
 
@@ -21,8 +23,7 @@
 
 ## 第三梯队（大票，先做 MVP）
 
-- **#6 多机同步**：走 **hub git 化 MVP**（hub 本身为 git repo，push/pull 即同步，不做 skill 级合并——git 已是合并工具），不与桌面对手的设备码/合并全功能正面拼。被 xingkongliang 与 skl 两面夹击，须做但不急。
-- **#7 Find 接入 skills.sh**：search API 已实测（含 installs 字段）；作为 ADR-0012 search 层的第三通道。
+（已清空——原 #6/#7 多机同步与 skills.sh find 已完成（feature `sync-find`），见「已完成」。）
 
 ## 缓做
 

@@ -158,6 +158,25 @@ describe('manager skill doc: shared find channel table (ADR-0021, ticket 05)', (
   });
 });
 
+describe('manager skill doc: multi-machine sync chapter (ADR-0020, ticket 06)', () => {
+  const doc = readFileSync(new URL('../../skills/skills-manager/SKILL.md', import.meta.url), 'utf8');
+
+  it('walks the three-stage workflow: init --remote, push, pull-then-distribute', () => {
+    expect(doc).toContain('## Workflow: sync the hub across machines');
+    const init = doc.indexOf('sync init --remote');
+    const push = doc.indexOf('sync push', init);
+    expect(init).toBeGreaterThanOrEqual(0);
+    expect(push).toBeGreaterThan(init);
+    expect(doc.indexOf('sync pull', push)).toBeGreaterThan(push);
+  });
+
+  it('states the discipline matching the CLI hard gates — no auto-distribute, git -C conflict pointer, never stash', () => {
+    expect(doc).toMatch(/pull never auto-distributes/);
+    expect(doc).toMatch(/git -C <hub>/);
+    expect(doc).toMatch(/never stashes/);
+  });
+});
+
 describe('compareDateVersions', () => {
   it('orders date-versioned release tags segment by segment', () => {
     expect(compareDateVersions('2026.9.9', '2026.9.10')).toBeLessThan(0);

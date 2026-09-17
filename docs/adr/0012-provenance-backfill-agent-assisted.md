@@ -4,6 +4,10 @@
 
 Accepted (2026-09-05)
 
+Amended by [ADR-0020](0020-hub-git-sync-mvp.md) (2026-09-17): the non-goal wording "the CLI keeps no network capability beyond git clone and catalog refresh" becomes "beyond **git transport (clone/fetch/push/pull) and catalog refresh**" — the `sync` command group's git operations.
+
+Amended by [ADR-0021](0021-skills-sh-direct-search-primary.md) (2026-09-17): the Layer-2 dual search channels become an ordered three — skills.sh direct API (primary), `npx skills find` (second), GitHub code search (third fallback) — defined once in the manager skill's shared channel table.
+
 ## Context
 
 After [ADR-0011](0011-init-adopts-lockfile-evidence.md), three cohorts remain source-less: hand-copied or user-written skills (no evidence anywhere), skills whose lock entries carry no usable evidence, and — a structural gap ADR-0011 left — **legacy imports**: evidence adoption ran only on the fresh-import write path, so skills imported before ADR-0011 could never pick up the lockfile evidence they already had. On this machine that legacy queue is real: 72 registry entries, 20 with `source: {type: local, url: null}`.

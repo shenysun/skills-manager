@@ -71,6 +71,10 @@ skills-manager preset list
 skills-manager preset remove frontend
 skills-manager preset apply frontend --agent claude-code
 skills-manager preset apply frontend --json
+skills-manager sync init --remote <url>
+skills-manager sync status [--json]
+skills-manager sync push
+skills-manager sync pull
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
@@ -90,6 +94,21 @@ apply 是显式快照——之后的打标或更新不会自动推送。`categor
 **预设（preset）**是一份命名的领域类别清单——可反复 apply 的加载集**档位**，不是安装组——存于 `registry.yaml` 顶层 `presets:` map。`preset set <name> <cat...>` 为覆盖式（同名原位覆盖；preset 名走 safe-name 校验；类别可先于词汇表存在——先建档位、后打标）。`preset list` 显示每个预设的成员类别与挂载足迹（当前承载它的物理运行时路径数，为零时省略；漂移按实报告，绝不暗示健康）。`preset remove` 删除条目并级联清空所有引用该名的 category-set 记录上的 `preset` 字段（categories 原样、runtime 不动），并输出摘除路径数。
 
 `preset apply <name>` 在 apply 时实时解析预设类别，走 ADR-0015 原封不动的路径级严格改写——`--agent` 可重复（缺省 = 检测集）、共享物理路径只写一次、manager skill 豁免、foreign 不动、uncategorized 移除、仅 user scope——并在已应用的 category-set 记录上盖 `preset` 档位戳，`categories status` 将其与已应用集合并列显示。裸 `categories apply` 会清掉该字段（手动覆盖绝不误报为命名档位）；`apply --all` 随解散一并清除；`distribute rollback --to user` 把运行时内容与带戳记录一起恢复。两道硬错闸保护命名对象：解析为 0 个受管技能、引用类别不在词汇表，均在 apply 时点名预设与类别拒绝执行。成功输出尾部带该档位的常驻成本行（char-approx、`≈` 前缀；`--json` 给结构化 `cost` 字段）。见 [ADR-0019](adr/0019-named-presets-category-subsets.md)。
+
+### sync（多机同步，ADR-0020）
+
+```sh
+skills-manager sync init --remote <url>   # git init（或 adopt）、canonical .gitignore、基线提交、挂 origin
+skills-manager sync status [--json]       # 只读零网络的同步状态探测
+skills-manager sync push                  # add -A + 一次技能级汇总提交 + push
+skills-manager sync pull                  # fetch + merge（要求干净工作树）
+```
+
+hub 本身成为一个 git 仓库；对用户自选的任意远端（本地 bare repo 也可以）push/pull 即是同步的全部机制。`sync init` 幂等，且 **adopt** 既有 `.git/`（历史保留——用户领先一步不是错误），只追加缺失的 canonical `.gitignore` 行——`.backups/` 与 `.skills/` 是机器本地状态（回滚快照、分布索引、活动日志），永不同步，分发是每台机器自己的事——树上还有未提交内容时做一次基线提交，可选挂 origin。输出为零省略的「做了什么」清单，结尾提醒推送前确认 hub 无敏感信息。已有 origin 指向他处时拒绝改指并给出手工命令——绝不静默改。
+
+`sync push` 暂存全部并做一次汇总提交（技能级计数：新增 / 更新 / 移除，registry 旗标；同 skill 内 rename 计为 update）后推送。干净树且远端已一致时输出「已是同步状态」并退出 0——绝不造空提交。`sync pull` 要求干净工作树（脏 → 非零退出，指引先 `sync push` 或手工处理；绝不 stash），随后 fetch + merge（允许 merge commit；不 rebase、不 ff-only）。merge 带来变更时结尾输出技能级统计，且仅当确有新 skill 拉到时才附「新拉取的 skill 尚未分发」的纯文案提醒；本就最新时只输出一行 already up to date。
+
+退出码语义：`push` / `pull` 在每道硬闸上都非零退出并带指引——未 git 化的 hub（先 `sync init`）、无 remote origin（`sync init --remote <url>` 或手工 `git remote add`）、无 git 身份（工具绝不代为配置）、未出生 HEAD、merge 冲突（冲突状态原样保留，经 `git -C <hub>` 自行解决）。`sync status` 是例外：未 git 化的 hub 友好提示并退出 0。`status` 报告 git 化与否、remote、脏文件数、ahead/behind（基于 remote-tracking ref、注明「上次 fetch」口径——它自己绝不 fetch）、最近同步 commit；`--json` 为机器可读形态。bootstrap 绝不 git 化 hub——同步是用户的显式选择。见 [ADR-0020](adr/0020-hub-git-sync-mvp.md)。
 
 ### 副本过期与自动刷新（ADR-0008）
 

@@ -1,6 +1,6 @@
 ---
 name: skills-manager
-description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories), applying / inspecting a category set (类别集), or saving / switching a named preset (预设 / 档位) so an agent loads only the selected domains, wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo), or asks to find / discover a new skill in the ecosystem (帮我找个 skill / find a skill for X).
+description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories), applying / inspecting a category set (类别集), or saving / switching a named preset (预设 / 档位) so an agent loads only the selected domains, wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo), asks to find / discover a new skill in the ecosystem (帮我找个 skill / find a skill for X), or wants to sync the skill hub across machines (多机同步 / sync push / sync pull / 我想在另一台机器上用这些 skills).
 ---
 
 # Skills Manager
@@ -276,6 +276,42 @@ The JSON carries `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill 
 - **Approximations, always.** `method` is `"char-approx"` (CJK characters ×1, everything else ÷4) and every displayed number is `≈`-prefixed — never relay a ledger number to the user as an exact token count.
 - **Suggest recalls, never execute them.** Every suggestion carries a verbatim runnable `undistribute` command (including the required `--to`, and `--project` where the path is a project target). Acting on it is the user's decision. Only `undistribute` is ever suggested — `get` (the reference layer) and `archive` are user-side follow-ups you may narrate but not run.
 - **Suggestion layers, in order**: archived-but-distributed skills (zero-controversy recalls — the impossible-to-miss head section), top-N most expensive descriptions, and scattered distributions (one skill across several paths — consolidate to one).
+
+## Workflow: sync the hub across machines (多机同步)
+
+Run this when the user asks "我想在另一台机器上用这些 skills" / "sync my skills" / "多台电脑怎么同步". The hub itself becomes a git repository; push/pull over the user's own remote is the whole sync mechanism (ADR-0020) — no device codes, no managed tokens, git stays the merge tool. Three moments, three commands:
+
+**First machine — set up once:**
+
+```bash
+skills-manager sync init --remote <url>   # git init (or adopt), canonical .gitignore, baseline commit, attach origin
+```
+
+`init` **adopts** an existing `.git/` (a manually git-ified hub is a step ahead, not an error — history kept), appends only the missing canonical `.gitignore` lines, makes one baseline commit when the tree has anything to commit, and reports exactly what it did, zero omission. `.backups/` and `.skills/` (distribution index, rollback snapshots, activity log) are machine-local and never sync — distribution is per machine, on purpose. A local bare repo works as the remote too. The output ends with a reminder to confirm the hub holds no secrets before it is pushed — relay it, don't bury it.
+
+**After changes — the routine, on every machine:**
+
+```bash
+skills-manager sync push     # add -A + one skill-level summary commit + push
+skills-manager sync status   # read-only probe: git-ified?, remote, dirty count, ahead/behind, last sync commit
+```
+
+`push` is snapshot-at-push-time — no write point ever auto-commits. With a clean tree and an up-to-date remote it reports "already in sync" and exits 0, never an empty commit. `status` is zero-network: ahead/behind reads the remote-tracking ref as of the last fetch and says so. `sync status --json` is the machine-readable form when you need to report sync posture in conversation.
+
+**New machine — get the content, then distribute yourself:**
+
+```bash
+skills-manager sync pull     # fetch + merge; ends with skill-level stats and a distribute reminder
+```
+
+`pull` ends with what the merge brought in (added / updated / removed skills, registry flag); the **not yet distributed** reminder prints only when skills actually arrived — the follow-up is the user's call. Offer `distribute` as the explicit next step when they want pulled skills live for an agent; never run it unprompted after a pull.
+
+Discipline — matching the CLI's hard gates. When the user hits one, the nonzero exit already carries this guidance; relay it, don't soften it:
+
+- **pull never auto-distributes**, and never runs over a dirty tree — it refuses and points at `sync push` or manual handling. It never stashes.
+- **Conflicts are the user's**: pull exits nonzero and points at `git -C <hub> status` — skills-manager never makes merge decisions. Merge commits are allowed; there is no rebase and no ff-only.
+- **A missing git identity, no remote, or an un-gitified hub are hard errors** on push/pull (with guidance) — the tool never configures git or picks a remote on the user's behalf. `sync status` on an un-gitified hub is the exception: a friendly hint plus exit 0.
+- Bootstrap never git-initializes the hub — sync is the user's explicit opt-in.
 
 ## Autonomy rules
 
