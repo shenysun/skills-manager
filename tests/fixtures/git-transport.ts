@@ -1,5 +1,6 @@
 import { cpSync } from 'node:fs';
 import type { GitCloneOptions, GitPort } from '../../src/core/ports/git.js';
+import { inertSyncGit } from './spy-git.js';
 
 export const FAKE_COMMIT = 'fedcba9876543210fedcba9876543210fedcba98';
 export const FAKE_TREE = '0123456789abcdef0123456789abcdef01234567';
@@ -16,5 +17,7 @@ export function materializingGit(upstream: string): GitPort {
     listRemoteHeads: () => [],
     statusShort: () => '',
     log: () => [],
+    ...inertSyncGit(),
+    commit: () => FAKE_COMMIT,
   };
 }

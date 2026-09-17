@@ -18,6 +18,27 @@ export interface GitPort {
   /** Tree SHA of `subpath` at HEAD (`HEAD:<subpath>^{tree}`); works on a shallow clone (ADR-0013). */
   revParseTree(repoDir: string, subpath: string): string;
   listRemoteHeads(repoUrl: string): string[];
+  /** Best-effort `git status --short`: empty on any git failure (existing consumers treat that as "not a repo"). */
   statusShort(cwd: string): string;
   log(cwd: string, maxCount: number): GitLogEntry[];
+
+  // Hub sync plumbing (ADR-0020): repo-local git operations on the hub itself.
+  // No third-party tools, no shelling out beyond system git — `available()` is
+  // the preflight that keeps a missing git a clean error instead of spawn noise.
+
+  /** Whether system git answers at all; false on a missing binary. */
+  available(): boolean;
+  /** `git init` in `cwd` (idempotent at git's own level, but callers detect adoption first). */
+  initRepo(cwd: string): void;
+  /** The URL remote `name` points at, or null when the remote is not configured. */
+  remoteUrl(cwd: string, name: string): string | null;
+  remoteAdd(cwd: string, name: string, url: string): void;
+  /** `git status --porcelain` output; empty when the tree is clean. Unlike
+   *  `statusShort` this is strict — a git failure throws, because sync must
+   *  never mistake "git answered no" for "clean tree". */
+  statusPorcelain(cwd: string): string;
+  /** Stage everything (`git add -A`). */
+  addAll(cwd: string): void;
+  /** Create a commit with `message`; returns the new HEAD's full SHA. */
+  commit(cwd: string, message: string): string;
 }

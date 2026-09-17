@@ -394,6 +394,28 @@ provenance.command('list')
     for (const skill of pending.locallyAuthored) console.log(`  ${skill}`);
   });
 
+// Hub git-ification for multi-machine sync (ADR-0020): each command thin, git
+// stays the merge tool, and the operator keeps every git decision.
+
+const sync = program.command('sync').description('Multi-machine sync via a git-ified hub (init/push/pull/status, ADR-0020)');
+sync.command('init')
+  .description('Turn the hub into a git repository (or adopt an existing one) with the canonical .gitignore and a baseline commit; optionally attach a remote')
+  .option('--remote <url>', 'git remote URL to attach as origin (a local bare repo works too)')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const result = s.sync.init({ remote: opts.remote });
+    s.activity.record({ action: 'cli-sync-init', summary: `${result.mode} hub git-ification`, details: result });
+    // Zero-omission report (US-4): every dimension states what happened, including "nothing".
+    console.log(result.mode === 'adopted' ? 'adopted: existing git repository kept (history preserved)' : 'initialized: fresh git repository created');
+    console.log(result.ignoreLinesAdded.length > 0
+      ? `.gitignore: appended ${result.ignoreLinesAdded.length} line(s): ${result.ignoreLinesAdded.join(', ')}`
+      : '.gitignore: nothing to append (canonical lines already present)');
+    console.log(result.baselineCommit ? `baseline commit: ${result.baselineCommit}` : 'baseline commit: none (tree already clean)');
+    if (result.remote === null) console.log('remote origin: not set (pass --remote <url> to attach one)');
+    else console.log(result.remote.attached ? `remote origin: attached ${result.remote.url}` : `remote origin: already ${result.remote.url}`);
+    console.log('Reminder: the hub will be pushed to this remote — confirm it contains no secrets (tokens, keys, .env files).');
+  });
+
 const backup = program.command('backup').description('Inspect and restore init backups (hub .backups/, 30-day retention)');backup.command('list')
   .description('List saved backups')
   .action((_opts, cmd) => print(services(cmd).backups.list()));

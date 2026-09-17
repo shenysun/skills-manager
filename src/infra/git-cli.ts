@@ -132,4 +132,37 @@ export class GitCli implements GitPort {
       return { hash, timestamp, subject: subject.join('\t') };
     });
   }
+
+  // Hub sync plumbing (ADR-0020). These are repo-local commands, not transports:
+  // no clone budget, no retry semantics — git answering "no" is an answer.
+
+  available(): boolean {
+    return this.runner.run('git', ['--version']).status === 0;
+  }
+
+  initRepo(cwd: string): void {
+    this.runner.runOrThrow('git', ['-C', cwd, 'init']);
+  }
+
+  remoteUrl(cwd: string, name: string): string | null {
+    const result = this.runner.run('git', ['-C', cwd, 'remote', 'get-url', name]);
+    return result.status === 0 && result.stdout.trim() !== '' ? result.stdout.trim() : null;
+  }
+
+  remoteAdd(cwd: string, name: string, url: string): void {
+    this.runner.runOrThrow('git', ['-C', cwd, 'remote', 'add', name, url]);
+  }
+
+  statusPorcelain(cwd: string): string {
+    return this.runner.runOrThrow('git', ['-C', cwd, 'status', '--porcelain']).trim();
+  }
+
+  addAll(cwd: string): void {
+    this.runner.runOrThrow('git', ['-C', cwd, 'add', '-A']);
+  }
+
+  commit(cwd: string, message: string): string {
+    this.runner.runOrThrow('git', ['-C', cwd, 'commit', '-m', message]);
+    return this.revParseHead(cwd);
+  }
 }
