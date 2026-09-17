@@ -22,6 +22,7 @@ import { ProvenanceService } from './provenance-service.js';
 import { FrontmatterMirrorService } from './frontmatter-mirror.js';
 import { FrontmatterEvidenceService } from './frontmatter-evidence.js';
 import { GetService } from './get-service.js';
+import { CostLedgerService } from './cost-ledger-service.js';
 import { ManagerSkillService } from './manager-skill-service.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
@@ -81,8 +82,9 @@ export function createCoreServices(options: CoreServicesOptions) {
   const provenance = new ProvenanceService(registry, skillLock, frontmatterEvidence);
   const managerSkill = new ManagerSkillService(options.fs, registry, distribute, views);
   const get = new GetService(options.fs, home, registry);
+  const cost = new CostLedgerService(options.fs, home, registry, distribute);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, get, package: packageService };
+  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, get, cost, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
@@ -111,4 +113,6 @@ export type { ManagerSkillBundle, ManagerSkillSeedStatus, ManagerSkillSeedResult
 export { BackupService } from './backup-service.js';
 export { GetService } from './get-service.js';
 export type { GetTarget } from './get-service.js';
+export { CostLedgerService, charApproxTokens } from './cost-ledger-service.js';
+export type { CostLedger, CostPathGroup, CostSkillLine, CostLedgerError } from './cost-ledger-service.js';
 export type { BackupInfo } from './backup-service.js';

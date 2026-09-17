@@ -14,6 +14,7 @@ import { HttpDownloadClient } from '../infra/http-download-client.js';
 import { DetectionService, detectionLogPath } from '../core/services/detection-service.js';
 import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
+import { renderCostLedger } from './cost-output.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
@@ -391,6 +392,23 @@ program.command('get')
     }
     if (target.archived) console.error(archivedNotice);
     process.stdout.write(s.get.read(target));
+  });
+
+// The resident-cost ledger (ADR-0018): a read-only account grouped by physical
+// runtime path. Suggestions are report-only — each names the verbatim
+// undistribute command and never runs it. No filter flags in v1: consumers
+// filter the `--json` structure themselves.
+program.command('cost')
+  .description('Show the resident context-cost ledger: per-runtime-path token cost of distributed skill frontmatter, with report-only recall suggestions')
+  .option('--json', 'machine-readable output for agents')
+  .option('--top <n>', 'how many of the most expensive descriptions to list', '5')
+  .action((opts, cmd) => {
+    const s = services(cmd);
+    const top = Number.parseInt(opts.top, 10);
+    if (!Number.isInteger(top) || top < 0) throw new Error(`--top expects a non-negative integer, got "${opts.top}"`);
+    const ledger = s.cost.ledger(top);
+    if (opts.json) return print(ledger);
+    process.stdout.write(renderCostLedger(ledger));
   });
 
 program.command('add')
