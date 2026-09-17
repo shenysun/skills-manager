@@ -29,3 +29,9 @@ export interface FileSystemPort {
   /** Last-modified time in epoch ms; 0 when the path does not exist. */
   modifiedAt(path: string): number;
 }
+
+/** The one broken-symlink predicate, so doctor's broken-links report and the
+ *  cost ledger's errors section can never silently diverge (ADR-0018, US26). */
+export function isBrokenSymlink(fs: FileSystemPort, path: string): boolean {
+  return fs.kind(path) === 'symlink' && fs.targetKind(path) === 'missing';
+}

@@ -14,7 +14,7 @@ import {
   type SkillName,
 } from '../model/index.js';
 import type { CatalogService } from './catalog-service.js';
-import type { FileSystemPort } from '../ports/filesystem.js';
+import { isBrokenSymlink, type FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
 import { assertPathInside, assertSafeSkillName, isLegacyConsumer, normalizeTags } from '../../shared/validation.js';
 import type { RegistryService } from './registry-service.js';
@@ -597,7 +597,7 @@ export class DistributeService {
     const broken: string[] = [];
     for (const record of this.loadIndex()) {
       for (const entry of record.entries) {
-        if (this.fs.kind(entry.runtimePath) === 'symlink' && this.fs.targetKind(entry.runtimePath) === 'missing') broken.push(entry.runtimePath);
+        if (isBrokenSymlink(this.fs, entry.runtimePath)) broken.push(entry.runtimePath);
       }
     }
     return broken;

@@ -1,10 +1,11 @@
 import path from 'node:path';
 import type { DoctorReport, SkillHome } from '../model/index.js';
-import type { FileSystemPort } from '../ports/filesystem.js';
+import { isBrokenSymlink, type FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
 import { RegistryService } from './registry-service.js';
 import { DistributeService } from './distribute-service.js';
 import { CatalogService } from './catalog-service.js';
+import { CostLedgerService } from './cost-ledger-service.js';
 
 const CATALOG_STALE_DAYS = 90;
 
@@ -16,6 +17,7 @@ export class DoctorService {
     private readonly registry: RegistryService,
     private readonly distribute: DistributeService,
     private readonly catalog: CatalogService,
+    private readonly costLedger: CostLedgerService,
   ) {}
 
   check(): DoctorReport {
@@ -41,6 +43,13 @@ export class DoctorService {
     if (importedWithoutSource.length > 0) {
       warnings.push(`${importedWithoutSource.length} imported skill(s) have no managed source and may be stale; supply one with \`skills-manager edit <skill> --source-url <url>\` to enable updates`);
     }
+    // The account, not an illness: the ledger is always attached untouched, and
+    // resident cost earns a warning only when scattered duplicates exist.
+    const residentCost = this.costLedger.ledger();
+    const { scattered } = residentCost.suggestions;
+    if (scattered.length > 0) {
+      warnings.push(`${scattered.length} scattered skill(s) distributed across several runtime paths; run \`skills-manager cost\` for the resident-cost account and consolidation hints`);
+    }
     return {
       skillHome: this.home.root,
       skillCount: this.registry.listCanonicalSkills().length,
@@ -50,6 +59,7 @@ export class DoctorService {
       gitStatus,
       catalog,
       importedWithoutSource,
+      residentCost,
     };
   }
 
@@ -60,7 +70,7 @@ export class DoctorService {
       for (const entry of this.fs.readDirectory(dir)) {
         const full = path.join(dir, entry.name);
         if (entry.kind === 'directory') walk(full);
-        if (entry.kind === 'symlink' && this.fs.targetKind(full) === 'missing') broken.push(full);
+        if (entry.kind === 'symlink' && isBrokenSymlink(this.fs, full)) broken.push(full);
       }
     };
     for (const root of roots) walk(root);

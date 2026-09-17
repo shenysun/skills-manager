@@ -191,6 +191,73 @@ export type DistributionHealth = {
   leftoverViews: boolean;
 };
 
+/** One managed skill's resident cost on one physical runtime path (ADR-0018). */
+export type CostSkillLine = {
+  skill: string;
+  tokens: number;
+  nameTokens: number;
+  descriptionTokens: number;
+  /** True when the SKILL.md carries no description — counted name-only (US15). */
+  incomplete?: boolean;
+  /** True when the hub entry is archived but still distributed (US11). */
+  archived?: boolean;
+};
+
+/** One physical runtime path's resident account (a shared path appears once). */
+export type CostPathGroup = {
+  runtimeDir: string;
+  kind: DistributionTargetKind;
+  /** The agent family this path serves — noted, so shared paths never double-count (US4). */
+  agents: string[];
+  tokens: number;
+  skills: CostSkillLine[];
+};
+
+/** An entry the ledger counted as 0: unreadable SKILL.md or broken symlink (US14/US26). */
+export type CostLedgerError = {
+  skill: string;
+  runtimePath: string;
+  reason: string;
+};
+
+/** A recall suggestion: verbatim runnable, never executed (US9/US10). `tokens`
+ *  is the cost the layer ranks by — total residency for the archived layer,
+ *  description-only for the top-N layer. */
+export type CostSuggestion = {
+  skill: string;
+  runtimeDir: string;
+  tokens: number;
+  command: string;
+};
+
+/** One scattered skill (distributed across several physical paths) with a
+ *  recall command per path — the operator consolidates by running all but
+ *  the one path they keep (US12). */
+export type CostScatteredSuggestion = {
+  skill: string;
+  runtimeDirs: string[];
+  commands: string[];
+};
+
+/** The three suggestion layers (ADR-0018): zero-controversy recalls head the
+ *  list, then the top-N expensive descriptions, then scattered consolidation. */
+export type CostSuggestions = {
+  archived: CostSuggestion[];
+  topDescriptions: CostSuggestion[];
+  scattered: CostScatteredSuggestion[];
+};
+
+/** The full three-layer account (US18): per-path → per-skill → suggestions. */
+export type CostLedger = {
+  method: 'char-approx';
+  totalTokens: number;
+  /** Unmanaged (foreign) entries in known runtime roots: counted as present, never itemized (US6). */
+  unmanaged: number;
+  paths: CostPathGroup[];
+  suggestions: CostSuggestions;
+  errors: CostLedgerError[];
+};
+
 export type DoctorReport = {
   skillHome: string;
   skillCount: number;
@@ -199,6 +266,9 @@ export type DoctorReport = {
   warnings: string[];
   gitStatus: string;
   catalog: { source: 'injected' | 'hub' | 'bundled'; commit: string; date: string; ageDays: number };
+  /** The resident-cost account (ADR-0018), always present and sourced from the
+   *  ledger core — doctor reports illnesses, the ledger reports accounts. */
+  residentCost: CostLedger;
   /** Imported entries with no evidence-adopted or supplied source: true snapshots whose upstream is unknown (ADR-0006, ADR-0011). */
   importedWithoutSource: Array<{ skill: string; importedAt: string | null }>;
 };

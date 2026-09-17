@@ -1,6 +1,6 @@
 import path from 'node:path';
-import type { DistributionTargetKind, RegistryEntry, SkillHome } from '../model/index.js';
-import type { FileSystemPort } from '../ports/filesystem.js';
+import type { DistributionTargetKind, RegistryEntry, SkillHome, CostSkillLine, CostPathGroup, CostLedgerError, CostSuggestion, CostScatteredSuggestion, CostSuggestions, CostLedger } from '../model/index.js';
+import { isBrokenSymlink, type FileSystemPort } from '../ports/filesystem.js';
 import { parseSkillFrontmatter } from './frontmatter-mirror.js';
 import type { RegistryService } from './registry-service.js';
 import type { DistributeService } from './distribute-service.js';
@@ -32,72 +32,11 @@ export function charApproxTokens(text: string): number {
   return cjk + Math.floor(others / 4);
 }
 
-/** One managed skill's resident cost on one physical runtime path. */
-export type CostSkillLine = {
-  skill: string;
-  tokens: number;
-  nameTokens: number;
-  descriptionTokens: number;
-  /** True when the SKILL.md carries no description — counted name-only (US15). */
-  incomplete?: boolean;
-  /** True when the hub entry is archived but still distributed (US11). */
-  archived?: boolean;
-};
+/** The ledger's data types live in the model (one-way layering, like every
+ *  other report type); re-exported here so the CLI's import surface stays put. */
+export type { CostSkillLine, CostPathGroup, CostLedgerError, CostSuggestion, CostScatteredSuggestion, CostSuggestions, CostLedger } from '../model/index.js';
 
-/** One physical runtime path's resident account (a shared path appears once). */
-export type CostPathGroup = {
-  runtimeDir: string;
-  kind: DistributionTargetKind;
-  /** The agent family this path serves — noted, so shared paths never double-count (US4). */
-  agents: string[];
-  tokens: number;
-  skills: CostSkillLine[];
-};
-
-/** An entry the ledger counted as 0: unreadable SKILL.md or broken symlink (US14/US26). */
-export type CostLedgerError = {
-  skill: string;
-  runtimePath: string;
-  reason: string;
-};
-
-/** A recall suggestion: verbatim runnable, never executed (US9/US10). `tokens`
- *  is the cost the layer ranks by — total residency for the archived layer,
- *  description-only for the top-N layer. */
-export type CostSuggestion = {
-  skill: string;
-  runtimeDir: string;
-  tokens: number;
-  command: string;
-};
-
-/** One scattered skill (distributed across several physical paths) with a
- *  recall command per path — the operator consolidates by running all but
- *  the one path they keep (US12). */
-export type CostScatteredSuggestion = {
-  skill: string;
-  runtimeDirs: string[];
-  commands: string[];
-};
-
-/** The three suggestion layers (ADR-0018): zero-controversy recalls head the
- *  list, then the top-N expensive descriptions, then scattered consolidation. */
-export type CostSuggestions = {
-  archived: CostSuggestion[];
-  topDescriptions: CostSuggestion[];
-  scattered: CostScatteredSuggestion[];
-};
-
-/** The full three-layer account (US18): per-path → per-skill → suggestions. */
-export type CostLedger = {
-  method: 'char-approx';
-  totalTokens: number;
-  /** Unmanaged (foreign) entries in known runtime roots: counted as present, never itemized (US6). */
-  unmanaged: number;
-  paths: CostPathGroup[];
-  suggestions: CostSuggestions;
-  errors: CostLedgerError[];
-};
+/** One counted distribution entry in flight: the index facts the suggestion
 
 /** One counted distribution entry in flight: the index facts the suggestion
  *  layers need beside the counted line. */
@@ -170,8 +109,9 @@ export class CostLedgerService {
    *  archived-but-distributed entries fall back to their archived hub copy
    *  (same frontmatter the distribution laid down) so they stay counted (US11). */
   private countEntry(skill: string, runtimePath: string, registryEntry: RegistryEntry | undefined): { line: CostSkillLine } | { error: CostLedgerError } {
-    // Same broken-symlink predicate as doctor's reporting, so the surfaces agree (US26).
-    const broken = this.fs.kind(runtimePath) === 'symlink' && this.fs.targetKind(runtimePath) === 'missing';
+    // The shared predicate keeps doctor's broken-links report and this errors
+    // section in agreement (US26).
+    const broken = isBrokenSymlink(this.fs, runtimePath);
     let text = this.readSkillMd(path.join(runtimePath, 'SKILL.md'));
     if (text === null && registryEntry?.archived && typeof registryEntry.archive_path === 'string') {
       text = this.readSkillMd(path.resolve(this.home.root, registryEntry.archive_path, 'SKILL.md'));

@@ -68,7 +68,8 @@ export function createCoreServices(options: CoreServicesOptions) {
   const distribute = new DistributeService(options.fs, home, registry, catalog, options.userHome);
   const install = new InstallService(options.fs, home, registry, source, views, distribute);
   const update = new UpdateService(registry, source, install);
-  const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog);
+  const cost = new CostLedgerService(options.fs, home, registry, distribute);
+  const doctor = new DoctorService(options.fs, options.git, home, registry, distribute, catalog, cost);
   const activity = new ActivityService(options.fs, options.git, home);
   const archive = new ArchiveService(options.fs, home, registry, views);
   const adopt = new AdoptService();
@@ -82,7 +83,6 @@ export function createCoreServices(options: CoreServicesOptions) {
   const provenance = new ProvenanceService(registry, skillLock, frontmatterEvidence);
   const managerSkill = new ManagerSkillService(options.fs, registry, distribute, views);
   const get = new GetService(options.fs, home, registry);
-  const cost = new CostLedgerService(options.fs, home, registry, distribute);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
   return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, get, cost, package: packageService };
 }
