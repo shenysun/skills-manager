@@ -71,19 +71,7 @@ export class SyncService {
   push(): SyncPushResult {
     this.assertGitAvailable();
     const root = this.home.root;
-    if (!this.gitified()) {
-      throw new SkillsManagerError(
-        'sync_not_gitified',
-        `The hub is not a git repository yet — run \`sync init\` first (status exits 0 here, push does not: there is nothing to push).`,
-      );
-    }
-    const remote = this.git.remoteUrl(root, 'origin');
-    if (remote === null) {
-      throw new SkillsManagerError(
-        'sync_no_remote',
-        `No remote origin configured — attach one with \`sync init --remote <url>\`, or run: git -C ${root} remote add origin <url>`,
-      );
-    }
+    const remote = this.assertSyncable(root, 'push does not: there is nothing to push');
     let commit: SyncPushResult['commit'];
     try {
       commit = this.summaryCommitIfNeeded(root);
@@ -108,6 +96,93 @@ export class SyncService {
     } catch (error) {
       throw withGitIdentityGuidance(error);
     }
+  }
+
+  /** Fetch + merge (US-11..US-14). The gates run before any network or merge
+   *  action: pull never runs over a dirty tree, never stashes, and never
+   *  decides a conflict — git's own nonzero exit plus manual `git -C <hub>`
+   *  guidance is the whole conflict story. */
+  pull(): SyncPullResult {
+    this.assertGitAvailable();
+    const root = this.home.root;
+    const remote = this.assertSyncable(root, 'pull does not: there is nothing to pull into');
+    if (this.git.statusPorcelain(root) !== '') {
+      throw new SkillsManagerError(
+        'sync_dirty_tree',
+        `The working tree has uncommitted changes — pull refuses to run over them and never stashes. Push them first (\`sync push\`), or handle them yourself: git -C ${root} status`,
+      );
+    }
+    // Pre-merge HEAD anchors the pull statistics; a repo that passed the clean
+    // tree gate on a valid hub always has commits (its files would otherwise
+    // still be untracked), so the null arm is a defensive empty-base reading.
+    const preHead = this.git.log(root, 1)[0]?.hash ?? null;
+    this.git.fetchOrigin(root);
+    let output: string;
+    try {
+      output = this.git.merge(root, this.mergeTarget(root));
+    } catch (error) {
+      throw withMergeConflictGuidance(error, root);
+    }
+    return { remote, upToDate: ALREADY_UP_TO_DATE.test(output), stats: this.pullStats(root, preHead) };
+  }
+
+  /** The hard gates every content-moving sync command shares (push, pull): a
+   *  hub without `.git/` or without origin is a blocked operation (nonzero),
+   *  never a partial one. The verb tail keeps each command's refusal honest
+   *  about what exactly it cannot do. */
+  private assertSyncable(root: string, verbTail: string): string {
+    if (!this.gitified()) {
+      throw new SkillsManagerError(
+        'sync_not_gitified',
+        `The hub is not a git repository yet — run \`sync init\` first (status exits 0 here, ${verbTail}).`,
+      );
+    }
+    const remote = this.git.remoteUrl(root, 'origin');
+    if (remote === null) {
+      throw new SkillsManagerError(
+        'sync_no_remote',
+        `No remote origin configured — attach one with \`sync init --remote <url>\`, or run: git -C ${root} remote add origin <url>`,
+      );
+    }
+    return remote;
+  }
+
+  /** What this machine merges: its own upstream when push has configured one
+   *  (that is where its pushes land), otherwise the remote's HEAD branch —
+   *  the new-machine arm, before any local push has set up tracking. */
+  private mergeTarget(root: string): string {
+    if (this.git.aheadBehind(root) !== null) return '@{upstream}';
+    const branch = this.git.remoteHeadBranch(root);
+    if (branch === null) {
+      throw new SkillsManagerError(
+        'sync_remote_head_unresolved',
+        `The remote's HEAD branch could not be resolved — nothing has been pushed to it yet. Run \`sync push\` from a machine that has content first, or inspect the remote yourself: git -C ${root} ls-remote origin`,
+      );
+    }
+    return `origin/${branch}`;
+  }
+
+  /** Skill-level view of what the merge brought in (US-14), on the same
+   *  counting rules as the push summary: pre-merge HEAD is the base, so a
+   *  skill the remote added reads as added and a remotely-changed one as
+   *  updated. */
+  private pullStats(root: string, preHead: string | null): SkillDiffSummary {
+    if (preHead === null) {
+      // A registry.yaml found on disk after the merge must have arrived with
+      // it: the clean-tree gate ran before, and an untracked registry would
+      // have been a dirty tree — so presence here really means "changed".
+      return {
+        added: this.git.lsTreeNames(root, 'HEAD', 'skills'),
+        updated: [],
+        removed: [],
+        registryChanged: this.fs.exists(path.join(root, 'registry.yaml')),
+        others: 0,
+      };
+    }
+    return summarizeSkills(
+      this.git.diffNameStatus(root, `${preHead}..HEAD`),
+      new Set(this.git.lsTreeNames(root, preHead, 'skills')),
+    );
   }
 
   /** Shared preflight for every git-touching sync command: a missing git is a
@@ -191,6 +266,9 @@ const shortSha = (sha: string): string => sha.slice(0, 7);
 /** The one-line push outcome git prints on stderr when there is nothing to send. */
 const EVERYTHING_UP_TO_DATE = /Everything up-to-date/;
 
+/** The one-line merge outcome git prints when the remote brought nothing new. */
+const ALREADY_UP_TO_DATE = /Already up to date\./;
+
 /** The commit message a push leaves behind (US-7): skill-level counts (a skill
  *  touched in three files is one entry), a registry flag, and an honest bucket
  *  for everything else (collections/, user .gitignore edits). "Added" means
@@ -198,6 +276,36 @@ const EVERYTHING_UP_TO_DATE = /Everything up-to-date/;
  *  skill is an update, which is why the caller passes HEAD's skill listing.
  *  Zero segments are omitted — the message stays one readable line. */
 function summaryMessage(changes: GitDiffEntry[], skillsAtHead: Set<string>): string {
+  const { added, updated, removed, registryChanged, others } = summarizeSkills(changes, skillsAtHead);
+  const parts = [
+    ...(added.length > 0 ? [`${added.length} added`] : []),
+    ...(updated.length > 0 ? [`${updated.length} updated`] : []),
+    ...(removed.length > 0 ? [`${removed.length} removed`] : []),
+    ...(registryChanged ? ['registry changed'] : []),
+    ...(others > 0 ? [`${others} other file(s)`] : []),
+  ];
+  return `sync: ${parts.join(', ') || 'no content changes'}`;
+}
+
+/** Skill-level classification of one diff — the shared report shape behind
+ *  push's commit message and pull's statistics (one counting rule, two
+ *  reports). */
+export type SkillDiffSummary = {
+  /** Skill names whose directory is absent at the diff's base. */
+  added: string[];
+  /** Skill names present at the base and touched by the diff. */
+  updated: string[];
+  /** Skill names the diff deleted. */
+  removed: string[];
+  /** Whether registry.yaml appears in the diff. */
+  registryChanged: boolean;
+  /** Diff entries outside the canonical spaces (collections/, .gitignore, …). */
+  others: number;
+};
+
+/** `skillsAtBase` is the skill listing at the diff's base ref: a skill absent
+ *  there is added, one present is updated. */
+function summarizeSkills(changes: GitDiffEntry[], skillsAtBase: Set<string>): SkillDiffSummary {
   const added = new Set<string>();
   const updated = new Set<string>();
   const removed = new Set<string>();
@@ -223,28 +331,24 @@ function summaryMessage(changes: GitDiffEntry[], skillsAtHead: Set<string>): str
       const skill = skillNameOf(filePath);
       if (skill === null) { others += 1; continue; }
       if (kind === 'removed') removed.add(skill);
-      else if (skillsAtHead.has(skill)) updated.add(skill);
+      else if (skillsAtBase.has(skill)) updated.add(skill);
       else added.add(skill);
     }
   }
-  const parts = [
-    ...(added.size > 0 ? [`${added.size} added`] : []),
-    ...(updated.size > 0 ? [`${updated.size} updated`] : []),
-    ...(removed.size > 0 ? [`${removed.size} removed`] : []),
-    ...(registryChanged ? ['registry changed'] : []),
-    ...(others > 0 ? [`${others} other file(s)`] : []),
-  ];
-  return `sync: ${parts.join(', ') || 'no content changes'}`;
+  return { added: [...added], updated: [...updated], removed: [...removed], registryChanged, others };
 }
 
 /** One side of a diff entry: the path and what happened to it. */
 type Side = [filePath: string, kind: 'added' | 'removed'];
 
+/** The single coercion every git-failure mapper starts with. */
+const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 /** An unborn HEAD (manual `git init`, never committed) turns every HEAD-based
  *  read into a raw git refusal — push maps it to the same guidance as the
  *  other hard gates instead of surfacing git's internals. */
 function withUnbornHeadGuidance(error: unknown, root: string): unknown {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   if (/unknown revision|bad revision|ambiguous argument 'HEAD'/i.test(message)) {
     return new SkillsManagerError(
       'sync_no_commits',
@@ -268,11 +372,25 @@ const GITIGNORE_HEADER = '# skills-manager sync: machine-local state, never sync
  *  git identity on the user's behalf (US-10's discipline applies to every
  *  commit we make, including init's baseline). */
 function withGitIdentityGuidance(error: unknown): unknown {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   if (/tell me who you are|Author identity unknown/i.test(message)) {
     return new SkillsManagerError(
       'sync_git_identity',
       'Git identity (user.name / user.email) is not configured, and skills-manager does not configure it for you. Set it globally, then retry:\n  git config --global user.name "Your Name"\n  git config --global user.email "you@example.com"',
+    );
+  }
+  return error;
+}
+
+/** A conflicted merge becomes manual-resolution guidance (US-12): the
+ *  conflict state stays exactly as git left it — the operator keeps every
+ *  merge decision. Any other merge failure passes through untouched. */
+function withMergeConflictGuidance(error: unknown, root: string): unknown {
+  const message = errorMessage(error);
+  if (/CONFLICT|Automatic merge failed/i.test(message)) {
+    return new SkillsManagerError(
+      'sync_merge_conflict',
+      `Merge conflict — skills-manager never makes merge decisions for you. The conflicted files are listed by:\n  git -C ${root} status\nResolve them by hand, then finish the merge yourself:\n  git -C ${root} add -A && git -C ${root} commit`,
     );
   }
   return error;
@@ -320,3 +438,13 @@ export type SyncStatusResult =
       /** HEAD's short SHA + subject, or null when the repo has no commits. */
       lastCommit: { sha: string; message: string } | null;
     };
+
+/** What one pull brought in, on the push summary's counting rules (US-14). */
+export type SyncPullResult = {
+  /** The origin URL that was pulled from. */
+  remote: string;
+  /** True when the merge reported nothing to merge (git's own answer). */
+  upToDate: boolean;
+  /** Skill-level diff pre-merge HEAD → post-merge HEAD. */
+  stats: SkillDiffSummary;
+};

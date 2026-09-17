@@ -34,10 +34,12 @@ export const GIT_IDENTITY: Record<string, string> = {
   GIT_COMMITTER_EMAIL: 'sync-test@example.com',
 };
 
-/** A local bare repository to use as the sync remote URL. */
+/** A local bare repository to use as the sync remote URL. `-b main` keeps the
+ *  remote's HEAD symref aligned with the branch `sync init` pins on every hub
+ *  (a dangling remote HEAD would make second-machine pulls unresolvable). */
 export function makeBareRemote(root: string, name = 'remote.git'): string {
   const url = path.join(root, name);
-  const result = spawnSync('git', ['init', '--bare', url]);
+  const result = spawnSync('git', ['init', '--bare', '-b', 'main', url]);
   if (result.status !== 0) throw new Error(`git init --bare failed: ${result.stderr}`);
   return url;
 }

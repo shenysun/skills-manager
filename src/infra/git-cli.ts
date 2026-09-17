@@ -140,8 +140,12 @@ export class GitCli implements GitPort {
     return this.runner.run('git', ['--version']).status === 0;
   }
 
+  /** `-b main` pins the branch name a fresh hub repo gets: multi-machine sync
+   *  needs every machine (and the remote's HEAD) on one branch, and git's
+   *  default branch name varies by machine config. Adopted repos keep their
+   *  own branch — pull resolves the remote side explicitly. */
   initRepo(cwd: string): void {
-    this.runner.runOrThrow('git', ['-C', cwd, 'init']);
+    this.runner.runOrThrow('git', ['-C', cwd, 'init', '-b', 'main']);
   }
 
   remoteUrl(cwd: string, name: string): string | null {
@@ -219,6 +223,28 @@ export class GitCli implements GitPort {
     const result = this.runner.run('git', ['-C', cwd, 'push', '-u', 'origin', 'HEAD']);
     if (result.status !== 0) {
       throw new Error(`Command failed: git push -u origin HEAD\n${result.stderr || result.stdout}`);
+    }
+    return `${result.stdout}\n${result.stderr}`.trim();
+  }
+
+  fetchOrigin(cwd: string): void {
+    this.runner.runOrThrow('git', ['-C', cwd, 'fetch', 'origin']);
+  }
+
+  /** The symref line comes first and reads `ref: refs/heads/<name>\tHEAD`; a
+   *  dangling remote HEAD (fresh bare repo, nothing pushed) prints no symref
+   *  line at all, which is the null answer. */
+  remoteHeadBranch(cwd: string): string | null {
+    const result = this.runner.run('git', ['-C', cwd, 'ls-remote', '--symref', 'origin', 'HEAD']);
+    if (result.status !== 0) return null;
+    return result.stdout.match(/ref: refs\/heads\/(\S+)[ \t]+HEAD/)?.[1] ?? null;
+  }
+
+  merge(cwd: string, ref: string): string {
+    const args = ['-C', cwd, 'merge', '--no-edit', '--allow-unrelated-histories', ref];
+    const result = this.runner.run('git', args);
+    if (result.status !== 0) {
+      throw new Error(`Command failed: git ${args.slice(2).join(' ')}\n${result.stderr || result.stdout}`);
     }
     return `${result.stdout}\n${result.stderr}`.trim();
   }

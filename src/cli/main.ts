@@ -462,6 +462,36 @@ sync.command('push')
     console.log(`pushed to origin: ${result.remote}`);
   });
 
+sync.command('pull')
+  .description('Fetch and merge the remote hub (merge commits allowed; a dirty tree is refused, never stashed; conflicts are yours to resolve)')
+  .action((_opts, cmd) => {
+    const s = services(cmd);
+    const result = s.sync.pull();
+    s.activity.record({
+      action: 'cli-sync-pull',
+      summary: result.upToDate ? 'Sync pull: already up to date' : `Pulled hub from ${result.remote}`,
+      details: { upToDate: result.upToDate, ...result.stats },
+    });
+    if (result.upToDate) {
+      console.log('already up to date: nothing to merge from the remote');
+      return;
+    }
+    console.log(`pulled from origin: ${result.remote}`);
+    const { added, updated, removed } = result.stats;
+    const segments = [
+      ...(added.length > 0 ? [`${added.length} added (${added.join(', ')})`] : []),
+      ...(updated.length > 0 ? [`${updated.length} updated (${updated.join(', ')})`] : []),
+      ...(removed.length > 0 ? [`${removed.length} removed (${removed.join(', ')})`] : []),
+    ];
+    console.log(segments.length > 0 ? `merged skills: ${segments.join(', ')}` : 'merged skills: none changed');
+    console.log(result.stats.registryChanged ? 'registry: changed' : 'registry: unchanged');
+    // Plain text, on purpose (US-14): the follow-up stays the operator's call —
+    // nothing is detected, distributed, or marked.
+    if (added.length > 0) {
+      console.log('Newly pulled skills are not distributed yet — run `distribute --skill <name>` when you want them available to your agents.');
+    }
+  });
+
 const backup = program.command('backup').description('Inspect and restore init backups (hub .backups/, 30-day retention)');backup.command('list')
   .description('List saved backups')
   .action((_opts, cmd) => print(services(cmd).backups.list()));

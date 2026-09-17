@@ -61,6 +61,19 @@ export interface GitPort {
    *  Returns git's combined output — "Everything up-to-date" lives on stderr
    *  and is the caller's in-sync signal; a rejected push throws (nonzero). */
   pushOrigin(cwd: string): string;
+  /** `git fetch origin` — the network half of pull; a failure throws raw so
+   *  transport errors stay distinguishable from merge failures. */
+  fetchOrigin(cwd: string): void;
+  /** The branch the remote's HEAD symref points at (`ls-remote --symref`), or
+   *  null when the remote's HEAD cannot be resolved (nothing pushed yet). This
+   *  is a network read — pull only, never status. */
+  remoteHeadBranch(cwd: string): string | null;
+  /** `git merge --no-edit <ref>` (merge commits allowed; no ff-only, no
+   *  rebase, and unrelated histories are permitted because every new machine
+   *  starts from its own baseline root). Returns git's combined output —
+   *  "Already up to date." is the caller's nothing-to-merge signal; a conflict
+   *  throws (nonzero) with git's own conflict text in the message. */
+  merge(cwd: string, ref: string): string;
 }
 
 export type GitDiffEntry = {
