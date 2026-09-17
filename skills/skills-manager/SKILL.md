@@ -1,6 +1,6 @@
 ---
 name: skills-manager
-description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories) or applying / inspecting a category set (类别集) so an agent loads only the selected domains, or wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo).
+description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories), applying / inspecting a category set (类别集), or saving / switching a named preset (预设 / 档位) so an agent loads only the selected domains, or wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo).
 ---
 
 # Skills Manager
@@ -115,6 +115,19 @@ State the strict semantics plainly whenever proposing an apply:
 - **Exemptions** — this manager skill is always exempt (switching categories never cuts off this conversation); foreign (unmanaged) entries are never touched.
 - **Idempotent** — re-running the same apply changes nothing; recovering from an interruption is just "run it again".
 - **No auto-push** — apply is an explicit snapshot; later tag edits or updates never mutate the runtime. `categories status` reports the drift ("N skills now match the set but are undistributed") and names the re-run command that converges.
+
+**Presets (预设 / 档位)** give a category list a name, so switching is one command instead of restating categories (ADR-0019):
+
+```bash
+skills-manager preset set frontend 前端 ui     # save / replace a named preset (categories may not exist yet — build first, tag later)
+skills-manager preset list                     # members + mount footprint (paths carrying it; drift reported, never implied healthy)
+skills-manager preset remove frontend          # delete + cascade-clear the name off every mounted path (runtime untouched)
+skills-manager preset apply frontend -a claude-code
+```
+
+Map 档位-speak straight onto these — there are no flags for the user to remember: "换个档位" / "只留前端技能" / "切到 X 组合" → `preset apply`; "记住这个组合" → `preset set`. When a name already holds the list, apply the name — never restate the categories.
+
+`preset apply` carries **exactly the strict semantics above** (uncategorized removed, manager skill exempt, foreign untouched, reversible via `distribute rollback --to user`) plus two hard errors that protect the saved object: a preset resolving to zero managed skills, or one referencing a category that no longer exists, both refuse at apply time naming the preset and its categories — relay the error verbatim; it points at the fix (tag skills into the categories, or re-`set` the preset's list). The success output ends with the preset's **resident-cost line** (`≈` tokens, char-approx): state the strict semantics *and* the cost line whenever proposing an apply — the same warnings `categories apply` gets, so switching 档位 never sounds cheaper or safer than it is.
 
 ### Update from sources
 

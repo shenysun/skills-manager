@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-17 (named presets)
+
+- **命名预设（preset / 档位）**（ADR-0019）：把一份领域类别清单存成可反复 apply 的命名**档位**——`registry.yaml` 顶层新增 `presets:` map（对象形状，随 hub 走），独立 `preset` 命令组四子命令。supersede ADR-0015 _Avoid_ 中「named switchable profiles」条款；裸 `categories apply` 语义原封不动（回归锁）。
+- **`preset set / list / remove`**：`set <name> <cat...>` 覆盖式建档（safe-preset-name 校验；类别可先于词汇表存在——先建档位、后打标）；`list` 显示成员类别 + 挂载足迹（承载该档位的物理运行时路径，为零省略，漂移按实报告）；`remove` 删条目并级联清空所有引用该名的档位戳（categories 原样、runtime 不动），输出摘除路径数。
+- **`preset apply <name>`**：apply 时实时解析类别，复用 ADR-0015 路径级严格改写（`-a` 可重复 / 缺省检测集、共享路径写一次、manager skill 豁免、foreign 不动、uncategorized 移除、幂等可重跑恢复）并盖档位戳——`categories status` 并列显示档位名；裸 `categories apply` 清戳（手动覆盖不误报）、`--all` 随解散清除、`distribute rollback --to user` 连带恢复。成功尾部一行该档位常驻成本（`≈` char-approx，复用 ADR-0018 核心；`--json` 给结构化 `cost` 字段）。
+- **两道硬错闸**：预设解析为 0 个受管技能、引用类别不在词汇表——均在 apply 时点名预设与类别拒绝执行，命名对象永不静默清档。
+- **文档收口**：manager skill 档位话术映射（「换个档位 / 只留前端技能 / 切到 X 组合」→ `preset apply`，「记住这个组合」→ `preset set`）+ 提议 apply 必陈述严格语义与成本行；CLI 双语参考、ROADMAP #5、CHANGELOG 同步。
+- 测试：preset set/list/remove/apply 全链路 CLI 端到端（含覆盖语义、safe-name 拒绝、两硬错闸文案、档位戳写入/清除/级联/rollback 随行、status 并列显示、幂等、共享路径写一次、成本尾行与 `--json`）。
+
 ## 2026-09-17 (resident-cost ledger)
 
 - **常驻成本账本**（ADR-0018）：只读核心按**物理 runtime 路径**分组统计每个受管分发的常驻 token 成本——口径为 frontmatter `name + description`（char-approx：CJK ×1、其余 ÷4，零依赖），共享路径只计一次并标注 agent family，user 与 project 路径同账，foreign 条目只报不计数的行。hub「未分发 = 零常驻」模型第一次有了承载面。

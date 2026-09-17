@@ -66,6 +66,11 @@ skills-manager categories list
 skills-manager categories apply frontend finance --agent claude-code
 skills-manager categories apply --all
 skills-manager categories status
+skills-manager preset set web frontend ui
+skills-manager preset list
+skills-manager preset remove web
+skills-manager preset apply web --agent claude-code
+skills-manager preset apply web --json
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
@@ -79,6 +84,12 @@ Skills carry a free-form multi-valued `categories: []` axis (frontend / finance 
 `categories apply <cat...>` is a distribute-level operation: it resolves the selected agents (`--agent` repeatable, default = detected set) to physical runtime paths (deduped), then rewrites each path to hold **exactly** the managed skills whose categories intersect the applied set — distributing what's missing and removing managed entries outside the set, **including untagged ones**. Removal is path-strict (an out-of-set entry goes even if an unselected same-path family agent references it; in-set entries fold in the union of referencing agents). The manager skill is unconditionally exempt; foreign entries are never touched. Apply is idempotent and takes a pre-apply snapshot; `apply --all` dissolves the filter (restores every managed skill, clears the record) and is mutually exclusive with a category list. The applied set is persisted per physical runtime path as an extension of the distribution index; `distribute rollback --to user` restores runtime content and the category-set record together.
 
 Apply is an explicit snapshot — later tag edits or updates never auto-push. `categories status` reports each path's applied set plus drift ("N skills now match the set but are undistributed"); re-running `apply` converges. See [ADR-0015](adr/0015-domain-categories-category-set-loading.md).
+
+### preset (named presets, ADR-0019)
+
+A **preset** is a named list of domain categories — a re-appliable loading set (预设 / 档位), not an install group — stored as a top-level `presets:` map in `registry.yaml`. `preset set <name> <cat...>` is replace semantics (overwrite-in-place when the name exists; preset names are safe-name validated, and categories need not exist in the hub yet — build the preset first, tag skills later). `preset list` shows each preset's member categories plus its mount footprint (how many physical runtime paths currently carry it, omitted when zero, drift reported as-is — never implied healthy). `preset remove` deletes the entry and cascade-clears the `preset` field off every category-set record referencing the name (categories kept, runtime untouched), reporting how many paths the name was detached from.
+
+`preset apply <name>` resolves the preset's categories at apply time through the unchanged ADR-0015 path-level strict rewrite — `--agent` repeatable (default = detected set), shared physical paths written once, manager skill exempt, foreign untouched, uncategorized removed, user scope only — and stamps the applied category-set record with the preset name, which `categories status` shows beside the applied set. A bare `categories apply` on a stamped path clears the field (manual overrides are never misreported as a named preset); `categories apply --all` dissolves it; `distribute rollback --to user` restores the runtime content and the stamped record together. Two hard errors protect the named object: a preset that resolves to zero managed skills, and one referencing a category absent from the hub vocabulary, both refuse at apply time naming the preset and its categories. Success output ends with the preset's resident-cost line (char-approx, `≈`-prefixed; `--json` carries the structured `cost` field). See [ADR-0019](adr/0019-named-presets-category-subsets.md).
 
 ### Stale copy targets and auto-refresh (ADR-0008)
 

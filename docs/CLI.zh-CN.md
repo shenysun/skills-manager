@@ -66,6 +66,11 @@ skills-manager categories list
 skills-manager categories apply 前端 金融 --agent claude-code
 skills-manager categories apply --all
 skills-manager categories status
+skills-manager preset set frontend 前端 ui
+skills-manager preset list
+skills-manager preset remove frontend
+skills-manager preset apply frontend --agent claude-code
+skills-manager preset apply frontend --json
 skills-manager archive old-skill
 skills-manager rebuild-collections
 ```
@@ -79,6 +84,12 @@ distribute 的目标可以是任意目录中的 agent id（`--agent`，可重复
 `categories apply <cat...>` 是 distribute 层操作：把所选 agent（`--agent` 可重复，缺省 = 检测集）解析到物理运行时路径（去重），然后把每个路径改写为**恰好**持有类别与所应用集合相交的受管技能——缺的分发、集合外的受管条目撤除，**包括未打标的**。撤除是路径级严格语义（越集条目即使被未选中的同路径 family 成员引用也撤；集内条目折叠引用 agent 的并集）。manager skill 无条件豁免；foreign 条目永不触碰。apply 幂等且先打快照；`apply --all` 解散过滤（恢复全部受管技能、清除记录），与类别列表互斥。已应用集合按物理运行时路径持久化为分发索引的扩展；`distribute rollback --to user` 把运行时内容与类别集记录一起恢复。
 
 apply 是显式快照——之后的打标或更新不会自动推送。`categories status` 报告各路径的已应用集合与漂移（「N 个技能现已匹配集合但未分发」）；重跑 `apply` 即收敛。见 [ADR-0015](adr/0015-domain-categories-category-set-loading.md)。
+
+### preset（命名预设 / 档位，ADR-0019）
+
+**预设（preset）**是一份命名的领域类别清单——可反复 apply 的加载集**档位**，不是安装组——存于 `registry.yaml` 顶层 `presets:` map。`preset set <name> <cat...>` 为覆盖式（同名原位覆盖；preset 名走 safe-name 校验；类别可先于词汇表存在——先建档位、后打标）。`preset list` 显示每个预设的成员类别与挂载足迹（当前承载它的物理运行时路径数，为零时省略；漂移按实报告，绝不暗示健康）。`preset remove` 删除条目并级联清空所有引用该名的 category-set 记录上的 `preset` 字段（categories 原样、runtime 不动），并输出摘除路径数。
+
+`preset apply <name>` 在 apply 时实时解析预设类别，走 ADR-0015 原封不动的路径级严格改写——`--agent` 可重复（缺省 = 检测集）、共享物理路径只写一次、manager skill 豁免、foreign 不动、uncategorized 移除、仅 user scope——并在已应用的 category-set 记录上盖 `preset` 档位戳，`categories status` 将其与已应用集合并列显示。裸 `categories apply` 会清掉该字段（手动覆盖绝不误报为命名档位）；`apply --all` 随解散一并清除；`distribute rollback --to user` 把运行时内容与带戳记录一起恢复。两道硬错闸保护命名对象：解析为 0 个受管技能、引用类别不在词汇表，均在 apply 时点名预设与类别拒绝执行。成功输出尾部带该档位的常驻成本行（char-approx、`≈` 前缀；`--json` 给结构化 `cost` 字段）。见 [ADR-0019](adr/0019-named-presets-category-subsets.md)。
 
 ### 副本过期与自动刷新（ADR-0008）
 
