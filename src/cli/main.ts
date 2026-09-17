@@ -14,6 +14,7 @@ import { HttpDownloadClient } from '../infra/http-download-client.js';
 import { DetectionService, detectionLogPath } from '../core/services/detection-service.js';
 import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
+import type { AppliedCategorySet } from '../core/model/index.js';
 import { renderCostLedger, renderPresetCostLine } from './cost-output.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
@@ -220,6 +221,19 @@ program.command('edit')
 
 // Domain categories: a free-form multi-valued registry axis, orthogonal to the
 // frozen legacy `category` (ADR-0015). Tag edits never touch runtime dirs.
+
+/** The applied-set column for `categories status`; a preset stamp rides beside the categories (US22), an unstamped path reads exactly as before. */
+function formatAppliedSet(applied: AppliedCategorySet | null): string {
+  if (applied === null) return 'no filter (no category set applied)';
+  if ('all' in applied) return 'no filter (--all applied)';
+  return `categories: ${applied.categories.join(', ')}${applied.preset ? ` (preset: ${applied.preset})` : ''}`;
+}
+
+/** Shared drift phrasing so `categories status` and `preset list` never diverge — honest, never implied healthy (US6). */
+function driftNote(drift: readonly string[]): string {
+  return `${drift.length} skill(s) match the set but are undistributed: ${drift.join(', ')}`;
+}
+
 const categories = program.command('categories').description('Tag skills with domain categories and inspect the hub vocabulary');
 categories.command('set')
   .description('Replace the whole category list for a skill (no categories given = clear)')
@@ -284,12 +298,9 @@ categories.command('status')
     }
     for (const item of paths) {
       const agents = item.agents.length > 0 ? item.agents.join(', ') : 'none';
-      const set = item.applied === null
-        ? 'no filter (no category set applied)'
-        : 'all' in item.applied ? 'no filter (--all applied)' : `categories: ${item.applied.categories.join(', ')}`;
-      console.log(`${item.runtimeDir} (agents: ${agents}) — ${set}`);
+      console.log(`${item.runtimeDir} (agents: ${agents}) — ${formatAppliedSet(item.applied)}`);
       if (item.drift.length > 0) {
-        console.log(`  drift: ${item.drift.length} skill(s) match the set but are undistributed: ${item.drift.join(', ')}`);
+        console.log(`  drift: ${driftNote(item.drift)}`);
         const rerun = item.applied !== null && 'all' in item.applied
           ? 'skills-manager categories apply --all'
           : `skills-manager categories apply ${item.applied?.categories.join(' ')}`;
@@ -312,11 +323,28 @@ preset.command('set')
     print(result);
   });
 preset.command('list')
-  .description('List every preset with its member categories')
+  .description('List every preset with its member categories and mount footprint (drift on mounted paths reported as-is)')
   .action((_opts, cmd) => {
-    const presets = services(cmd).registry.listPresets();
-    for (const { name, categories } of presets) console.log(`${name}: ${categories.join(', ')}`);
-    if (presets.length === 0) console.log('No presets yet — save one with `preset set <name> <category...>`.');
+    const s = services(cmd);
+    const presets = s.registry.listPresets();
+    if (presets.length === 0) {
+      console.log('No presets yet — save one with `preset set <name> <category...>`.');
+      return;
+    }
+    // Mount footprint (US5/US6): which physical runtime paths currently carry
+    // each preset — zero mounts stay silent, and a drifted mount is reported,
+    // never implied healthy. Paths, not resolved-skill counts.
+    const statusPaths = s.distribute.categorySetStatus().paths;
+    for (const { name, categories } of presets) {
+      console.log(`${name}: ${categories.join(', ')}`);
+      const mounts = statusPaths.filter((item) => item.applied !== null && 'categories' in item.applied && item.applied.preset === name);
+      if (mounts.length === 0) continue;
+      console.log(`  mounted on ${mounts.length} runtime path(s): ${mounts.map((item) => item.runtimeDir).join(', ')}`);
+      for (const item of mounts) {
+        if (item.drift.length === 0) continue;
+        console.log(`  drift on ${item.runtimeDir}: ${driftNote(item.drift)}`);
+      }
+    }
   });
 preset.command('remove')
   .description('Delete a preset and cascade-clear its name off every category-set record referencing it (applied categories kept, runtime untouched); reports how many paths the name was detached from')
