@@ -298,6 +298,27 @@ categories.command('status')
     }
   });
 
+// Named presets: a saved category list — the re-appliable loading-set档位
+// (ADR-0019). Storage only; switching runtime dirs is `preset apply`'s job.
+const preset = program.command('preset').description('Manage named lists of domain categories (re-appliable agent loading sets, ADR-0019)');
+preset.command('set')
+  .description('Replace the whole member list of a preset (overwrite-in-place when the name exists; categories need not exist in the hub yet)')
+  .argument('<name>')
+  .argument('<category...>')
+  .action((name, values, _opts, cmd) => {
+    const s = services(cmd);
+    const result = s.registry.setPreset(name, values);
+    s.activity.record({ action: 'cli-preset-set', summary: `set preset ${name}`, details: { preset: name, categories: values } });
+    print(result);
+  });
+preset.command('list')
+  .description('List every preset with its member categories')
+  .action((_opts, cmd) => {
+    const presets = services(cmd).registry.listPresets();
+    for (const { name, categories } of presets) console.log(`${name}: ${categories.join(', ')}`);
+    if (presets.length === 0) console.log('No presets yet — save one with `preset set <name> <category...>`.');
+  });
+
 const provenance = program.command('provenance').description('Backfill provenance for source-less skills (frontmatter & lockfile evidence adoption, ADR-0011/0012/0017)');
 provenance.command('adopt')
   .description('Adopt frontmatter/lockfile evidence onto legacy imported skills that have no source yet')

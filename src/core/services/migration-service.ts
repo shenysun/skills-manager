@@ -41,7 +41,7 @@ export class MigrationService {
   plan(): MigrationPlan {
     const mapping = this.agentMapping();
     const registryChanges: MigrationPlan['registryChanges'] = [];
-    for (const [skill, entry] of Object.entries(this.readRawRegistry())) {
+    for (const [skill, entry] of Object.entries(this.readRawRegistry().skills || {})) {
       const consumers = (entry.consumers || []) as string[];
       const legacy = consumers.filter((value) => isLegacyConsumer(value));
       if (legacy.length === 0) continue;
@@ -62,12 +62,13 @@ export class MigrationService {
     const rawRegistry = this.readRawRegistry();
     const registrySkills: string[] = [];
     for (const change of plan.registryChanges) {
-      const entry = rawRegistry[change.skill];
+      const entry = rawRegistry.skills?.[change.skill];
+      if (!entry) continue;
       entry.consumers = change.to;
       registrySkills.push(change.skill);
     }
     this.fs.writeText(path.join(backupDir, 'registry.yaml'), this.fs.readText(this.home.registryFile));
-    this.fs.writeText(this.home.registryFile, YAML.stringify({ skills: rawRegistry }, { lineWidth: 0 }));
+    this.fs.writeText(this.home.registryFile, YAML.stringify({ ...rawRegistry, skills: rawRegistry.skills || {} }, { lineWidth: 0 }));
 
     // 2. Hub index: v1 consumer entries → v2 dual-layer entries (identical runtimePath).
     const records = this.readRawIndex();
@@ -106,10 +107,13 @@ export class MigrationService {
     this.fs.writeText(this.distribute.indexPath(), this.fs.readText(path.join(dir, 'distributions.jsonl')));
   }
 
-  private readRawRegistry(): Record<string, { consumers?: string[]; [key: string]: unknown }> {
+  /** Raw whole-document registry read — the loader hard-fails on legacy tags by
+   *  design, so migrations bypass it. Returns the top-level object so sibling
+   *  keys (e.g. `presets`, ADR-0019) ride the rewrite untouched. */
+  private readRawRegistry(): { skills?: Record<string, { consumers?: string[]; [key: string]: unknown }>; [key: string]: unknown } {
     if (!this.fs.exists(this.home.registryFile)) return {};
-    const parsed = YAML.parse(this.fs.readText(this.home.registryFile)) as { skills?: Record<string, { consumers?: string[]; [key: string]: unknown }> } | null;
-    return parsed?.skills || {};
+    const parsed = YAML.parse(this.fs.readText(this.home.registryFile)) as { skills?: Record<string, { consumers?: string[]; [key: string]: unknown }>; [key: string]: unknown } | null;
+    return parsed || {};
   }
 
   private readRawIndex(): LegacyRecord[] {

@@ -1,9 +1,9 @@
 import path from 'node:path';
 import YAML from 'yaml';
-import { type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
+import { type PresetEntry, type Registry, type RegistryEntry, type Skill, type SkillName, type SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import { SkillsManagerError } from '../../shared/errors.js';
-import { assertPathInside, assertSafeSkillName, isLegacyConsumer, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
+import { assertPathInside, assertSafePresetName, assertSafeSkillName, isLegacyConsumer, normalizeTags, parseAgentTags, validateRegistrySafePatch, type RegistrySafePatch } from '../../shared/validation.js';
 import type { FrontmatterMirrorService } from './frontmatter-mirror.js';
 import { treeContentSha } from './tree-content-hash.js';
 
@@ -17,7 +17,8 @@ export class RegistryService {
   load(): Registry {
     if (!this.fs.exists(this.home.registryFile)) return { skills: {} };
     const parsed = YAML.parse(this.fs.readText(this.home.registryFile)) as Registry | null;
-    const registry = parsed && typeof parsed === 'object' && parsed.skills ? parsed : { skills: {} };
+    const registry = parsed && typeof parsed === 'object' ? parsed : { skills: {} };
+    if (!registry.skills) return { ...registry, skills: {} };
     const legacy = Object.entries(registry.skills || {})
       .filter(([, entry]) => (entry.consumers || []).some((value) => isLegacyConsumer(value)))
       .map(([name]) => name);
@@ -29,7 +30,10 @@ export class RegistryService {
 
   save(registry: Registry) {
     this.fs.makeDirectory(this.home.root);
-    this.fs.writeText(this.home.registryFile, YAML.stringify({ skills: registry.skills || {} }, { lineWidth: 0 }));
+    // Presets ride the same file as skills entries (ADR-0019); the key is
+    // omitted while empty so a preset-less hub reads exactly as before.
+    const presets = registry.presets && Object.keys(registry.presets).length > 0 ? { presets: registry.presets } : {};
+    this.fs.writeText(this.home.registryFile, YAML.stringify({ skills: registry.skills || {}, ...presets }, { lineWidth: 0 }));
   }
 
   skillDir(skill: SkillName) {
@@ -99,7 +103,7 @@ export class RegistryService {
       skills[item.skill] = this.defaultEntry(item.skill, { ...(skills[item.skill] || {}), ...item.patch });
     }
     this.captureUrlContentAnchors(skills, items);
-    this.save({ skills });
+    this.save({ ...registry, skills });
     this.reprojectMirrors(skills, items);
     return items.map((item) => skills[item.skill]);
   }
@@ -143,7 +147,7 @@ export class RegistryService {
     if (!registry.skills?.[skill]) return;
     const skills = { ...registry.skills };
     delete skills[skill];
-    this.save({ skills });
+    this.save({ ...registry, skills });
   }
 
   editSafeFields(skill: SkillName, patch: Partial<RegistrySafePatch>) {
@@ -183,6 +187,27 @@ export class RegistryService {
     return [...counts.entries()]
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => (a.category < b.category ? -1 : a.category > b.category ? 1 : 0));
+  }
+
+  /** Replace a preset's whole member list (overwrite-in-place, the same replace
+   *  convention as `categories set`; ADR-0019). Storage is deliberately
+   *  unvalidated against the vocabulary — build the preset first, tag skills
+   *  into its categories later (US16). */
+  setPreset(name: string, categories: readonly string[]): PresetEntry {
+    assertSafePresetName(name);
+    const entry: PresetEntry = { categories: normalizeTags(categories) };
+    if (entry.categories.length === 0) {
+      throw new SkillsManagerError('invalid_preset', `Preset ${name} needs at least one category. Pass the member categories, e.g. \`preset set ${name} 前端 后端\`.`);
+    }
+    const registry = this.load();
+    this.save({ ...registry, presets: { ...(registry.presets || {}), [name]: entry } });
+    return entry;
+  }
+
+  listPresets(): Array<{ name: string; categories: string[] }> {
+    return Object.entries(this.load().presets || {})
+      .map(([name, entry]) => ({ name, categories: normalizeTags(entry?.categories || []) }))
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   }
 
   defaultEntry(skill: SkillName, patch: Partial<RegistryEntry> = {}): RegistryEntry {

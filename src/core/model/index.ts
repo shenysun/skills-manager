@@ -82,8 +82,16 @@ export type RegistryEntry = {
   [key: string]: unknown;
 };
 
+/** A named list of domain categories — the re-appliable loading-set档位 (ADR-0019).
+ *  Object-shaped to leave room for future fields; no reserved words. */
+export type PresetEntry = {
+  categories: string[];
+};
+
 export type Registry = {
   skills: Record<SkillName, RegistryEntry>;
+  /** Named presets, hub-level declarative data beside the skills entries (ADR-0019). */
+  presets?: Record<string, PresetEntry>;
 };
 
 export type Skill = {

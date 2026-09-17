@@ -22,6 +22,18 @@ export function assertSafeSkillName(name: string): asserts name is string {
   }
 }
 
+/** Preset names compose into commands and category-set records, so they must
+ *  stay single-token and path-safe (ADR-0019). Unlike skill names they carry no
+ *  charset regex — non-ASCII names are fine; only structure is policed. */
+export function assertSafePresetName(name: string): asserts name is string {
+  if (!name || /[\s\u0000-\u001f\u007f/\\]/.test(name)) {
+    throw new SkillsManagerError(
+      'invalid_preset_name',
+      `Invalid preset name: "${name}". Use a non-empty name without whitespace, control, or path-separator characters.`,
+    );
+  }
+}
+
 export function assertPathInside(child: string, parent: string) {
   const resolvedChild = path.resolve(child);
   const resolvedParent = path.resolve(parent);
