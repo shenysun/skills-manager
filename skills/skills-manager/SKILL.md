@@ -14,8 +14,9 @@ Key vocabulary you will need when reading output:
 - **`imported: true`**: how the skill *entered* the hub (via `init`), orthogonal to whether it has a source.
 - **Detected agents**: the agent set `npx skills` would target on this machine, resolved locally from the bundled catalog snapshot.
 - **Domain category / category set**: a skill's free-form `categories: []` (前端 / 金融 / backend — the user's own vocabulary, orthogonal to the frozen legacy `category`); a **category set** is the per-runtime-path applied filter state that `categories status` reports.
+- **Resident cost / Cost ledger**: the per-message token cost of a distributed skill's frontmatter `name + description` (an undistributed skill costs nothing). `cost` accounts it per physical runtime path — approximately, always shown `≈` (`method: "char-approx"`).
 
-The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. Commands print JSON — except `status` (a human-readable summary), `get` (the skill file itself), and `--help`. Parse stdout; don't guess the shape.
+The CLI is non-interactive (bootstrap's agent picker is the one exception); every choice is a flag. Commands print JSON — except `status` (a human-readable summary), `get` (the skill file itself), `cost` (a human ledger view; `--json` prints the machine form), and `--help`. Parse stdout; don't guess the shape.
 
 ## First run / empty hub
 
@@ -40,6 +41,7 @@ skills-manager get <name>             # zero-retention read: full SKILL.md (fron
 skills-manager get <name> --path      # absolute hub dir, for read-only borrowing of sibling files
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source queue
+skills-manager cost [--top <n>] [--json]  # resident-cost ledger: per-path cost + report-only recall suggestions
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
@@ -224,6 +226,22 @@ skills-manager doctor
 ```
 
 Summarize: adopted-from-lockfile count, sources written by approval, confirmed locally-authored, skipped, and the before/after of the doctor queue.
+
+## Workflow: audit resident context cost
+
+Every distributed skill charges every message the tokens of its frontmatter `name + description` — its **resident cost**. That is the account `skills-manager cost` keeps: totals grouped by physical runtime path (a shared path counted once, its agent family noted), per-skill lines under each path, and report-only recall suggestions. Consult it unprompted when the user wonders what their agents pay per message (常驻成本 / context cost) — and when it shows expensive or zero-controversy distributions, propose the recall yourself instead of waiting to be asked.
+
+```bash
+skills-manager cost --json                 # the full three-layer ledger — parse this in conversation
+skills-manager cost                        # human view: path groups → per-skill lines → total + unmanaged line → suggestions
+skills-manager cost --top 10               # widen the expensive-descriptions list (default 5)
+```
+
+The JSON carries `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill lines), the top-level `totalTokens` and `method`, a three-layer `suggestions` object, an `unmanaged` count for foreign entries the ledger honestly omits, and an `errors` list for unreadable entries (counted 0; entries missing a description are flagged `incomplete`).
+
+- **Approximations, always.** `method` is `"char-approx"` (CJK characters ×1, everything else ÷4) and every displayed number is `≈`-prefixed — never relay a ledger number to the user as an exact token count.
+- **Suggest recalls, never execute them.** Every suggestion carries a verbatim runnable `undistribute` command (including the required `--to`, and `--project` where the path is a project target). Acting on it is the user's decision. Only `undistribute` is ever suggested — `get` (the reference layer) and `archive` are user-side follow-ups you may narrate but not run.
+- **Suggestion layers, in order**: archived-but-distributed skills (zero-controversy recalls — the impossible-to-miss head section), top-N most expensive descriptions, and scattered distributions (one skill across several paths — consolidate to one).
 
 ## Autonomy rules
 

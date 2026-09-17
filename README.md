@@ -11,6 +11,7 @@ Manage your agent skills **from the conversation**: one `npx` command installs t
 - **One hub, every agent** — a single content library (`~/.skills-manager`) distributes any subset to any of the 70+ catalog agents, symlink or copy per target, with stale-copy detection and rollback.
 - **Five source types** — git repos and URLs, direct download URLs (SKILL.md / zip / tar), local zip archives, Claude plugin marketplaces, and well-known discovery indexes.
 - **Updates that don't cry wolf** — the update anchor is the git tree SHA of the skill's own subdirectory, so upstream commits outside the skill never light up an update.
+- **The resident-cost ledger** — every distributed skill's frontmatter charges each message; `skills-manager cost` accounts it per runtime path (approximate, `≈`) with report-only recall suggestions. Undistributed = zero. See [ADR-0018](docs/adr/0018-resident-cost-ledger.md).
 - **Provenance backfill** — imported skills without a source get one through lockfile-evidence adoption, agent-driven search, and your approval.
 - **The manager skill** — every management action happens in agent conversation ([ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)); the CLI underneath is a plain JSON engine.
 
@@ -106,6 +107,7 @@ skills-manager provenance adopt                  # backfill lockfile evidence
 skills-manager categories set my-skill frontend     # tag with a domain category
 skills-manager categories apply frontend -a claude-code  # load only that domain
 skills-manager categories status                  # applied sets + drift
+skills-manager cost                              # resident context-cost ledger (report-only recall suggestions)
 skills-manager archive old-skill
 ```
 

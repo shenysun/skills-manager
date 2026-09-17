@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-17 (resident-cost ledger)
+
+- **常驻成本账本**（ADR-0018）：只读核心按**物理 runtime 路径**分组统计每个受管分发的常驻 token 成本——口径为 frontmatter `name + description`（char-approx：CJK ×1、其余 ÷4，零依赖），共享路径只计一次并标注 agent family，user 与 project 路径同账，foreign 条目只报不计数的行。hub「未分发 = 零常驻」模型第一次有了承载面。
+- **`skills-manager cost`**：人读输出（路径组 → per-skill 行 → 总计 + unmanaged 行 → 三层建议）与 `--json` 三层结构（`paths[]` / per-skill / `suggestions`）同源同构；`--top <n>`（默认 5）控制最贵 description 清单长度；顶层 `method: "char-approx"` 元数据声明近似口径，展示一律 `≈1.2k` 风格缩写。
+- **建议只报告不执行**：每条建议附逐字可运行的 `undistribute` 命令（含必需的 `--to`，project 路径带 `--project`）；三层为 archived-but-distributed 零争议收回（置顶）、top-N 最贵 description、scattered 归并提示。无 token 阈值、无使用判断、无 `--apply`。
+- **缺陷诚实**：SKILL.md 不可读（含 broken symlink，与 doctor 共享判定谓词）计 0 并进 errors 节；description 缺失按 name-only 计并标 `incomplete`。
+- **doctor `residentCost` 集成**：报告常驻结构化字段（账本核心直挂，恒存在）；告警仅在跨路径 scattered 重复分发时提及常驻成本——doctor 报病、账本报账。
+- **dashboard 常驻成本线**：内容区顶部「常驻 ≈N tokens · N 路径」一行（与 update strip 同区域同样式），inline 展开为 per-path 分组明细；skill preview 接入展开区行尾 `· ≈N` 足迹。懒加载自新端点 `GET /api/cost`，`/api/state` 形状零变化；zh/en 双目录收录。
+- **manager skill 收录 cost 工作流**：查账本（`--json` 三层 + `method` 语义——agent 不得把 `≈` 近似数当精确数转述）→ 未经提示即建议收回昂贵/零争议分发，建议只指向 `undistribute`（`get` 与 `archive` 是可叙述不代执行的用户侧后续）。
+- 测试 +43 例：char-approx 纯函数、账本服务（共享路径/user+project/foreign/archived/scattered/缺陷标注）、CLI 渲染与 `--json`/`--top`、doctor residentCost 与仅 scattered 告警、`/api/cost` 端点、dashboard domain 纯函数与两端点 join 用例。
+
 ## 2026-09-10 (manager-skill-first)
 
 - **manager skill 成为产品正门**（ADR-0014）：`npx skills-manager-cli` 不带子命令即 bootstrap——建 hub → 从 npm 包内副本种 manager skill（以发布 tag `v<version>` 作为 source 戳，tree-SHA 更新检测照常可用）→ 挂载（symlink）到你选择的 agent → 打印起始提示词（「帮我看看我的 skills：有哪些、装到哪些 agent 了、有没有能更新的」）。幂等；**永不导入**——导入存量 runtime skills 是装完后通过 manager skill 在对话里完成的动作，bootstrap 只提示发现数量。

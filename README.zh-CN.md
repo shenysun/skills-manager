@@ -11,6 +11,7 @@
 - **一个库，所有 agent**——单一内容库（`~/.skills-manager`）把任意子集分发到 catalog 里的 70+ agent，按目标选软链接或拷贝，带副本过期检测与回滚。
 - **五类源**——git 仓库与 URL、直下 URL（单个 `SKILL.md` / zip / tar）、本地 zip 归档、Claude 插件市场、well-known 发现索引。
 - **更新不误报**——更新锚点是 skill 自身子目录的 git tree SHA，上游动了 skill 之外的文件不会点亮「可更新」。
+- **常驻成本账本**——每个已分发 skill 的 frontmatter 都在按条消息计费；`skills-manager cost` 按运行时路径记账（近似口径，`≈` 展示）并给出只报告不执行的收回建议。未分发 = 零常驻。见 [ADR-0018](docs/adr/0018-resident-cost-ledger.md)。
 - **来源可回填**——没有来源的导入 skill，经锁文件证据采纳、agent 搜索、你批准三层流程补齐 provenance。
 - **manager skill**——所有管理动作都在 agent 对话里完成（[ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)）；底层 CLI 是纯 JSON 引擎。
 
@@ -106,6 +107,7 @@ skills-manager provenance adopt                  # 补采锁文件证据
 skills-manager categories set my-skill 前端       # 打领域类别标签
 skills-manager categories apply 前端 -a claude-code  # 只加载该领域
 skills-manager categories status                  # 已应用集合 + 漂移
+skills-manager cost                              # 常驻上下文成本账本（只报告不执行的收回建议）
 skills-manager archive old-skill
 ```
 

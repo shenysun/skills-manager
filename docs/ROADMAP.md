@@ -8,14 +8,14 @@
 - **#1 SEO / 命名防御**（2026-09-16 完成）：README 双语定位区分（vs xingkongliang 桌面版）+ 五条差异化主张；package.json description/keywords 重写。
   - **待复测检查点**：npm 索引随下次发版生效后，`npm search skills-manager --searchlimit=10` 对比基线（2026-09-16 测得 **9/10**，根因旧 keywords 缺字面词）；`npm view skills-manager-cli keywords` 确认上线。
 - **#2 Frontmatter 便携 provenance + #3 引用层 `get`**（2026-09-17 完成，feature `provenance-get`）：打包一张特性票交付（7 张实施票，QA 27/27 场景 0 缺陷，commits c5d5669…bd44dad）。裁定见 **ADR-0017**（registry 是 SoT、frontmatter 单向投影、五写入点闭口、git 源逐字对齐 gh skill `metadata.github-*` 四键换互认、frontmatter 优先 lockfile 兜底、证据即校准、fingerprint 不豁免）；`get` v1 hub-only、完整 SKILL.md stdout、`--path` 只读借目录。遗留：marketplace 写入点无 install seam 实测（纯函数层已覆盖）。
+- **#4 上下文成本可视化**（2026-09-17 完成，feature `context-cost`）：常驻成本账本（ADR-0018）——只读核心按物理 runtime 路径分组统计 frontmatter `name+description` 常驻 token（char-approx，`≈` 展示 + `method` 元数据），三个薄适配共享同一核心：`cost` CLI（人读 + `--json` 三层结构）、doctor `residentCost` 结构化字段（仅 scattered 告警）、dashboard `GET /api/cost`（顶部 inline 常驻线 + preview 接入足迹，懒加载）；建议只指向 `undistribute`、只报告不执行，manager skill 收录查账本→建议收回工作流。
 
 ## 第一梯队（下一个特性，建议打包一张票）
 
-（已清空——原 #2/#3 已完成，下一批从第二梯队 #4/#5 取。）
+（已清空——原 #2/#3 与 #4 已完成，下一批从第二梯队 #5 取。）
 
 ## 第二梯队
 
-- **#4 上下文成本可视化**：按物理 runtime 路径统计常驻 token 成本（frontmatter description）+ 降级建议；dashboard doctor 信号承载。全赛道仅 `asm` 有（deep-dive §3.1），与 hub「未分发 = 零常驻」模型最契合。
 - **#5 Preset / Bundle**：命名的类别子集 + apply，`categories apply`（ADR-0015）的自然延伸；asm bundles + xingkongliang presets 双重验证需求。
 
 ## 第三梯队（大票，先做 MVP）
