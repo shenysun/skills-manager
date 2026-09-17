@@ -255,6 +255,11 @@ export function createDashboardApp(options: DashboardServerOptions): FastifyInst
 
   app.get('/api/state', async () => data(await state()));
 
+  // The resident-cost ledger (ADR-0018): the ledger core as-is — same JSON
+  // `cost --json` emits, never recomputed here. Lazy-loaded by the web tier so
+  // /api/state stays light (ticket 03/04); read-only, top-N at its default 5.
+  app.get('/api/cost', async () => data(getServices().cost.ledger()));
+
   // Skill preview (read-only): one file of one skill, rendered server-side.
   app.get('/api/skill/file', async (request) => {
     const query = request.query as { name?: string; path?: string };
