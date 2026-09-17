@@ -227,17 +227,42 @@ export class GitCli implements GitPort {
     return `${result.stdout}\n${result.stderr}`.trim();
   }
 
+  /** `--prune` keeps the remote-tracking refs an honest mirror — pull picks its
+   *  merge target from them, and a branch the remote deleted must not survive
+   *  as a phantom candidate. */
   fetchOrigin(cwd: string): void {
-    this.runner.runOrThrow('git', ['-C', cwd, 'fetch', 'origin']);
+    this.runner.runOrThrow('git', ['-C', cwd, 'fetch', '--prune', 'origin']);
   }
 
   /** The symref line comes first and reads `ref: refs/heads/<name>\tHEAD`; a
-   *  dangling remote HEAD (fresh bare repo, nothing pushed) prints no symref
-   *  line at all, which is the null answer. */
+   *  dangling remote HEAD (fresh bare repo, or a self-built one whose HEAD
+   *  points at a never-pushed branch) prints no symref line at all, which is
+   *  the null answer. */
   remoteHeadBranch(cwd: string): string | null {
     const result = this.runner.run('git', ['-C', cwd, 'ls-remote', '--symref', 'origin', 'HEAD']);
     if (result.status !== 0) return null;
     return result.stdout.match(/ref: refs\/heads\/(\S+)[ \t]+HEAD/)?.[1] ?? null;
+  }
+
+  /** A fetch's own record of what the remote carries — `origin/<name>` is a
+   *  local ref after fetch, so this is the authoritative list of merge targets
+   *  that can actually be merged, with no second network round-trip.
+   *  `origin/HEAD` (set only by clone/`remote set-head`) is not a branch. */
+  originBranchNames(cwd: string): string[] {
+    const output = this.runner.runOrThrow('git', [
+      '-C', cwd, 'for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/',
+    ]);
+    return output.split('\n')
+      .filter(Boolean)
+      .filter((name) => name !== 'origin/HEAD')
+      .map((name) => name.slice('origin/'.length));
+  }
+
+  /** `symbolic-ref` fails on a detached HEAD and on an unborn branch — both are
+   *  "no branch name" answers, not failures worth surfacing. */
+  currentBranch(cwd: string): string | null {
+    const result = this.runner.run('git', ['-C', cwd, 'symbolic-ref', '--short', 'HEAD']);
+    return result.status === 0 ? result.stdout.trim() : null;
   }
 
   merge(cwd: string, ref: string): string {

@@ -190,19 +190,34 @@ export class SyncService {
     return remote;
   }
 
-  /** What this machine merges: its own upstream when push has configured one
-   *  (that is where its pushes land), otherwise the remote's HEAD branch —
-   *  the new-machine arm, before any local push has set up tracking. */
+  /** What this machine merges, in priority order: its own upstream when push
+   *  has configured one (that is where its pushes land), otherwise — the
+   *  new-machine arm, before any local push has set up tracking — the remote
+   *  branch of the same name (pull merges where `push -u origin HEAD` pushes,
+   *  and `sync init` pins every fresh hub to `main`, so a dangling self-built
+   *  remote HEAD — symref at a never-pushed branch — resolves fine), otherwise
+   *  the remote's declared HEAD branch (adopted repos on a branch the remote
+   *  does not carry), otherwise the sole branch when the remote has exactly
+   *  one. The refusals tell the truth about the remote: "nothing pushed yet"
+   *  only when it really has no branches. */
   private mergeTarget(root: string): string {
     if (this.git.aheadBehind(root) !== null) return '@{upstream}';
-    const branch = this.git.remoteHeadBranch(root);
-    if (branch === null) {
+    const branches = this.git.originBranchNames(root);
+    if (branches.length === 0) {
       throw new SkillsManagerError(
-        'sync_remote_head_unresolved',
-        `The remote's HEAD branch could not be resolved — nothing has been pushed to it yet. Run \`sync push\` from a machine that has content first, or inspect the remote yourself: git -C ${root} ls-remote origin`,
+        'sync_remote_empty',
+        `The remote has no branches yet — nothing has been pushed to it. Run \`sync push\` from a machine that has content first, or inspect the remote yourself: git -C ${root} ls-remote origin`,
       );
     }
-    return `origin/${branch}`;
+    const local = this.git.currentBranch(root);
+    if (local !== null && branches.includes(local)) return `origin/${local}`;
+    const head = this.git.remoteHeadBranch(root);
+    if (head !== null && branches.includes(head)) return `origin/${head}`;
+    if (branches.length === 1) return `origin/${branches[0]}`;
+    throw new SkillsManagerError(
+      'sync_merge_target_ambiguous',
+      `The remote's HEAD branch could not be resolved, its branches (${branches.join(', ')}) do not include this machine's branch \`${local ?? '(detached)'}\`, and picking one for you would be a merge decision. Point yourself at a branch, then rerun \`sync pull\`: git -C ${root} branch --set-upstream-to=origin/<branch>, or inspect the remote yourself: git -C ${root} ls-remote origin`,
+    );
   }
 
   /** Skill-level view of what the merge brought in (US-14), on the same

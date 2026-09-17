@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-18 (dangling remote HEAD pull fix)
+
+- **修复自建远端 HEAD symref 悬空时新机 pull 兜底失败（ticket 08）**：`git init --bare`（不带 `-b main`）的远端 HEAD symref 默认指向从未被推送的分支，hub 推送的固定分支是 `main`——远端明明有内容，新机 pull 却报「远端还什么都没推过」且按指引永远无法自愈。修复：merge 目标改为四段解析链——本机 upstream → 同名远端分支（pull 合并的正是 `push -u origin HEAD` 推送的目标）→ 远端声明的 HEAD 分支 → 唯一远端分支（前三步均不中且远端多分支时非零退出，如实列出远端实际分支与本机分支并给出 `--set-upstream-to` 指引，绝不瞎猜）；分支枚举改读 fetch 后的 `refs/remotes/origin/`（本地读，无第二次网络往返，且正是 `origin/<name>` 合法目标的权威集合），fetch 升级为 `--prune`——远端已删分支不得以幽灵 tracking ref 残留成候选；「nothing has been pushed yet」措辞只在远端真的没有分支时出现（新错误码 `sync_remote_empty`，不可判定时错误码 `sync_merge_target_ambiguous` 如实列出远端分支与本机分支）。CLI 双语参考与 CONTEXT Hub sync 词条补 merge 目标解析链。
+- 测试：CLI seam 新增七条——QA 原始复现（悬空 HEAD 远端新机首拉成功合入）、多分支远端同名优先（merge subject 锁定 `origin/main`）、远端声明 HEAD 兜底（adopt 仓库本地分支不在远端）、不可判定时如实拒绝（列分支、不谎称 nothing pushed、带指引）、真空远端保留准确 nothing-pushed 措辞、同名优先排序意图显式锁定（adopt dev 机合 `origin/dev` 而非远端声明的 main——pull 合并的正是 push 推送的目标）、远端删分支后 prune 不留幽灵目标（回退到远端声明 HEAD）；fixture `makeBareRemote` 支持显式 headBranch 以覆盖自建默认世界。
+
 ## 2026-09-18 (new-machine first-pull registry fix)
 
 - **修复新机首拉必冲突（ticket 07）**：真实 hub（装过至少一个 skill）在新机 `sync init --remote` 后首次 `sync pull`，B 机基线里的占位 `registry.yaml`（`skills: {}`，init 时 ensure() 生成）与 A 机真实 registry 在 unrelated-histories merge 下必然 AA 相撞、退出 1——「不需要理解 git 也能同步」的最普通首次设置路径被打断。修复：三条前置同时成立时 pull 自动以远端真实 registry 覆盖占位并结成 merge commit——① `registry.yaml` 是唯一冲突路径；② 本地内容为字节级占位符；③ 本地历史仅有那一条 init 基线提交（`sync: baseline commit`）——该状态下本地不存在任何用户数据（未 push、无手工提交），故不构成「对用户数据做合并决策」；移除最后一个 skill 后序列化回 `skills: {}` 的真实清空 push 因历史不止基线一条而被排除。其余一切冲突形状（其他路径参与、本地 registry 真实、历史超出基线）仍原样留给 `git -C <hub>` 手工解决。CLI 输出零省略注明占位被真实侧取代（`registry conflict: resolved by keeping the remote registry …`）。CLI 双语参考与 manager skill 同步章节补唯一例外措辞；占位符常量 `EMPTY_REGISTRY_FILE` 与基线提交信息 `BASELINE_COMMIT_MESSAGE` 单点定义。

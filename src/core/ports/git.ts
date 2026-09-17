@@ -61,13 +61,23 @@ export interface GitPort {
    *  Returns git's combined output — "Everything up-to-date" lives on stderr
    *  and is the caller's in-sync signal; a rejected push throws (nonzero). */
   pushOrigin(cwd: string): string;
-  /** `git fetch origin` — the network half of pull; a failure throws raw so
-   *  transport errors stay distinguishable from merge failures. */
+  /** `git fetch --prune origin` — the network half of pull; `--prune` keeps
+   *  `refs/remotes/origin/` an honest mirror of the remote (a deleted remote
+   *  branch must not linger as a phantom merge target). A failure throws raw
+   *  so transport errors stay distinguishable from merge failures. */
   fetchOrigin(cwd: string): void;
   /** The branch the remote's HEAD symref points at (`ls-remote --symref`), or
-   *  null when the remote's HEAD cannot be resolved (nothing pushed yet). This
-   *  is a network read — pull only, never status. */
+   *  null when the remote's HEAD cannot be resolved (nothing pushed yet, or a
+   *  self-built remote whose HEAD symref dangles — points at a branch that was
+   *  never pushed). This is a network read — pull only, never status. */
   remoteHeadBranch(cwd: string): string | null;
+  /** The branches the last fetch brought under `refs/remotes/origin/` (HEAD
+   *  symref excluded) — a purely local read, and the exact set `origin/<name>`
+   *  merge targets can come from. Strict: a git failure throws. */
+  originBranchNames(cwd: string): string[];
+  /** The checked-out branch's name (`symbolic-ref --short HEAD`), or null on a
+   *  detached HEAD / unborn branch. */
+  currentBranch(cwd: string): string | null;
   /** `git merge --no-edit <ref>` (merge commits allowed; no ff-only, no
    *  rebase, and unrelated histories are permitted because every new machine
    *  starts from its own baseline root). Returns git's combined output —

@@ -266,6 +266,143 @@ describe('sync pull (multi-machine round trip)', () => {
   });
 });
 
+describe('sync pull (merge-target resolution, ticket 08)', () => {
+  it('pulls on a self-built remote whose HEAD symref dangles (default-init bare repo, QA repro)', () => {
+    // `git init --bare` without `-b main` symrefs HEAD at master; hubs push
+    // their pinned main — the remote HAS content, its HEAD just resolves to
+    // nothing. A new machine must still merge origin/main.
+    makeHub(home);
+    const remote = makeBareRemote(root, 'remote.git', 'master');
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(path.join(hubB, 'skills', 'demo', 'SKILL.md'))).toBe(true);
+  });
+
+  it('prefers the branch matching this machine when the remote carries several (pull merges where push pushes)', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root, 'remote.git', 'master');
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    git(home, ['push', 'origin', 'main:refs/heads/dev']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(git(hubB, ['log', '-1', '--pretty=%s'])).toMatch(/origin\/main/);
+  });
+
+  it('still honors the remote\'s declared HEAD when the local branch is absent (adopted repo)', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root); // HEAD aligned at main
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    git(home, ['push', 'origin', 'main:refs/heads/dev']);
+    // B is an adopted repo on its own branch — the remote's HEAD is its guide.
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    git(hubB, ['init', '-b', 'feature-x']);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(path.join(hubB, 'skills', 'demo', 'SKILL.md'))).toBe(true);
+    expect(git(hubB, ['log', '-1', '--pretty=%s'])).toMatch(/origin\/main/);
+  });
+
+  it('refuses honestly when nothing can pick: dangling HEAD, several branches, no local match', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root, 'remote.git', 'master');
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    git(home, ['push', 'origin', 'main:refs/heads/dev']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    git(hubB, ['init', '-b', 'feature-x']);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status).not.toBe(0);
+    // The refusal tells the truth about the remote: content exists (no
+    // "nothing pushed" claim), the branches are named, the local branch is named.
+    expect(result.stderr).not.toMatch(/nothing has been pushed/i);
+    expect(result.stderr).toMatch(/dev, main/); // for-each-ref's alphabetical order
+    expect(result.stderr).toMatch(/feature-x/);
+    expect(result.stderr).toMatch(/set-upstream-to/);
+  });
+
+  it('keeps the accurate nothing-pushed message for a genuinely empty remote', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root, 'remote.git', 'master');
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/nothing has been pushed/i);
+    expect(result.stderr).toMatch(/sync push/);
+  });
+
+  it('merges the same-named branch even when the remote HEAD names another (pull merges where push pushes)', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root); // HEAD aligned at main
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    git(home, ['push', 'origin', 'main:refs/heads/dev']);
+    // An adopted repo on dev: its own pushes would land on origin/dev, so its
+    // pull must merge origin/dev — not the remote's declared HEAD (origin/main).
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    git(hubB, ['init', '-b', 'dev']);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(git(hubB, ['log', '-1', '--pretty=%s'])).toMatch(/origin\/dev/);
+  });
+
+  it('does not merge a branch the remote has deleted (fetch prunes stale tracking refs)', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    git(home, ['push', 'origin', 'main:refs/heads/dev']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    git(hubB, ['init', '-b', 'dev']);
+    run(['sync', 'init', '--remote', remote], hubB);
+    run(['sync', 'pull'], hubB); // fetches dev; merge lands B on origin/dev's line
+    // The remote drops dev and main moves on; B pulls again — the stale
+    // refs/remotes/origin/dev must not survive as a phantom merge target.
+    git(home, ['push', 'origin', '--delete', 'dev']);
+    expect(git(remote, ['for-each-ref', 'refs/heads/'])).not.toContain('dev');
+    addSkill(home, 'post-dev');
+    run(['sync', 'push']);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status, result.stderr).toBe(0);
+    // Without the same-named branch anymore, the target falls through to the
+    // remote's declared HEAD (main) — not to a deleted dev's stale tip.
+    expect(git(hubB, ['log', '-1', '--pretty=%s'])).toMatch(/origin\/main/);
+    expect(existsSync(path.join(hubB, 'skills', 'post-dev', 'SKILL.md'))).toBe(true);
+  });
+});
+
 describe('sync pull (hard gates)', () => {
   it('exits nonzero with sync init guidance on a hub that is not git-ified', () => {
     makeHub(home);
