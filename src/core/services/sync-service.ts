@@ -3,6 +3,7 @@ import type { SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitDiffEntry, GitPort } from '../ports/git.js';
 import { SkillsManagerError } from '../../shared/errors.js';
+import { EMPTY_REGISTRY_FILE } from './skill-home-service.js';
 
 /**
  * Hub git-ification for multi-machine sync (ADR-0020). The hub itself becomes
@@ -100,8 +101,11 @@ export class SyncService {
 
   /** Fetch + merge (US-11..US-14). The gates run before any network or merge
    *  action: pull never runs over a dirty tree, never stashes, and never
-   *  decides a conflict — git's own nonzero exit plus manual `git -C <hub>`
-   *  guidance is the whole conflict story. */
+   *  decides a conflict over user data — git's own nonzero exit plus manual
+   *  `git -C <hub>` guidance is the whole story there. The single exception
+   *  (ticket 07): when the local side is provably nothing but the init
+   *  baseline's empty placeholder registry, the remote's real registry
+   *  supersedes it automatically — a placeholder is not user data. */
   pull(): SyncPullResult {
     this.assertGitAvailable();
     const root = this.home.root;
@@ -117,13 +121,52 @@ export class SyncService {
     // still be untracked), so the null arm is a defensive empty-base reading.
     const preHead = this.git.log(root, 1)[0]?.hash ?? null;
     this.git.fetchOrigin(root);
-    let output: string;
     try {
-      output = this.git.merge(root, this.mergeTarget(root));
+      const output = this.git.merge(root, this.mergeTarget(root));
+      return { remote, upToDate: ALREADY_UP_TO_DATE.test(output), stats: this.pullStats(root, preHead), registryPlaceholderSuperseded: null };
     } catch (error) {
-      throw withMergeConflictGuidance(error, root);
+      if (!this.reconcilePlaceholderRegistry(root, error)) throw withMergeConflictGuidance(error, root);
+      return { remote, upToDate: false, stats: this.pullStats(root, preHead), registryPlaceholderSuperseded: true };
     }
-    return { remote, upToDate: ALREADY_UP_TO_DATE.test(output), stats: this.pullStats(root, preHead) };
+  }
+
+  /** The one conflict the tool settles itself (ticket 07): the registry.yaml
+   *  clash between the empty placeholder `ensure()` baselines on a fresh hub
+   *  and the remote's real registry — without this, every real hub's first
+   *  pull on a new machine dies in it. The preconditions make the local side
+   *  provably user-data-free, so no merge decision about user content is
+   *  being made: the conflicted path set is exactly registry.yaml, the local
+   *  content is the byte-exact placeholder, and local history is nothing but
+   *  the init baseline commit (no push, no hand commit — nothing of the
+   *  user's exists locally to lose; the remote's real registry simply
+   *  supersedes the empty placeholder). Every other conflict shape — other
+   *  paths involved, a real local registry, or any history beyond the
+   *  baseline (including a pushed "removed the last skill", whose serialized
+   *  registry is byte-identical to the placeholder) — is genuine divergence
+   *  and stays exactly as git left it. Returns true when the placeholder was
+   *  superseded, false when the conflict is not this case. */
+  private reconcilePlaceholderRegistry(root: string, error: unknown): boolean {
+    if (!isConflictedMerge(error)) return false;
+    const conflicts = this.git.statusPorcelain(root)
+      .split('\n')
+      .filter((line) => CONFLICT_CODES.has(line.slice(0, 2)))
+      .map((line) => line.slice(3));
+    if (conflicts.length !== 1 || conflicts[0] !== REGISTRY_PATH) return false;
+    if (this.git.showFile(root, 'HEAD', REGISTRY_PATH) !== EMPTY_REGISTRY_FILE) return false;
+    const history = this.git.log(root, 2);
+    if (history.length !== 1 || history[0].subject !== BASELINE_COMMIT_MESSAGE) return false;
+    try {
+      this.git.checkoutConflictSide(root, 'theirs', REGISTRY_PATH);
+      this.git.addAll(root);
+      this.git.commitNoEdit(root);
+    } catch (resolutionError) {
+      // A failure mid-reconciliation leaves the merge unfinished — the same
+      // manual-resolution guidance as an untouched conflict gets the operator
+      // out (identity refusals keep their own, more specific guidance).
+      if (isGitIdentityRefusal(resolutionError)) throw withGitIdentityGuidance(resolutionError);
+      throw withMergeConflictGuidance(resolutionError, root);
+    }
+    return true;
   }
 
   /** The hard gates every content-moving sync command shares (push, pull): a
@@ -233,7 +276,7 @@ export class SyncService {
     if (this.git.statusPorcelain(root) === '') return null;
     this.git.addAll(root);
     try {
-      return shortSha(this.git.commit(root, 'sync: baseline commit'));
+      return shortSha(this.git.commit(root, BASELINE_COMMIT_MESSAGE));
     } catch (error) {
       throw withGitIdentityGuidance(error);
     }
@@ -268,6 +311,29 @@ const EVERYTHING_UP_TO_DATE = /Everything up-to-date/;
 
 /** The one-line merge outcome git prints when the remote brought nothing new. */
 const ALREADY_UP_TO_DATE = /Already up to date\./;
+
+/** porcelain's unmerged XY codes — the paths a conflicted merge left for
+ *  someone to decide (pull's placeholder probe only ever sees AA in practice;
+ *  the full set keeps the read honest). */
+const CONFLICT_CODES = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
+
+/** The hub-root-relative registry path, as git sees it (one definition for
+ *  pull's placeholder probe and conflict-set check). */
+const REGISTRY_PATH = 'registry.yaml';
+
+/** The one commit `sync init`'s baseline leaves — pull's placeholder probe
+ *  requires local history to be exactly this and nothing else (shared with
+ *  baselineCommitIfNeeded so the probe and the writer cannot drift). */
+const BASELINE_COMMIT_MESSAGE = 'sync: baseline commit';
+
+/** The shared "did this merge die in conflicts?" read — one predicate so the
+ *  placeholder probe and the manual-guidance mapper cannot drift apart. */
+const isConflictedMerge = (error: unknown): boolean => /CONFLICT|Automatic merge failed/i.test(errorMessage(error));
+
+/** The "who are you" half of git's identity refusal, matched before mapping —
+ *  so reconciliation failures keep the identity guidance, not the generic one. */
+const isGitIdentityRefusal = (error: unknown): boolean =>
+  /tell me who you are|Author identity unknown/i.test(errorMessage(error));
 
 /** The commit message a push leaves behind (US-7): skill-level counts (a skill
  *  touched in three files is one entry), a registry flag, and an honest bucket
@@ -372,8 +438,7 @@ const GITIGNORE_HEADER = '# skills-manager sync: machine-local state, never sync
  *  git identity on the user's behalf (US-10's discipline applies to every
  *  commit we make, including init's baseline). */
 function withGitIdentityGuidance(error: unknown): unknown {
-  const message = errorMessage(error);
-  if (/tell me who you are|Author identity unknown/i.test(message)) {
+  if (isGitIdentityRefusal(error)) {
     return new SkillsManagerError(
       'sync_git_identity',
       'Git identity (user.name / user.email) is not configured, and skills-manager does not configure it for you. Set it globally, then retry:\n  git config --global user.name "Your Name"\n  git config --global user.email "you@example.com"',
@@ -386,8 +451,7 @@ function withGitIdentityGuidance(error: unknown): unknown {
  *  conflict state stays exactly as git left it — the operator keeps every
  *  merge decision. Any other merge failure passes through untouched. */
 function withMergeConflictGuidance(error: unknown, root: string): unknown {
-  const message = errorMessage(error);
-  if (/CONFLICT|Automatic merge failed/i.test(message)) {
+  if (isConflictedMerge(error)) {
     return new SkillsManagerError(
       'sync_merge_conflict',
       `Merge conflict — skills-manager never makes merge decisions for you. The conflicted files are listed by:\n  git -C ${root} status\nResolve them by hand, then finish the merge yourself:\n  git -C ${root} add -A && git -C ${root} commit`,
@@ -447,4 +511,8 @@ export type SyncPullResult = {
   upToDate: boolean;
   /** Skill-level diff pre-merge HEAD → post-merge HEAD. */
   stats: SkillDiffSummary;
+  /** True when the merge clashed on registry.yaml and the local side was
+   *  provably the init baseline's empty placeholder (ticket 07) — the
+   *  remote's real registry superseded it. Null on every ordinary pull. */
+  registryPlaceholderSuperseded: true | null;
 };

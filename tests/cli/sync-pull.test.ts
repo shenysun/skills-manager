@@ -112,6 +112,122 @@ describe('sync pull (normal flow)', () => {
   });
 });
 
+describe('sync pull (placeholder registry reconciliation, ticket 07)', () => {
+  it('merges cleanly on a new machine whose baseline carries only the placeholder registry, keeping the remote real one (US-11)', () => {
+    // Machine A installed a real skill first — its registry has entries before
+    // init baselines it. The fixture's hand-written `skills: {}` hides exactly
+    // this divergence (QA's repro path).
+    makeHub(home);
+    writeFileSync(path.join(home, 'registry.yaml'), 'skills:\n  demo:\n    source: git\n');
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(path.join(hubB, 'registry.yaml'), 'utf8')).toContain('demo:');
+    expect(result.stdout).toMatch(/registry: changed/);
+  });
+
+  it('leaves a real local registry to the operator even when the remote side is the byte-empty placeholder', () => {
+    makeHub(home);
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    // Machine B carries real content before its first pull — a byte-empty
+    // remote registry is indistinguishable from a pushed "removed the last
+    // skill", so the tool must not pick a winner between two real sides.
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB);
+    writeFileSync(path.join(hubB, 'registry.yaml'), 'skills:\n  own:\n    source: git\n');
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(new RegExp(`git -C ${hubB}`));
+    expect(git(hubB, ['status', '--porcelain'])).toContain('AA registry.yaml');
+  });
+});
+
+describe('sync pull (placeholder reconciliation discipline guards)', () => {
+  it('leaves a both-sides-real registry clash to the operator — no auto-resolution, git state intact (US-12)', () => {
+    makeHub(home);
+    writeFileSync(path.join(home, 'registry.yaml'), 'skills:\n  a-side:\n    source: git\n');
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB);
+    writeFileSync(path.join(hubB, 'registry.yaml'), 'skills:\n  b-side:\n    source: git\n');
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(new RegExp(`git -C ${hubB}`));
+    expect(result.stderr).toMatch(/resolve|conflict/i);
+    // Neither real registry was decided over: the AA state is exactly git's.
+    expect(git(hubB, ['status', '--porcelain'])).toContain('AA registry.yaml');
+  });
+
+  it('never auto-resolves a byte-empty registry on the shared-history arm — a pushed "removed the last skill" is real data', () => {
+    // Shared history first: A (real registry) push → B pull.
+    makeHub(home);
+    writeFileSync(path.join(home, 'registry.yaml'), 'skills:\n  demo:\n    source: git\n');
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    run(['sync', 'init', '--remote', remote], hubB);
+    run(['sync', 'pull'], hubB);
+    // A removes its only skill and pushes — the registry serializes back to
+    // the byte-exact `skills: {}`, indistinguishable from a placeholder.
+    rmSync(path.join(home, 'skills', 'demo'), { recursive: true });
+    writeFileSync(path.join(home, 'registry.yaml'), 'skills: {}\n');
+    run(['sync', 'push']);
+    // B meanwhile commits its own registry edit — the pull must clash and
+    // leave it to the operator, because B has an upstream (not a new machine).
+    writeFileSync(path.join(hubB, 'registry.yaml'), 'skills:\n  demo:\n    source: marketplace\n');
+    git(hubB, ['add', '-A']);
+    git(hubB, ['commit', '-m', 'b registry edit']);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(new RegExp(`git -C ${hubB}`));
+    // Shared history conflicts read UU (both modified); the point is that the
+    // state is exactly git's, untouched by any auto-resolution.
+    expect(git(hubB, ['status', '--porcelain'])).toContain('UU registry.yaml');
+  });
+
+  it('refuses the whole merge when a real file conflicts alongside the placeholder registry', () => {
+    makeHub(home);
+    writeFileSync(path.join(home, 'registry.yaml'), 'skills:\n  demo:\n    source: git\n');
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    run(['sync', 'push']);
+    const hubB = path.join(root, 'hub-b');
+    makeHub(hubB, []);
+    // B's baseline carries its own version of A's skill file — the merge
+    // clashes there too, so even the reconcilable registry must stay unmerged.
+    addSkill(hubB, 'demo');
+    writeFileSync(path.join(hubB, 'skills', 'demo', 'SKILL.md'), '---\nname: demo\ndescription: b side\n---\nB\n');
+    run(['sync', 'init', '--remote', remote], hubB);
+
+    const result = run(['sync', 'pull'], hubB);
+
+    expect(result.status).not.toBe(0);
+    expect(git(hubB, ['status', '--porcelain'])).toContain('AA skills/demo/SKILL.md');
+    expect(git(hubB, ['status', '--porcelain'])).toContain('AA registry.yaml');
+  });
+});
+
 describe('sync pull (multi-machine round trip)', () => {
   it('locks the full tracer: A push → B pull → B change push → A pull (ticket 04)', () => {
     makeHub(home);

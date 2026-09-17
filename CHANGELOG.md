@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-18 (new-machine first-pull registry fix)
+
+- **修复新机首拉必冲突（ticket 07）**：真实 hub（装过至少一个 skill）在新机 `sync init --remote` 后首次 `sync pull`，B 机基线里的占位 `registry.yaml`（`skills: {}`，init 时 ensure() 生成）与 A 机真实 registry 在 unrelated-histories merge 下必然 AA 相撞、退出 1——「不需要理解 git 也能同步」的最普通首次设置路径被打断。修复：三条前置同时成立时 pull 自动以远端真实 registry 覆盖占位并结成 merge commit——① `registry.yaml` 是唯一冲突路径；② 本地内容为字节级占位符；③ 本地历史仅有那一条 init 基线提交（`sync: baseline commit`）——该状态下本地不存在任何用户数据（未 push、无手工提交），故不构成「对用户数据做合并决策」；移除最后一个 skill 后序列化回 `skills: {}` 的真实清空 push 因历史不止基线一条而被排除。其余一切冲突形状（其他路径参与、本地 registry 真实、历史超出基线）仍原样留给 `git -C <hub>` 手工解决。CLI 输出零省略注明占位被真实侧取代（`registry conflict: resolved by keeping the remote registry …`）。CLI 双语参考与 manager skill 同步章节补唯一例外措辞；占位符常量 `EMPTY_REGISTRY_FILE` 与基线提交信息 `BASELINE_COMMIT_MESSAGE` 单点定义。
+- 测试：CLI seam 新增五条——QA 原始复现（A 机真实 registry + B 机空 hub 首拉干净合入）、双侧真实 registry 冲突仍手工（AA 原样）、共享历史上字节级空 registry（真实清空 push）绝不自动解决（UU 原样）、本地真实 registry 对远端占位同样留给手工（远端空可能是真实清空）、真实文件与占位 registry 并发冲突整体拒绝不半自动解决；另以真实 `add` 安装路径端到端复现验证（fixture 手写 registry 正是此前盲区）。
+
 ## 2026-09-18 (hub git sync + skills.sh find)
 
 - **Hub git 化多机同步 MVP**（ADR-0020）：hub 本身成为 git 仓库，对用户自选远端 push/pull 即同步——不做 skill 级合并（git 已是合并工具）、不做设备码/token 代管（凭据留在用户自己的 git 里）。`skills/`、`collections/`、`registry.yaml` 进版本控制；`.backups/` 与 `.skills/`（分布索引、回滚快照、活动日志）为机器本地状态，canonical `.gitignore` 排除——分发是每机自己的事，新机 pull 后自行 distribute。

@@ -13,6 +13,11 @@ export function createSkillHome(root: string): SkillHome {
   };
 }
 
+/** The byte-exact empty registry `ensure()` writes. Sync's placeholder probe
+ *  (ticket 07) matches against this single definition: a registry whose whole
+ *  content is this carries zero user data by construction. */
+export const EMPTY_REGISTRY_FILE = 'skills: {}\n';
+
 export class SkillHomeService {
   constructor(private readonly fs: FileSystemPort, readonly home: SkillHome) {}
 
@@ -25,7 +30,7 @@ export class SkillHomeService {
     this.fs.makeDirectory(this.home.root);
     this.fs.makeDirectory(this.home.skillsDir);
     this.fs.makeDirectory(this.home.collectionsDir);
-    if (!this.fs.exists(this.home.registryFile)) this.fs.writeText(this.home.registryFile, 'skills: {}\n');
+    if (!this.fs.exists(this.home.registryFile)) this.fs.writeText(this.home.registryFile, EMPTY_REGISTRY_FILE);
     return this.home;
   }
 

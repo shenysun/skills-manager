@@ -463,14 +463,14 @@ sync.command('push')
   });
 
 sync.command('pull')
-  .description('Fetch and merge the remote hub (merge commits allowed; a dirty tree is refused, never stashed; conflicts are yours to resolve)')
+  .description('Fetch and merge the remote hub (merge commits allowed; a dirty tree is refused, never stashed; user-data conflicts are yours to resolve — only the tool-generated empty registry placeholder is reconciled)')
   .action((_opts, cmd) => {
     const s = services(cmd);
     const result = s.sync.pull();
     s.activity.record({
       action: 'cli-sync-pull',
       summary: result.upToDate ? 'Sync pull: already up to date' : `Pulled hub from ${result.remote}`,
-      details: { upToDate: result.upToDate, ...result.stats },
+      details: { upToDate: result.upToDate, registryPlaceholderSuperseded: result.registryPlaceholderSuperseded, ...result.stats },
     });
     if (result.upToDate) {
       console.log('already up to date: nothing to merge from the remote');
@@ -485,6 +485,12 @@ sync.command('pull')
     ];
     console.log(segments.length > 0 ? `merged skills: ${segments.join(', ')}` : 'merged skills: none changed');
     console.log(result.stats.registryChanged ? 'registry: changed' : 'registry: unchanged');
+    if (result.registryPlaceholderSuperseded !== null) {
+      // Zero-omission (ticket 07): the merge clashed on registry.yaml and the
+      // tool settled it because the local side was provably its own init
+      // placeholder — say so plainly.
+      console.log('registry conflict: resolved by keeping the remote registry (the local side was the empty init placeholder, not user data)');
+    }
     // Plain text, on purpose (US-14): the follow-up stays the operator's call —
     // nothing is detected, distributed, or marked.
     if (added.length > 0) {

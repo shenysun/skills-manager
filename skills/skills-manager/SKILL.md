@@ -309,7 +309,7 @@ skills-manager sync pull     # fetch + merge; ends with skill-level stats and a 
 Discipline — matching the CLI's hard gates. When the user hits one, the nonzero exit already carries this guidance; relay it, don't soften it:
 
 - **pull never auto-distributes**, and never runs over a dirty tree — it refuses and points at `sync push` or manual handling. It never stashes.
-- **Conflicts are the user's**: pull exits nonzero and points at `git -C <hub> status` — skills-manager never makes merge decisions. Merge commits are allowed; there is no rebase and no ff-only.
+- **Conflicts are the user's**: pull exits nonzero and points at `git -C <hub> status` — skills-manager never makes merge decisions over user data. The single exception: when `registry.yaml` is the only conflicted path, the local content is the empty placeholder (`skills: {}`), and local history is nothing but the init baseline commit, pull keeps the remote's real registry and says so — in that state no local user data exists. Merge commits are allowed; there is no rebase and no ff-only.
 - **A missing git identity, no remote, or an un-gitified hub are hard errors** on push/pull (with guidance) — the tool never configures git or picks a remote on the user's behalf. `sync status` on an un-gitified hub is the exception: a friendly hint plus exit 0.
 - Bootstrap never git-initializes the hub — sync is the user's explicit opt-in.
 

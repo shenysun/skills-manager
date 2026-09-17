@@ -74,6 +74,15 @@ export interface GitPort {
    *  "Already up to date." is the caller's nothing-to-merge signal; a conflict
    *  throws (nonzero) with git's own conflict text in the message. */
   merge(cwd: string, ref: string): string;
+  /** `git show <ref>:<path>` — a file's content at a ref; null when the path
+   *  is absent at that ref (a missing path is an answer, not a failure). */
+  showFile(cwd: string, ref: string, filePath: string): string | null;
+  /** `git checkout --ours|--theirs -- <path>` — pick one side of an unmerged
+   *  path left by a conflicted merge. */
+  checkoutConflictSide(cwd: string, side: 'ours' | 'theirs', filePath: string): void;
+  /** `git commit --no-edit` — conclude an in-progress merge with git's own
+   *  prepared message; returns the new HEAD's full SHA. */
+  commitNoEdit(cwd: string): string;
 }
 
 export type GitDiffEntry = {

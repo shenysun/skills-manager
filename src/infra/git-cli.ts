@@ -248,4 +248,18 @@ export class GitCli implements GitPort {
     }
     return `${result.stdout}\n${result.stderr}`.trim();
   }
+
+  showFile(cwd: string, ref: string, filePath: string): string | null {
+    const result = this.runner.run('git', ['-C', cwd, 'show', `${ref}:${filePath}`]);
+    return result.status === 0 ? result.stdout : null;
+  }
+
+  checkoutConflictSide(cwd: string, side: 'ours' | 'theirs', filePath: string): void {
+    this.runner.runOrThrow('git', ['-C', cwd, 'checkout', `--${side}`, '--', filePath]);
+  }
+
+  commitNoEdit(cwd: string): string {
+    this.runner.runOrThrow('git', ['-C', cwd, 'commit', '--no-edit']);
+    return this.revParseHead(cwd);
+  }
 }
