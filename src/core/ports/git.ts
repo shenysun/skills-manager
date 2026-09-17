@@ -49,4 +49,22 @@ export interface GitPort {
    *  HEAD); any other git failure throws (strict — a broken repo must not
    *  masquerade as "no upstream"). */
   aheadBehind(cwd: string): { ahead: number; behind: number } | null;
+  /** `git diff --name-status <ref>` (NUL-separated, so paths with special
+   *  characters survive unquoted): what changed relative to `ref`. A rename
+   *  entry carries both paths; code is git's own letter (A/M/D/R…). */
+  diffNameStatus(cwd: string, ref: string): GitDiffEntry[];
+  /** `git ls-tree --name-only <ref> <subpath>/` — the immediate child names at
+   *  that ref (trailing slashes on directories trimmed); an absent path is an
+   *  empty list, not an error. */
+  lsTreeNames(cwd: string, ref: string, subpath: string): string[];
+  /** Push HEAD to origin with upstream tracking (`git push -u origin HEAD`).
+   *  Returns git's combined output — "Everything up-to-date" lives on stderr
+   *  and is the caller's in-sync signal; a rejected push throws (nonzero). */
+  pushOrigin(cwd: string): string;
 }
+
+export type GitDiffEntry = {
+  code: string;
+  /** One path for A/M/D; two (old, new) for renames/copies. */
+  paths: string[];
+};

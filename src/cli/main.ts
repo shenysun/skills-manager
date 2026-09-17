@@ -441,6 +441,27 @@ sync.command('status')
       : `last sync commit: ${result.lastCommit.sha} ${result.lastCommit.message}`);
   });
 
+sync.command('push')
+  .description('Stage all changes, make one summary commit, and push to the remote (no empty commits)')
+  .action((_opts, cmd) => {
+    const s = services(cmd);
+    const result = s.sync.push();
+    // Honest summary: an in-sync push sent nothing, and the log must not claim one did.
+    s.activity.record({
+      action: 'cli-sync-push',
+      summary: result.upToDate ? 'Sync push: already in sync, nothing sent' : `Pushed hub to ${result.remote}`,
+      details: { commit: result.commit?.sha ?? null, upToDate: result.upToDate },
+    });
+    if (result.upToDate) {
+      console.log('already in sync: no changes to commit, remote is up to date');
+      return;
+    }
+    console.log(result.commit === null
+      ? 'commit: none (working tree clean — pushed existing local commits)'
+      : `commit: ${result.commit.sha} ${result.commit.message}`);
+    console.log(`pushed to origin: ${result.remote}`);
+  });
+
 const backup = program.command('backup').description('Inspect and restore init backups (hub .backups/, 30-day retention)');backup.command('list')
   .description('List saved backups')
   .action((_opts, cmd) => print(services(cmd).backups.list()));

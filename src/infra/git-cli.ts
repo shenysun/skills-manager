@@ -1,4 +1,4 @@
-import type { GitCloneOptions, GitLogEntry, GitPort } from '../core/ports/git.js';
+import type { GitCloneOptions, GitDiffEntry, GitLogEntry, GitPort } from '../core/ports/git.js';
 import { CommandTimeoutError, ShellRunner } from './shell-runner.js';
 import { HTTP1_RETRY_ENV, isRetryableTransportFailure } from './git-transport-retry.js';
 
@@ -184,5 +184,42 @@ export class GitCli implements GitPort {
     const parsed = output.match(/^(\d+)\t(\d+)$/);
     if (parsed === null) throw new Error(`Command failed: git ${args.join(' ')}\nunparseable output: ${output}`);
     return { behind: Number(parsed[1]), ahead: Number(parsed[2]) };
+  }
+
+  /** NUL records: `A\0path` or `R100\0old\0new` — a two-path shape the tab
+   *  format would quoting-mangle. The trailing NUL leaves one empty token,
+   *  which the reader skips rather than miscounting as a path. */
+  diffNameStatus(cwd: string, ref: string): GitDiffEntry[] {
+    const output = this.runner.runOrThrow('git', ['-C', cwd, 'diff', '--name-status', '-z', ref]);
+    const tokens = output.split('\0');
+    const entries: GitDiffEntry[] = [];
+    for (let i = 0; i < tokens.length; i += 1) {
+      const code = tokens[i];
+      if (code === '' || code === undefined) continue;
+      const twoPaths = code.startsWith('R') || code.startsWith('C');
+      entries.push(twoPaths ? { code, paths: [tokens[i + 1], tokens[i + 2]] } : { code, paths: [tokens[i + 1]] });
+      i += twoPaths ? 2 : 1;
+    }
+    return entries;
+  }
+
+  lsTreeNames(cwd: string, ref: string, subpath: string): string[] {
+    const output = this.runner.runOrThrow('git', ['-C', cwd, 'ls-tree', '--name-only', ref, `${subpath}/`]);
+    // The pathspec form prints full paths (`skills/demo`) — the caller asked
+    // for child names, and this form (unlike the `ref:subpath` tree-ish) stays
+    // exit-0 empty when the path is absent at that ref.
+    const prefix = `${subpath}/`;
+    return output.split('\n').filter(Boolean).map((name) => {
+      const trimmed = name.replace(/\/$/, '');
+      return trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed;
+    });
+  }
+
+  pushOrigin(cwd: string): string {
+    const result = this.runner.run('git', ['-C', cwd, 'push', '-u', 'origin', 'HEAD']);
+    if (result.status !== 0) {
+      throw new Error(`Command failed: git push -u origin HEAD\n${result.stderr || result.stdout}`);
+    }
+    return `${result.stdout}\n${result.stderr}`.trim();
   }
 }
