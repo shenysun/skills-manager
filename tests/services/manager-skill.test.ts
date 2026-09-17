@@ -134,6 +134,30 @@ describe('ManagerSkillService.selfCheck', () => {
   });
 });
 
+describe('manager skill doc: shared find channel table (ADR-0021, ticket 05)', () => {
+  const doc = readFileSync(new URL('../../skills/skills-manager/SKILL.md', import.meta.url), 'utf8');
+
+  it('orders the discovery channels: skills.sh direct API, then npx, then gh code search', () => {
+    const direct = doc.indexOf('skills.sh/api/search');
+    const npx = doc.indexOf('npx -y skills find');
+    expect(direct).toBeGreaterThanOrEqual(0);
+    expect(npx).toBeGreaterThan(direct);
+    expect(doc.indexOf('gh api -X GET search/code')).toBeGreaterThan(npx);
+  });
+
+  it('defines the channel table once — backfill Step 3 references it instead of redefining it', () => {
+    expect(doc.match(/skills\.sh\/api\/search/g)).toHaveLength(1);
+    expect(doc).toContain('## Workflow: find and install a skill');
+    const step3 = doc.indexOf('### Step 3');
+    expect(step3).toBeGreaterThan(0);
+    expect(doc.indexOf('shared channel table', step3)).toBeGreaterThan(step3);
+  });
+
+  it('marks installs as an adoption signal, never a quality verdict', () => {
+    expect(doc).toMatch(/installs[^\n]*adoption signal/);
+  });
+});
+
 describe('compareDateVersions', () => {
   it('orders date-versioned release tags segment by segment', () => {
     expect(compareDateVersions('2026.9.9', '2026.9.10')).toBeLessThan(0);

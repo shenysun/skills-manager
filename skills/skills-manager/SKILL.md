@@ -1,6 +1,6 @@
 ---
 name: skills-manager
-description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories), applying / inspecting a category set (类别集), or saving / switching a named preset (预设 / 档位) so an agent loads only the selected domains, or wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo).
+description: Operate the skills-manager CLI — manage a local skill hub (install, import, distribute to agents/projects, update) and backfill provenance for source-less skills (adopt lockfile evidence, search the ecosystem for candidates, verify, get the user's approval, write sources). Use this skill whenever the user mentions skills-manager, the skill home / hub (~/.skills-manager), importing skills from agent runtime directories, distributing or undistributing skills, updating skills from their sources, tagging skills with domain categories (类别 / 分类 / categories), applying / inspecting a category set (类别集), or saving / switching a named preset (预设 / 档位) so an agent loads only the selected domains, wants to fix / backfill / find where a skill came from (its source, provenance, origin, upstream repo), or asks to find / discover a new skill in the ecosystem (帮我找个 skill / find a skill for X).
 ---
 
 # Skills Manager
@@ -166,6 +166,41 @@ skills-manager bootstrap [--agent <id...>] [--force]  # (re)mount this skill ont
 skills-manager web [-p 4777]                      # local dashboard
 ```
 
+## Workflow: find and install a skill (查找与发现技能)
+
+Run this when the user asks "帮我找个处理 PDF 的 skill" / "find a skill for X" — discovering a *new* skill from the ecosystem is a first-class flow, not a backfill side effect. The sequence:
+
+1. **Distill English keywords** from the ask. The channels are English-keyword search engines: a Chinese ask becomes 2–3 English words ("处理 PDF 的" → `pdf`), never a translated sentence.
+2. **Search the shared channel table** (below) — one query; the first channel that answers serves the result.
+3. **Verify before presenting** — the same bar as backfill: for each top candidate, fetch the upstream `SKILL.md` and compare its `name`/`description` against what the user asked for. Discard mismatches — junk candidates cost more trust than fewer, better ones.
+4. **Present with evidence**: `name`, `owner/repo`, `installs` (an adoption signal, never a quality verdict — say so when showing the number), and the skills.sh link (`https://skills.sh/<owner>/<repo>/<skillId>`). Name the channel that served the result.
+5. **Install only on the user's pick**, through the unchanged source-first machinery. The API's `source` field is already `owner/repo` and `skillId` is the skill's directory inside that repo:
+
+   ```bash
+   skills-manager add <source> --list              # confirm the skill is there and its exact name/subpath
+   skills-manager add <source> --skill <skillId>   # the selector matches a discovered name or subpath
+   ```
+
+   Distribution stays a separate, explicit step — offer `distribute` afterwards if the user wants the skill live for an agent.
+
+### Search channel table (shared — ADR-0021)
+
+Both consumers use this one table: the find workflow above and provenance backfill Step 3. Defined once here, referenced there.
+
+| # | Channel | Command |
+|---|---------|---------|
+| ① | skills.sh direct API (**primary**) | `curl -s --max-time 30 "https://skills.sh/api/search?q=<kw>"` |
+| ② | `npx skills find` (second — buffer against API drift) | `npx -y skills find "<kw>"` |
+| ③ | GitHub code search (last resort) | `gh api -X GET search/code -f q='filename:SKILL.md "<kw>" in:file' -f per_page=10 --jq '.items[] | {repo: .repository.full_name, path: .path}'` |
+
+Channel discipline:
+
+- **English keywords only; one query, no retries** — no re-querying, no guessed or undocumented API parameters. The single exception is channel ③'s rate-limit handling, spelled out in its own row of discipline below.
+- **Any failure = channel unavailable, degrade silently**: a timeout (cap ~30s), a non-200, JSON that fails to parse, or a missing/empty `skills` array all mean "try the next channel". The user sees one result set, not the failed attempts — but the presented result names the channel that produced it.
+- Channel ① returns structured JSON — `skills: [{id, skillId, name, installs, source}]` — with `source` = `owner/repo` and `id` = `source/skillId`.
+- Channel ② output lines look like `owner/repo@skillname <installs>` with a `https://skills.sh/...` link; on some npm setups `npx` chokes on this package with `Unknown command` — that is the channel being unavailable, not your query being wrong.
+- Channel ③ returns noise on generic names — prefer a distinctive phrase as the quoted term. Rate limits (429/403) are common: wait ~20s, retry once (the one sanctioned retry), then switch the phrase before giving up on the channel.
+
 ## Workflow: backfill sources for the whole library
 
 Run this when the user asks to "补齐来源 / fix sources / find out where these skills came from / make them updatable", or when `doctor` reports imported-without-source skills. The rule that governs everything: **evidence is adopted automatically; guesses are never written without the user picking them, one skill at a time** (ADR-0012).
@@ -193,23 +228,9 @@ When the queue is more than a handful (5+), fan the search out to parallel subag
 
 For each pending skill:
 
-1. Read its `SKILL.md` frontmatter (`name`, `description`) from the hub — that's the query material.
-2. **Primary channel** — the skills.sh ecosystem:
-
-   ```bash
-   npx -y skills find "<name>"
-   ```
-
-   Output lines look like `owner/repo@skillname <installs>` with a `https://skills.sh/...` link. Pass a real query word — never `--help`. Treat *any* failure as "channel unavailable" and move on: empty results, a hang (cap at ~30s, don't retry), or the command itself erroring — on some npm setups `npx` chokes on this package with `Unknown command`, which has nothing to do with your query.
-3. **Fallback channel** — GitHub code search (authenticated `gh` works offline of skills.sh):
-
-   ```bash
-   gh api -X GET search/code -f q='filename:SKILL.md "<name>" in:file' -f per_page=10 \
-     --jq '.items[] | {repo: .repository.full_name, path: .path}'
-   ```
-
-   Generic names return noise; prefer a distinctive phrase from the description as the quoted term. Rate limits (429/403) are common — wait ~20s, retry once, then switch the phrase before giving up on the channel.
-4. **Verify before presenting.** For each top candidate, fetch the upstream `SKILL.md` and compare its `name`/`description` with the local copy:
+1. Read its `SKILL.md` frontmatter (`name`, `description`) from the hub — that's the query material. Distill it to English keywords per the channel table's discipline.
+2. **Search the shared channel table** — the ordered three channels and their discipline live in one place: the *"Search channel table"* section under **Workflow: find and install a skill** (above). This step is the table's other consumer; it never redefines it.
+3. **Verify before presenting.** For each top candidate, fetch the upstream `SKILL.md` and compare its `name`/`description` with the local copy:
 
    ```bash
    curl -sL https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<path-without-SKILL.md>/SKILL.md
