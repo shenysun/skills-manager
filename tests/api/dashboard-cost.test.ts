@@ -6,6 +6,7 @@ import { createDashboardApp } from '../../src/dashboard/server/main.js';
 import { createRuntimeServices } from '../../src/infra/runtime.js';
 import type { GitHubApiPort } from '../../src/core/ports/github-api.js';
 import { fixtureSnapshot } from '../fixtures/catalog-snapshot.js';
+import { footprintOf } from '../../dashboard-web/src/domain/costLedger.js';
 
 // Offline GitHub fake: same reason as dashboard-state — this suite is entirely
 // local; without it the state row cases would reach api.github.com for real.
@@ -107,5 +108,26 @@ describe('GET /api/state shape (the ledger never leaks into state)', () => {
     expect(Object.keys(body.data).sort()).toEqual(['activity', 'knownProjects', 'skills', 'updateCount']);
     expect(body.data.skills[0]).not.toHaveProperty('cost');
     expect(body.data).not.toHaveProperty('residentCost');
+  });
+});
+
+// The preview's row-tail footprint joins the two lazy surfaces by string: the
+// state endpoint's distribution runtimePath → dirname → the ledger's
+// runtimeDir. This pins the join against real endpoint output, where a
+// normalization drift between the two surfaces would silently blank the `· ≈N`.
+describe('state × cost wiring (preview footprint join, US23)', () => {
+  it('resolves a resident footprint for every distributed row of both endpoints', async () => {
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'user', skills: ['alpha'], agents: ['claude-code'] } });
+    await app.inject({ method: 'POST', url: '/api/distribute', payload: { to: 'project', projectRoot: path.join(root, 'proj-a'), skills: ['alpha'], agents: ['warp'] } });
+
+    const stateResponse = await app.inject({ method: 'GET', url: '/api/state' });
+    const alpha = JSON.parse(stateResponse.body).data.skills.find((skill: { name: string }) => skill.name === 'alpha');
+    const rows = alpha.distribution.flatMap((target: { entries: Array<{ runtimePath: string }> }) => target.entries.map((entry) => entry.runtimePath));
+    expect(rows.length).toBe(2);
+
+    const ledger = await getCost();
+    for (const runtimePath of rows) {
+      expect(footprintOf(ledger, 'alpha', runtimePath), runtimePath).toBeGreaterThan(0);
+    }
   });
 });

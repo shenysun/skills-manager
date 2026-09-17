@@ -33,6 +33,7 @@ export default {
     truncated: '内容超过 512KB,已截断显示。',
     binary: '二进制文件,不渲染内容 · {size}',
     loading: '加载中…',
+    footprintHint: '该路径的常驻成本(char-approx 近似)',
   },
   action: {
     distribute: '接入',
@@ -45,6 +46,13 @@ export default {
     text: '{n} 个技能可更新',
     updateAll: '全部更新',
     updating: '更新中…',
+  },
+  cost: {
+    line: '常驻 {tokens} tokens · {n} 路径',
+    user: '用户',
+    unmanaged: '{n} 个未管理技能未计入',
+    archived: '已归档',
+    incomplete: '缺描述',
   },
   empty: {
     filtered: {

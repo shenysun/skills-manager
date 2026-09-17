@@ -69,6 +69,15 @@ export function fetchState() {
   return api<DashboardState>('/api/state');
 }
 
+export type { CostLedger } from '../domain/costLedger';
+
+/** The resident-cost ledger (ADR-0018), same JSON `cost --json` emits. It
+ *  deliberately stays out of /api/state (US24): the cost strip and the skill
+ *  preview lazy-load it from here instead. */
+export function fetchCost() {
+  return api<CostLedger>('/api/cost');
+}
+
 export type DistributeMode = 'symlink' | 'copy';
 
 /** Wire shape of GET /api/catalog/agents rows — same type the picker domain reasons about. */

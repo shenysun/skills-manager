@@ -2,11 +2,12 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Sheet from './Sheet.vue';
-import { errorMessage, fetchSkillFile, fetchSkillFiles, type SkillFileEntry, type SkillFilePayload, type SkillRowState } from '../api/client';
+import { errorMessage, fetchCost, fetchSkillFile, fetchSkillFiles, type CostLedger, type SkillFileEntry, type SkillFilePayload, type SkillRowState } from '../api/client';
 import { buildFileTree, defaultPreviewPath, type FileTreeNode } from '../domain/fileTree';
 import { renderedView, togglePreviewView, type PreviewView } from '../domain/previewView';
 import { sourceLink } from '../domain/sourceLink';
 import { distCountsText, projectRootsOf } from '../domain/distribution';
+import { footprintOf, formatApproxTokens } from '../domain/costLedger';
 
 // Read-only skill preview (CONTEXT.md): a wide Sheet over the library — head
 // carries only name + actions; a meta zone below holds the full description
@@ -23,6 +24,37 @@ const selectedPath = ref<string | null>(null);
 const file = ref<SkillFilePayload | null>(null);
 const loadError = ref<string | null>(null);
 const view = ref<PreviewView>(renderedView);
+
+// Resident footprints (US23): lazy — the ledger is fetched once, on the first
+// 接入 expansion, and never enters /api/state (US24). A failed or missing
+// fetch renders the rows exactly as before (footprintOf → null).
+const cost = ref<CostLedger | null>(null);
+let costRequested = false;
+
+function ensureCost() {
+  if (costRequested) return;
+  costRequested = true;
+  void fetchCost()
+    .then((ledger) => {
+      cost.value = ledger;
+    })
+    .catch(() => {
+      cost.value = null;
+    });
+}
+
+/** Row-tail `· ≈N` per runtime path, resolved once per ledger load. */
+const footprints = computed(() => {
+  if (cost.value === null) return new Map<string, string>();
+  const map = new Map<string, string>();
+  for (const target of props.skill.distribution) {
+    for (const entry of target.entries) {
+      const tokens = footprintOf(cost.value, props.skill.name, entry.runtimePath);
+      if (tokens !== null) map.set(entry.runtimePath, `· ${formatApproxTokens(tokens)}`);
+    }
+  }
+  return map;
+});
 
 const src = computed(() => sourceLink(props.skill.source));
 const projectRoots = computed(() => projectRootsOf(props.skill.distribution));
@@ -93,7 +125,7 @@ function formatSize(bytes: number): string {
         </span>
         <!-- 接入 reverse lookup: inline <details>, grouped by target (physical
              layer); shared runtime paths appear once, agents on each. -->
-        <details v-if="distributed" class="min-w-0">
+        <details v-if="distributed" class="min-w-0" @toggle="ensureCost">
           <summary class="cursor-pointer text-fg3 hover:text-fg2">{{ t('preview.distPrefix') }} {{ distCounts }}</summary>
           <div class="grid gap-[10px] pt-[8px] pb-[2px]">
             <div v-for="target in skill.distribution" :key="target.targetRoot">
@@ -106,6 +138,10 @@ function formatSize(bytes: number): string {
               <p v-for="entry in target.entries" :key="entry.runtimePath" class="flex items-baseline gap-[12px] text-[12.5px] text-fg3">
                 <span class="shrink-0">{{ entry.agents.join(', ') }}</span>
                 <span class="mono [overflow-wrap:anywhere]">{{ entry.runtimePath }}</span>
+                <!-- Row-tail resident footprint (US23); the meta main line above stays untouched. -->
+                <span v-if="footprints.get(entry.runtimePath)" class="shrink-0" :title="t('preview.footprintHint')">
+                  {{ footprints.get(entry.runtimePath) }}
+                </span>
               </p>
             </div>
           </div>

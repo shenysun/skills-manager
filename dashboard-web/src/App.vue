@@ -9,6 +9,7 @@ import { exitSelection, idleSelection, isSelected, selectionCount, toggleSelecti
 import { showUpdateStrip, updatableNames } from './domain/updateStrip';
 import { useNotice } from './composables/useNotice';
 import SkillRow from './components/SkillRow.vue';
+import CostStrip from './components/CostStrip.vue';
 import SkillPreviewSheet from './components/SkillPreviewSheet.vue';
 import AgentPickerSheet from './components/AgentPickerSheet.vue';
 import UndistributeSheet from './components/UndistributeSheet.vue';
@@ -284,6 +285,10 @@ async function onRemoveConfirm() {
         {{ updatingAll ? t('strip.updating') : t('strip.updateAll') }}
       </button>
     </p>
+
+    <!-- Resident-cost line (ADR-0018): same region/styling as the update strip,
+         lazy-loaded from /api/cost — the ledger never enters /api/state. -->
+    <CostStrip />
 
     <div v-if="loadError" class="px-[2px] py-[48px] text-fg2">
       <p class="mb-[6px] text-[16px] font-semibold text-fg">{{ t('error.loadFailed', { message: loadError }) }}</p>

@@ -33,6 +33,7 @@ export default {
     truncated: 'Content exceeds 512KB; shown truncated.',
     binary: 'Binary file, contents not rendered · {size}',
     loading: 'Loading…',
+    footprintHint: 'Resident cost on this path (char-approx)',
   },
   action: {
     distribute: 'Distribute',
@@ -45,6 +46,13 @@ export default {
     text: '{n} skills can be updated',
     updateAll: 'Update all',
     updating: 'Updating…',
+  },
+  cost: {
+    line: 'Resident {tokens} tokens · {n} path(s)',
+    user: 'User',
+    unmanaged: '{n} unmanaged skill(s) not counted',
+    archived: 'archived',
+    incomplete: 'no description',
   },
   empty: {
     filtered: {
