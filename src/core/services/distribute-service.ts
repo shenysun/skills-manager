@@ -10,6 +10,7 @@ import {
   type DistributionIndexEntry,
   type DistributionIndexRecord,
   type DistributionTargetKind,
+  type PresetEntry,
   type SkillHome,
   type SkillName,
 } from '../model/index.js';
@@ -231,6 +232,33 @@ export class DistributeService {
       );
     }
     return { preset: name, ...this.rewriteToWanted(wanted, applied, agents) };
+  }
+
+  /**
+   * `preset remove`'s cascade (ADR-0019): drop the registry entry, then clear
+   * the preset stamp on every category-set record referencing the name —
+   * the applied categories stay exactly as they are, runtime dirs are not
+   * touched, and no dangling 档位 reference survives. Returns how many paths
+   * the name was detached from, so the operator can confirm the cascade.
+   */
+  removePresetCascade(name: string): { preset: PresetEntry; detached: number } {
+    const preset = this.registry.removePreset(name);
+    let detached = 0;
+    for (const record of this.loadIndex()) {
+      let changed = false;
+      const next: Record<string, AppliedCategorySet> = {};
+      for (const [dir, set] of Object.entries(record.categorySets ?? {})) {
+        if ('categories' in set && set.preset === name) {
+          next[dir] = { categories: set.categories };
+          detached += 1;
+          changed = true;
+        } else {
+          next[dir] = set;
+        }
+      }
+      if (changed) this.rewriteRecord({ kind: record.kind, targetRoot: record.targetRoot, id: record.id }, record.entries, next);
+    }
+    return { preset, detached };
   }
 
   /** Managed hub skills every category apply draws from — the manager skill is never in the pool. */

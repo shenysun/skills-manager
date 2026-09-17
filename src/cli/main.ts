@@ -318,6 +318,15 @@ preset.command('list')
     for (const { name, categories } of presets) console.log(`${name}: ${categories.join(', ')}`);
     if (presets.length === 0) console.log('No presets yet — save one with `preset set <name> <category...>`.');
   });
+preset.command('remove')
+  .description('Delete a preset and cascade-clear its name off every category-set record referencing it (applied categories kept, runtime untouched); reports how many paths the name was detached from')
+  .argument('<name>')
+  .action((name, _opts, cmd) => {
+    const s = services(cmd);
+    const { preset, detached } = s.distribute.removePresetCascade(name);
+    s.activity.record({ action: 'cli-preset-remove', summary: `removed preset ${name}, detached from ${detached} runtime path(s)`, details: { preset: name, detached } });
+    console.log(`Removed preset ${name} [${preset.categories.join(', ')}] — detached the name from ${detached} runtime path(s)`);
+  });
 preset.command('apply')
   .description("Rewrite the selected agents' runtime dirs to exactly the skills in the preset's categories (same strict semantics as `categories apply`: manager skill exempt, foreign untouched, uncategorized removed) and stamp the record with the preset name; success ends with the preset's resident-cost line")
   .argument('<name>')

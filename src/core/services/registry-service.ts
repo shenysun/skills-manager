@@ -220,6 +220,16 @@ export class RegistryService {
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   }
 
+  /** Delete a preset entry (ADR-0019). Absent name is the same hard error as
+   *  `getPreset` — the cascade caller hears it before anything is detached. */
+  removePreset(name: string): PresetEntry {
+    const entry = this.getPreset(name);
+    const registry = this.load();
+    const { [name]: _dropped, ...rest } = registry.presets || {};
+    this.save({ ...registry, presets: rest });
+    return entry;
+  }
+
   defaultEntry(skill: SkillName, patch: Partial<RegistryEntry> = {}): RegistryEntry {
     assertSafeSkillName(skill);
     // No legacy default tags: desired agents are catalog ids (see ADR-0004).
