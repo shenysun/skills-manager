@@ -28,12 +28,49 @@ export class SyncService {
       );
     }
     const root = this.home.root;
-    const adopted = this.fs.kind(path.join(root, '.git')) !== 'missing';
+    const adopted = this.gitified();
     if (!adopted) this.git.initRepo(root);
     const ignoreLinesAdded = this.reconcileGitignore();
     const baselineCommit = this.baselineCommitIfNeeded(root);
     const remote = this.attachRemoteIfGiven(root, options.remote);
     return { mode: adopted ? 'adopted' : 'initialized', gitInitRan: !adopted, ignoreLinesAdded, baselineCommit, remote };
+  }
+
+  /** Read-only, zero-network status probe (US-15/16/17). A hub without `.git/`
+   *  is not an error here — status answers "not yet, run init" and exits 0
+   *  (unlike push/pull, whose nonzero exit signals a blocked operation). */
+  status(): SyncStatusResult {
+    const root = this.home.root;
+    if (!this.gitified()) {
+      return { home: root, gitified: false, hint: 'Run `sync init` to git-ify the hub for multi-machine sync.' };
+    }
+    if (!this.git.available()) {
+      throw new SkillsManagerError(
+        'sync_git_missing',
+        'System git is not available, but the hub is a git repository and `sync status` reads it with git. Install git and make sure it is on PATH.',
+      );
+    }
+    // Strict porcelain first: it validates the repo, so the reads after it never
+    // mistake a broken repo for "no upstream" / "no commits".
+    const porcelain = this.git.statusPorcelain(root);
+    const dirtyFiles = porcelain === '' ? 0 : porcelain.split('\n').length;
+    const remote = this.git.remoteUrl(root, 'origin');
+    const aheadBehind = this.git.aheadBehind(root);
+    const last = this.git.log(root, 1)[0] ?? null;
+    return {
+      home: root,
+      gitified: true,
+      remote,
+      dirtyFiles,
+      aheadBehind: aheadBehind === null ? null : { ...aheadBehind, basis: 'last-fetch' as const },
+      lastCommit: last === null ? null : { sha: shortSha(last.hash), message: last.subject },
+    };
+  }
+
+  /** Adoption probe shared by init (adopt vs create) and status (git-ified or
+   *  hint): a `.git/` entry is the same signal in both. */
+  private gitified(): boolean {
+    return this.fs.kind(path.join(this.home.root, '.git')) !== 'missing';
   }
 
   /** Canonical ignore policy (ADR-0020): `.backups/` and `.skills/` are
@@ -66,7 +103,7 @@ export class SyncService {
     if (this.git.statusPorcelain(root) === '') return null;
     this.git.addAll(root);
     try {
-      return this.git.commit(root, 'sync: baseline commit').slice(0, 7);
+      return shortSha(this.git.commit(root, 'sync: baseline commit'));
     } catch (error) {
       throw withGitIdentityGuidance(error);
     }
@@ -92,6 +129,9 @@ export class SyncService {
 
 /** Machine-local state excluded from sync (ADR-0020). */
 export const CANONICAL_IGNORE_LINES = ['.backups/', '.skills/'] as const;
+
+/** Git's default abbreviation length — the short SHA every report shows. */
+const shortSha = (sha: string): string => sha.slice(0, 7);
 
 const GITIGNORE_HEADER = '# skills-manager sync: machine-local state, never synced (ADR-0020)\n';
 
@@ -120,3 +160,22 @@ export type SyncInitResult = {
   /** Remote attach outcome; null when `--remote` was not given. */
   remote: { attached: boolean; url: string } | null;
 };
+
+/** One read-only snapshot of the hub's sync posture. The git-ified arm carries
+ *  every dimension with null (never an omitted key) for "not there yet" — the
+ *  same zero-omission bar as init's report. */
+export type SyncStatusResult =
+  | { home: string; gitified: false; hint: string }
+  | {
+      home: string;
+      gitified: true;
+      /** origin URL, or null when no remote is configured. */
+      remote: string | null;
+      /** Working-tree entries git would report (`status --porcelain` line count). */
+      dirtyFiles: number;
+      /** Off the remote-tracking ref, `basis: 'last-fetch'` — status never fetches.
+       *  Null when no upstream tracking ref is configured (nothing pushed yet). */
+      aheadBehind: { ahead: number; behind: number; basis: 'last-fetch' } | null;
+      /** HEAD's short SHA + subject, or null when the repo has no commits. */
+      lastCommit: { sha: string; message: string } | null;
+    };

@@ -33,12 +33,20 @@ export interface GitPort {
   /** The URL remote `name` points at, or null when the remote is not configured. */
   remoteUrl(cwd: string, name: string): string | null;
   remoteAdd(cwd: string, name: string, url: string): void;
-  /** `git status --porcelain` output; empty when the tree is clean. Unlike
-   *  `statusShort` this is strict — a git failure throws, because sync must
-   *  never mistake "git answered no" for "clean tree". */
+  /** `git status --porcelain -uall` output (untracked directories expanded to
+   *  individual files, so a line count is an honest file count); empty when
+   *  the tree is clean. Unlike `statusShort` this is strict — a git failure
+   *  throws, because sync must never mistake "git answered no" for "clean
+   *  tree". */
   statusPorcelain(cwd: string): string;
   /** Stage everything (`git add -A`). */
   addAll(cwd: string): void;
   /** Create a commit with `message`; returns the new HEAD's full SHA. */
   commit(cwd: string, message: string): string;
+  /** Commits HEAD is ahead of / behind its upstream (remote-tracking ref) — a
+   *  purely local read off the last fetch, never a network round-trip. Null
+   *  when the upstream cannot be resolved (none configured, or an unborn
+   *  HEAD); any other git failure throws (strict — a broken repo must not
+   *  masquerade as "no upstream"). */
+  aheadBehind(cwd: string): { ahead: number; behind: number } | null;
 }

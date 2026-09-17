@@ -115,7 +115,7 @@ export type { ManagerSkillBundle, ManagerSkillSeedStatus, ManagerSkillSeedResult
 export { BackupService } from './backup-service.js';
 export { GetService } from './get-service.js';
 export { SyncService, CANONICAL_IGNORE_LINES } from './sync-service.js';
-export type { SyncInitResult } from './sync-service.js';
+export type { SyncInitResult, SyncStatusResult } from './sync-service.js';
 export type { GetTarget } from './get-service.js';
 export { CostLedgerService, charApproxTokens } from './cost-ledger-service.js';
 export type { CostLedger, CostPathGroup, CostSkillLine, CostLedgerError } from './cost-ledger-service.js';

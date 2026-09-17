@@ -416,6 +416,31 @@ sync.command('init')
     console.log('Reminder: the hub will be pushed to this remote — confirm it contains no secrets (tokens, keys, .env files).');
   });
 
+sync.command('status')
+  .description('Read-only sync status: git-ification, remote, dirty files, ahead/behind (last fetch), last sync commit — zero network')
+  .option('--json', 'machine-readable output for agents')
+  .action((opts, cmd) => {
+    const result = services(cmd).sync.status();
+    if (opts.json) return print(result);
+    // Read-only probe: no activity record — status itself must not dirty the hub.
+    console.log(`hub: ${result.home}`);
+    if (!result.gitified) {
+      console.log(`git: no — ${result.hint}`);
+      return;
+    }
+    console.log('git: yes');
+    console.log(result.remote === null
+      ? 'remote origin: not configured (attach one with `sync init --remote <url>`)'
+      : `remote origin: ${result.remote}`);
+    console.log(result.dirtyFiles === 0 ? 'dirty files: 0 (clean tree)' : `dirty files: ${result.dirtyFiles}`);
+    console.log(result.aheadBehind === null
+      ? 'ahead/behind: unknown (no upstream tracking ref yet — set by your first push)'
+      : `ahead/behind: ahead ${result.aheadBehind.ahead}, behind ${result.aheadBehind.behind} (based on last fetch — run \`git -C ${result.home} fetch\` to refresh)`);
+    console.log(result.lastCommit === null
+      ? 'last sync commit: none yet (the hub repo has no commits)'
+      : `last sync commit: ${result.lastCommit.sha} ${result.lastCommit.message}`);
+  });
+
 const backup = program.command('backup').description('Inspect and restore init backups (hub .backups/, 30-day retention)');backup.command('list')
   .description('List saved backups')
   .action((_opts, cmd) => print(services(cmd).backups.list()));

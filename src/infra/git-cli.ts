@@ -154,7 +154,7 @@ export class GitCli implements GitPort {
   }
 
   statusPorcelain(cwd: string): string {
-    return this.runner.runOrThrow('git', ['-C', cwd, 'status', '--porcelain']).trim();
+    return this.runner.runOrThrow('git', ['-C', cwd, 'status', '--porcelain', '-uall']).trim();
   }
 
   addAll(cwd: string): void {
@@ -164,5 +164,25 @@ export class GitCli implements GitPort {
   commit(cwd: string, message: string): string {
     this.runner.runOrThrow('git', ['-C', cwd, 'commit', '-m', message]);
     return this.revParseHead(cwd);
+  }
+
+  /** `@{upstream}...HEAD` with `--left-right --count` yields "behind\tahead"
+   *  off the remote-tracking ref — local objects only, no fetch. An
+   *  unresolvable upstream is git's own fatal for this read ("no upstream
+   *  configured", or "no such branch" on an unborn HEAD) and maps to null;
+   *  any other refusal throws (strict), and the counts are parsed only from
+   *  the exact two-integer shape — malformed output never silently reads as
+   *  zero. */
+  aheadBehind(cwd: string): { ahead: number; behind: number } | null {
+    const args = ['-C', cwd, 'rev-list', '--left-right', '--count', '@{upstream}...HEAD'];
+    const result = this.runner.run('git', args);
+    if (result.status !== 0) {
+      if (/no upstream configured|does not have an upstream|no such branch/i.test(result.stderr)) return null;
+      throw new Error(`Command failed: git ${args.join(' ')}\n${result.stderr || result.stdout}`);
+    }
+    const output = result.stdout.trim();
+    const parsed = output.match(/^(\d+)\t(\d+)$/);
+    if (parsed === null) throw new Error(`Command failed: git ${args.join(' ')}\nunparseable output: ${output}`);
+    return { behind: Number(parsed[1]), ahead: Number(parsed[2]) };
   }
 }
