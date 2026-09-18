@@ -1,6 +1,6 @@
 {
   "name": "skills-manager-cli",
-  "version": "2026.9.15",
+  "version": "2026.9.18",
   "packageManager": "pnpm@10.33.0",
   "description": "CLI-first agent skill hub: one npx bootstrap, then manage skills in agent conversation — install from git/URL/archive/marketplace/well-known sources, distribute symlink-or-copy to 70+ agents, tree-SHA update anchors, provenance backfill, optional local dashboard",
   "repository": {
