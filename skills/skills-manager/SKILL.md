@@ -45,6 +45,7 @@ skills-manager doctor --share         # privacy-safe hub health paste card (coun
 skills-manager cost [--top <n>] [--json] [--share] [--budget <tokens>]  # resident-cost ledger; --share = privacy-safe paste card
 skills-manager audit security [skill...] [--strict] [--format json|github]  # report-only; --strict = CI gate; --format github = Actions annotations
 skills-manager audit overlap [skill...] [--threshold 0-1] [--strict] [--json]  # pairs whose descriptions compete; run it when the user says the wrong skill fires or one never triggers, then propose boundary wording for them to approve (never edit descriptions unasked)
+skills-manager audit descriptions [skill...] [--strict] [--json]  # lint descriptions (missing, >1024, no "use when", 1st/2nd person, vague); run it when a skill never triggers, then propose a rewrite for the user to approve (never edit unasked)
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list

@@ -55,6 +55,7 @@ skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
 skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
+skills-manager audit descriptions [skills...] [--strict] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -171,6 +172,29 @@ skills-manager audit overlap --json
 ```
 
 Agents choose a skill by matching your message against every skill's `name + description`. When two descriptions claim the same trigger words (say `jest-unit-tests` and `testing-conventions`), the agent may load the wrong one, or neither. `audit overlap` finds those pairs offline and deterministically, with no model and no network. It scores each pair with IDF-weighted Jaccard over description terms (ASCII words, light plural folding, CJK bigrams, common filler words dropped), so words every skill uses barely count and distinctive shared words dominate. Each pair lists its most distinctive shared terms and a suggested fix: write a boundary into each description ("For X, use the other skill instead"), or merge the two. It is report-only and never edits a description. `--json` gives `{ method: "idf-jaccard", threshold, scanned, pairs[] }`. With `--strict`, the verdict goes to stderr and stdout stays unchanged.
+
+### audit descriptions (will this skill ever trigger?)
+
+```sh
+skills-manager audit descriptions            # lint every non-archived hub skill, worst first
+skills-manager audit descriptions a b        # only these skills
+skills-manager audit descriptions --strict   # CI gate: exit 1 on error-level findings (warnings never fail)
+skills-manager audit descriptions --json
+```
+
+The description is all an agent sees before it decides to load a skill, so a weak one means the skill never triggers. This lint checks each description against the Agent Skills spec and Anthropic's authoring guidance, offline and deterministically:
+
+| Rule | Level | Fires when |
+| --- | --- | --- |
+| `missing` | error | the description is empty (the skill can only be called by name) |
+| `too-long` | error | it is over 1024 chars |
+| `xml-tag` | error | it contains an XML/HTML tag |
+| `name-format` | error | the name is not ≤ 64 lowercase letters, digits and hyphens, or contains `anthropic`/`claude` |
+| `no-trigger` | warn | it never says *when* to use the skill ("Use when …", "when the user …", 当/用于/只要…使用) |
+| `point-of-view` | warn | it is written in first or second person ("I can …", "You can use …") |
+| `vague` | warn | it is under 40 chars or has fewer than 4 concrete terms ("Helps with documents") |
+
+Each skill gets a 0–100 score (−40 per error, −15 per warning) and every finding comes with a fix. The lint is report-only and never edits a description. `--json` gives `{ scanned, errors, warnings, skills[] }`. With `--strict`, the verdict goes to stderr.
 
 ### audit security (install/update security scan MVP)
 

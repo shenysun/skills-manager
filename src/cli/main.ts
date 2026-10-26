@@ -6,6 +6,7 @@ import { isInsecureHttpSource, normalizeGitSourceUrl } from '../core/services/so
 import { isUpdatableSourceType } from '../core/services/update-service.js';
 import { parseFormatFlag } from '../core/services/url-payload.js';
 import { findDescriptionOverlaps, renderOverlapReport } from '../core/services/description-overlap.js';
+import { lintDescriptions, renderDescriptionLint } from '../core/services/description-lint.js';
 import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
@@ -781,7 +782,7 @@ program.command('check')
     if (!ok) process.exitCode = 1;
   });
 
-const audit = program.command('audit').description('Report-only audits over hub skills (security, description overlap)');
+const audit = program.command('audit').description('Report-only audits over hub skills (security, description overlap, description lint)');
 audit.command('security')
   .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (report-only by default)')
   .argument('[skills...]', 'canonical skill names; omit to scan every non-archived hub skill')
@@ -825,6 +826,25 @@ audit.command('overlap')
     else process.stdout.write(renderOverlapReport(report));
     if (opts.strict && report.pairs.length > 0) {
       process.stderr.write(`Overlap: ${report.pairs.length} competing pair(s) — FAIL (--strict); sharpen the descriptions above\n`);
+      process.exitCode = 1;
+    }
+  });
+audit.command('descriptions')
+  .description('Lint skill descriptions for what makes them fail to trigger: missing, too long, no "use when", wrong point of view, vague; offline, report-only')
+  .argument('[skills...]', 'canonical skill names; omit to lint every non-archived hub skill')
+  .option('--strict', 'exit 1 when any error-level finding is present (warnings never fail)')
+  .option('--json', 'machine-readable report')
+  .action((skills: string[], opts: { strict?: boolean; json?: boolean }, cmd) => {
+    const s = services(cmd);
+    const all = s.registry.listSkills();
+    const missing = skills.filter((name) => !all.some((skill) => skill.name === name));
+    if (missing.length > 0) throw new Error(`Skill not found: ${missing.join(', ')}. Run \`skills-manager list\` to see hub skills.`);
+    const picked = skills.length > 0 ? all.filter((skill) => skills.includes(skill.name)) : all;
+    const report = lintDescriptions(picked.map((skill) => ({ name: skill.name, description: skill.description })));
+    if (opts.json) print(report);
+    else process.stdout.write(renderDescriptionLint(report));
+    if (opts.strict && report.errors > 0) {
+      process.stderr.write(`Description lint: ${report.errors} error(s) — FAIL (--strict)\n`);
       process.exitCode = 1;
     }
   });

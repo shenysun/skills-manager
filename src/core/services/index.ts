@@ -126,3 +126,5 @@ export { SecurityScanService, BuiltinSecurityScanner, scanText, summarizeFinding
 export type { SecurityScannerPort } from '../ports/security-scanner.js';
 export { findDescriptionOverlaps, renderOverlapReport, descriptionTerms } from './description-overlap.js';
 export type { OverlapReport, OverlapPair, OverlapInput } from './description-overlap.js';
+export { lintDescription, lintDescriptions, renderDescriptionLint, DESCRIPTION_MAX_CHARS } from './description-lint.js';
+export type { DescriptionLint, DescriptionLintReport, LintFinding } from './description-lint.js';

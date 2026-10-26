@@ -55,6 +55,7 @@ skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
 skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
+skills-manager audit descriptions [skills...] [--strict] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -171,6 +172,29 @@ skills-manager audit overlap --json
 ```
 
 agent 选 skill 时，是拿你的消息去匹配每个 skill 的 `name + description`。两个 description 抢同一批触发词（比如 `jest-unit-tests` 与 `testing-conventions`）时，agent 可能加载错的那个，也可能一个都不加载。`audit overlap` 离线、确定性地找出这些对：不调模型、不联网。它对 description 词项（ASCII 单词、轻度复数归并、CJK 二元组，并去掉常见虚词）计算 IDF 加权 Jaccard 作为每对的分数，所以人人都用的词几乎不计分，起作用的是有区分度的共享词。每对列出最有区分度的共享词和一条修复建议：在双方 description 里写明边界（「X 的情况请用另一个 skill」），或者把两者合并。只报告，从不改 description。`--json` 输出 `{ method: "idf-jaccard", threshold, scanned, pairs[] }`。带 `--strict` 时结论写 stderr，stdout 不变。
+
+### audit descriptions（这个 skill 到底会不会被触发？）
+
+```sh
+skills-manager audit descriptions            # 检查所有未归档 hub skill，最差的排在前面
+skills-manager audit descriptions a b        # 只检查这些 skill
+skills-manager audit descriptions --strict   # CI 闸：有 error 级问题即退出 1（warning 永不失败）
+skills-manager audit descriptions --json
+```
+
+agent 决定是否加载某个 skill 之前，只看得到它的 description，description 写得弱，这个 skill 就永远不会被触发。这项 lint 对照 Agent Skills 规范和 Anthropic 的编写指南检查每条 description，离线、结果确定：
+
+| 规则 | 级别 | 何时触发 |
+| --- | --- | --- |
+| `missing` | error | description 为空（只能按名字调用） |
+| `too-long` | error | 超过 1024 字符 |
+| `xml-tag` | error | 含 XML/HTML 标签 |
+| `name-format` | error | 名字不是不超过 64 位的小写字母、数字、连字符，或含 `anthropic`/`claude` |
+| `no-trigger` | warn | 从不说明*何时*使用（「Use when …」「when the user …」、当/用于/只要…使用） |
+| `point-of-view` | warn | 用第一或第二人称写（「I can …」「You can use …」） |
+| `vague` | warn | 少于 40 字符，或具体词少于 4 个（「Helps with documents」） |
+
+每个 skill 得一个 0–100 分（每个 error 扣 40，每个 warning 扣 15），每条发现都附修复建议。只报告，从不改 description。`--json` 输出 `{ scanned, errors, warnings, skills[] }`。带 `--strict` 时结论写 stderr。
 
 ### audit security（装前安全扫描 MVP）
 
