@@ -274,7 +274,7 @@ Skills can ship scripts and docs that call the shell, hit the network, or mentio
 skills-manager doctor                         # one-glance: security.high + warning when non-zero
 skills-manager audit security                 # every non-archived hub skill
 skills-manager audit security --strict        # CI gate: exit 1 on high only
-skills-manager check [--budget <n>] [--freshness]  # all hub CI gates, one exit code
+skills-manager check [--budget <n>] [--freshness] [--overlap] [--descriptions]  # all hub CI gates, one exit code
 skills-manager audit overlap                  # skills whose descriptions compete (wrong skill picked); report-only
 skills-manager audit security --format github # Actions annotations for the PR Files tab
 skills-manager audit security <name>          # one skill — JSON report on stdout (default)

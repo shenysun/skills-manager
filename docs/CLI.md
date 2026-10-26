@@ -67,7 +67,7 @@ skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
 skills-manager provenance list
 skills-manager provenance list --fail-on-imported
-skills-manager check [--budget <tokens>] [--freshness] [--json]
+skills-manager check [--budget <tokens>] [--freshness] [--overlap] [--descriptions] [--json]
 skills-manager provenance adopt
 skills-manager provenance adopt --dry-run --skill my-skill
 skills-manager categories set my-skill frontend backend
@@ -224,7 +224,7 @@ The scanner is a `SecurityScannerPort` — a future SkillSpector / third-party a
 
 ### check (all hub gates, one exit code)
 
-`skills-manager check` runs the hub CI gates together and exits 1 if any fails: **security** (any high finding, same as `audit security --strict`) and **provenance** (imported-without-source, same as `provenance list --fail-on-imported`) always run offline; `--budget <tokens>` adds the resident-cost gate (`cost --budget`), `--freshness` adds the networked tree-SHA check (fails on stale or failed, like `update --check --fail-on-stale`). One `PASS`/`FAIL` line per gate plus a verdict; `--json` gives `{ ok, gates[] }`. Copy-paste workflow: [`examples/github-actions/hub-check.yml`](../examples/github-actions/hub-check.yml).
+`skills-manager check` runs the hub CI gates together and exits 1 if any fails: **security** (any high finding, same as `audit security --strict`) and **provenance** (imported-without-source, same as `provenance list --fail-on-imported`) always run offline; `--budget <tokens>` adds the resident-cost gate (`cost --budget`), `--freshness` adds the networked tree-SHA check (fails on stale or failed, like `update --check --fail-on-stale`). Two offline skill-quality gates are opt-in too: `--overlap` fails when any two descriptions compete (same as `audit overlap --strict` at the default 0.3 threshold), and `--descriptions` fails on error-level description lint findings (same as `audit descriptions --strict`; warnings never fail). They are opt-in because many existing hubs carry harmless warnings and near-duplicates, and turning them on by default would break CI that passes today. One `PASS`/`FAIL` line per gate plus a verdict; `--json` gives `{ ok, gates[] }`. Copy-paste workflow: [`examples/github-actions/hub-check.yml`](../examples/github-actions/hub-check.yml).
 
 ### get (the reference layer, ADR-0017)
 

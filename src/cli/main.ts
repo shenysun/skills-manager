@@ -745,9 +745,11 @@ program.command('update')
 // One exit code for CI: the offline hub gates (security high, imported-without-source)
 // always run; the resident budget and the networked freshness check are opt-in.
 program.command('check')
-  .description('Run the hub CI gates in one go: audit security (high) + provenance (imported-without-source), plus optional --budget and --freshness; exit 1 if any gate fails')
+  .description('Run the hub CI gates in one go: audit security (high) + provenance (imported-without-source), plus optional --budget, --freshness, --overlap and --descriptions; exit 1 if any gate fails')
   .option('--budget <tokens>', 'also fail when total resident tokens exceed this budget (same as cost --budget)')
   .option('--freshness', 'also run update --check (network) and fail on stale or failed detection')
+  .option('--overlap', 'also fail when any two skill descriptions compete (same as audit overlap --strict, threshold 0.3)')
+  .option('--descriptions', 'also fail on error-level description lint findings (same as audit descriptions --strict; warnings never fail)')
   .option('--json', 'machine-readable gate results')
   .action(async (opts, cmd) => {
     const budget = opts.budget === undefined ? null : Number(opts.budget);
@@ -762,6 +764,17 @@ program.command('check')
     if (budget !== null) {
       const total = s.cost.ledger(0).totalTokens;
       gates.push({ gate: 'budget', ok: total <= budget, detail: `${total} / ${budget} resident tokens${total > budget ? ' — run `skills-manager cost` for recalls' : ''}` });
+    }
+    if (opts.overlap || opts.descriptions) {
+      const inputs = s.registry.listSkills().map((skill) => ({ name: skill.name, description: skill.description }));
+      if (opts.overlap) {
+        const pairs = findDescriptionOverlaps(inputs, 0.3).pairs.length;
+        gates.push({ gate: 'overlap', ok: pairs === 0, detail: `${pairs} competing description pair(s)${pairs ? ' — run `skills-manager audit overlap`' : ''}` });
+      }
+      if (opts.descriptions) {
+        const lint = lintDescriptions(inputs);
+        gates.push({ gate: 'descriptions', ok: lint.errors === 0, detail: `${lint.errors} error(s), ${lint.warnings} warning(s) in skill descriptions${lint.errors ? ' — run `skills-manager audit descriptions`' : ''}` });
+      }
     }
     if (opts.freshness) {
       const detection = new DetectionService({ githubApi: new GitHubApiClient(), http: new HttpDownloadClient(), fs: new NodeFileSystem() });

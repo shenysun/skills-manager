@@ -66,4 +66,31 @@ describe('check', () => {
   it('rejects a bad --budget', () => {
     expect(run(['check', '--budget', 'lots']).status).toBe(1);
   });
+
+  it('--overlap and --descriptions are opt-in gates', () => {
+    for (const name of ['grill-a', 'grill-b']) {
+      const dir = path.join(sourceRoot, 'skills', name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: Relentless interview to sharpen a plan or design. Use when the user wants grilling.\n---\n# x\n`);
+    }
+    expect(run(['add', sourceRoot, '--all', '--yes']).status).toBe(0);
+    expect(run(['check']).status).toBe(0);
+    const result = run(['check', '--overlap', '--descriptions', '--json']);
+    expect(result.status).toBe(1);
+    const out = JSON.parse(result.stdout);
+    expect(out.gates.map((g: { gate: string }) => g.gate)).toEqual(['security', 'provenance', 'overlap', 'descriptions']);
+    expect(out.gates.find((g: { gate: string }) => g.gate === 'overlap').ok).toBe(false);
+    expect(out.gates.find((g: { gate: string }) => g.gate === 'descriptions').ok).toBe(true);
+  });
+
+  it('--descriptions fails on an error-level lint finding', () => {
+    const dir = path.join(sourceRoot, 'skills', 'claude-helper');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: claude-helper\ndescription: Formats release notes from merged pull requests. Use when cutting a release.\n---\n# x\n');
+    expect(run(['add', sourceRoot, '--all', '--yes']).status).toBe(0);
+    const result = run(['check', '--descriptions']);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toMatch(/FAIL descriptions: 1 error/);
+    expect(result.stdout).toMatch(/audit descriptions/);
+  });
 });
