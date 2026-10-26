@@ -73,6 +73,8 @@ skills-manager cost --share            # privacy-safe paste card of your residen
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 ```
 
+**CI?** Drop [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) into `.github/workflows/` on a hub repo (`skills/` + `registry.yaml`). It runs `audit security --strict` on PR/push and fails only on high-severity findings.
+
 Runtime copies become hub-backed; originals are backed up first.
 
 ## How it works
