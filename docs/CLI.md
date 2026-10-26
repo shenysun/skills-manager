@@ -149,6 +149,8 @@ skills-manager cost --budget 2000  # exit 1 when total resident tokens exceed 20
 skills-manager update --check --fail-on-stale  # exit 1 when any skill is stale (tree-SHA freshness CI gate; failed checks already exit 1; stdout JSON unchanged)
 ```
 
+Flag mistakes on `cost` (`--top`/`--budget` not a non-negative integer, `--json` with `--share`) and `update` (`--fail-on-stale` without `--check`) are reported before the hub is resolved, so a typo in a fresh CI runner says what is wrong with the flag instead of "No skill home".
+
 `cost` is the read-only resident-cost account: the per-message token cost every distributed skill charges via its frontmatter `name + description`, grouped by **physical runtime path** (user and project both; a shared path counted once with its agent family noted; foreign entries appear only as an uncounted-count line). Counting is **char-approx** (CJK characters ×1, all others ÷4, zero dependencies) — a magnitude reference, never an exact count: every displayed number is `≈`-prefixed (`≈1.2k` style) and the JSON carries `method: "char-approx"`. The JSON is three-layer: `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill lines), the top-level `totalTokens`, and a `suggestions` object. Unreadable entries (broken symlinks included) count 0 and surface in `errors`; entries missing a description are flagged `incomplete`.
 
 `cost --share` renders the same ledger as a short paste card: totals, path kinds with agent families (never absolute paths), the three heaviest skills, then a `Try:` / `Reproduce:` footer and the repo link — so people can share their skill tax without leaking home directories (and without a circular "Share: cost --share" CTA).

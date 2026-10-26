@@ -625,12 +625,12 @@ program.command('cost')
   .option('--top <n>', 'how many of the most expensive descriptions to list', '5')
   .option('--budget <tokens>', 'exit 1 when total resident tokens exceed this budget (CI / pre-commit gate)')
   .action((opts, cmd) => {
-    const s = services(cmd);
     const top = Number.parseInt(opts.top, 10);
     if (!Number.isInteger(top) || top < 0) throw new Error(`--top expects a non-negative integer, got "${opts.top}"`);
     if (opts.json && opts.share) throw new Error('use either --json or --share, not both');
     const budget = opts.budget === undefined ? null : Number(opts.budget);
     if (budget !== null && (!Number.isInteger(budget) || budget < 0)) throw new Error(`--budget expects a non-negative integer token count, got "${opts.budget}"`);
+    const s = services(cmd);
     const ledger = s.cost.ledger(top);
     if (opts.json) print(ledger);
     else process.stdout.write(opts.share ? renderCostShare(ledger) : renderCostLedger(ledger));
@@ -691,8 +691,8 @@ program.command('update')
   .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill (git/marketplace: skill subdirectory tree SHA, not whole-repo HEAD; uncalibrated entries adopt their observed anchor, ADR-0013)')
   .option('--fail-on-stale', 'with --check: also exit 1 when any skill is stale (failed checks already exit 1; CI / hub-freshness gate)')
   .action(async (opts, cmd) => {
-    const s = services(cmd);
     if (opts.failOnStale && !opts.check) throw new Error('--fail-on-stale requires --check');
+    const s = services(cmd);
     if (opts.check) {
       const detection = new DetectionService({ githubApi: new GitHubApiClient(), http: new HttpDownloadClient(), fs: new NodeFileSystem() });
       const listed = s.registry.listSkills({ includeArchived: false });
