@@ -7,7 +7,7 @@
 
 - **Goal**: GitHub stars 179 → 300 without paid/spam tactics.
 - **Ship first**: repo discovery (description/topics/homepage) + README badges + competitor comparison table.
-- **Then**: demo asset + outbound posts + one shareable product wedge (create/push or install security hook).
+- **Then**: demo asset + outbound posts + shareable wedges (`audit security`, `cost --share`, migration one-liner).
 - Track in `.scratch/star-300/plan.md` (local).
 
 ## 已完成
@@ -31,6 +31,8 @@
 ## 第三梯队（大票，先做 MVP）
 
 （已清空——原 #6/#7 多机同步与 skills.sh find 已完成（feature `sync-find`），见「已完成」。）
+
+- **Growth: `cost --share`**（进行中 / 本分支）：隐私安全粘贴卡——总量、path kind+agent family、最重 skill、仓库链接；无绝对路径。
 
 ## 缓做
 

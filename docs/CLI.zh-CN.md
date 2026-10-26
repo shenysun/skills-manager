@@ -128,9 +128,12 @@ hub 本身成为一个 git 仓库；对用户自选的任意远端（本地 bare
 skills-manager cost              # 人读视图：路径组 → per-skill 行 → 总计 + unmanaged 行 → 建议
 skills-manager cost --json       # 完整账本的 JSON（机器形态）
 skills-manager cost --top 10     # 加宽最贵 description 清单（默认 5）
+skills-manager cost --share     # 可粘贴分享卡（无绝对路径），适合发 X / HN / 聊天
 ```
 
 `cost` 是只读的常驻成本账本：每个已分发 skill 经 frontmatter `name + description` 按条消息计费的常驻 token 成本，按**物理运行时路径**分组（user 与 project 同账；共享路径只计一次并标注 agent family；foreign 条目不逐条计费，只汇总为一行未计数数量）。计数口径为 **char-approx**（CJK 字符 ×1、其余 ÷4，零依赖）——量级参考而非精确计数：展示数字一律 `≈` 前缀（`≈1.2k` 风格缩写），JSON 携带 `method: "char-approx"`。JSON 为三层结构：`paths[]`（各含 `runtimeDir`、`kind`、`agents`、per-skill 行）、顶层 `totalTokens`、以及 `suggestions` 对象。不可读条目（含 broken symlink）计 0 并进 `errors`；缺 description 的条目标记 `incomplete`。
+
+`cost --share` 把同一本账本收成短粘贴卡：总量、路径 kind + agent family（从不带绝对路径）、最重的三个 skill、仓库链接——分享「skill 税」时不泄露家目录。
 
 建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。
 
