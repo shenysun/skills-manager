@@ -95,6 +95,19 @@ describe('bootstrap (ADR-0014)', () => {
     expect(forced.status, forced.stderr).toBe(0);
     expect(lstatSync(path.join(userHome, '.claude', 'skills', 'skills-manager')).isSymbolicLink()).toBe(true);
   });
+
+  it('prints pasteable cost --share and doctor demos after the starter prompt', () => {
+    const result = run(['bootstrap']);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/Also try \(CLI demos/);
+    expect(result.stdout).toMatch(/skills-manager cost --share/);
+    expect(result.stdout).toMatch(/skills-manager doctor/);
+    // Starter prompt still leads; demos trail it.
+    const starterAt = result.stdout.indexOf('帮我看看我的 skills');
+    const demosAt = result.stdout.indexOf('skills-manager cost --share');
+    expect(starterAt).toBeGreaterThanOrEqual(0);
+    expect(demosAt).toBeGreaterThan(starterAt);
+  });
 });
 
 describe('single entry point (ADR-0014): only bootstrap creates the default hub', () => {

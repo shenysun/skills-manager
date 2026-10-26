@@ -46,7 +46,7 @@ npx skills-manager-cli
 
 ![skills-manager demo](docs/assets/demo.gif)
 
-*`--help` and the resident context-cost ledger (`cost`) in action.*
+*`--help` and the resident context-cost ledger (`cost`) in action. After bootstrap, try `cost --share` and `doctor` — both are printed as pasteable demos.*
 
 That is the whole setup. Bootstrap creates the skill hub (`~/.skills-manager`), installs the **manager skill** into it from the bundled copy, and mounts it (symlink) into the agents it detects on your machine — you confirm the list in the one prompt it shows.
 

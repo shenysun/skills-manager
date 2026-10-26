@@ -288,6 +288,8 @@ skills-manager cost --share               # privacy-safe paste card (no absolute
 skills-manager cost --budget <tokens>     # gate: exit 1 when total resident tokens exceed the budget (stderr verdict)
 ```
 
+Bootstrap prints `cost --share` and `doctor` as pasteable demos right after the starter prompt — when a user just ran `npx skills-manager-cli`, offer those two next if they ask what else to try.
+
 The JSON carries `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill lines), the top-level `totalTokens` and `method`, a three-layer `suggestions` object, an `unmanaged` count for foreign entries the ledger honestly omits, and an `errors` list for unreadable entries (counted 0; entries missing a description are flagged `incomplete`).
 
 - **Approximations, always.** `method` is `"char-approx"` (CJK characters ×1, everything else ÷4) and every displayed number is `≈`-prefixed — never relay a ledger number to the user as an exact token count.

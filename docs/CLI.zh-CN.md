@@ -23,7 +23,7 @@ skills-manager bootstrap --agent claude-code --agent cursor   # 脚本化
 skills-manager bootstrap --force       # 替换运行时路径上非托管的 skills-manager
 ```
 
-bootstrap（ADR-0014）只做四件事：确保技能库存在；从 npm 包内副本把 **manager skill** 种进库（以发布 tag 作为更新来源戳）；把它（软链接）挂载到你选择的 agent —— TTY 下对检测到的 agent 弹多选（默认全选），`--agent` 跳过提问，非 TTY 挂到全部检测到的 agent；最后打印起始提示词。它永远不做导入：导入现有运行时技能是你之后通过 manager skill 在对话里完成的动作。bootstrap 幂等；且 CLI 每次运行都会自检库内副本与包内副本，未被他改时静默刷新（你手改过的副本视为外来物，不再触碰）。
+bootstrap（ADR-0014）只做四件事：确保技能库存在；从 npm 包内副本把 **manager skill** 种进库（以发布 tag 作为更新来源戳）；把它（软链接）挂载到你选择的 agent —— TTY 下对检测到的 agent 弹多选（默认全选），`--agent` 跳过提问，非 TTY 挂到全部检测到的 agent；最后打印起始提示词。起始提示词之后还会打印两行可粘贴 CLI demo（`cost --share`、`doctor`），让常驻成本分享卡与健康/安全汇总一键可试——下次 npm 发版后尤其有用。它永远不做导入：导入现有运行时技能是你之后通过 manager skill 在对话里完成的动作。bootstrap 幂等；且 CLI 每次运行都会自检库内副本与包内副本，未被他改时静默刷新（你手改过的副本视为外来物，不再触碰）。
 
 ## 命令
 
