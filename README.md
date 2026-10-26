@@ -91,6 +91,17 @@ https://github.com/shenysun/skills-manager
 
 **CI?** Drop [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) into `.github/workflows/` on a hub repo (`skills/` + `registry.yaml`). It runs `audit security --strict --format github` on PR/push — fails only on high-severity findings, and annotates the PR Files tab.
 
+Every gate exits 1 on failure and writes its verdict to stderr, so stdout (text/JSON) stays stable:
+
+| Gate | Command | Fails when | Network |
+| --- | --- | --- | --- |
+| Security | `audit security --strict` | any high-severity finding | no |
+| Provenance | `provenance list --fail-on-imported` | an imported skill has no usable source (can't get updates) | no |
+| Resident cost | `cost --budget <tokens>` | total resident tokens exceed the budget | no |
+| Freshness | `update --check --fail-on-stale` | any skill is stale, or a check fails | yes (`GH_TOKEN` helps) |
+
+Details: [docs/CLI.md](docs/CLI.md).
+
 Runtime copies become hub-backed; originals are backed up first.
 
 ## How it works
