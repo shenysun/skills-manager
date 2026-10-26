@@ -71,6 +71,7 @@ skills-manager init --dry-run          # preview importing existing runtime skil
 # or ask your agent: Import my existing skills into skills-manager
 skills-manager cost --share            # privacy-safe paste card of your resident skill tax
 skills-manager doctor --share          # privacy-safe hub health card (counts only)
+skills-manager update --check          # freshness vs skill subtree tree-SHA (git) — no cry-wolf
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 ```
 
@@ -153,6 +154,7 @@ skills-manager list
 skills-manager add owner/repo --all --yes
 skills-manager distribute --to user --skill my-skill --agent claude-code
 skills-manager update --plan
+skills-manager update --check                     # tree-SHA freshness (git/marketplace)
 skills-manager update --skill my-skill
 skills-manager init --dry-run                    # preview runtime-skill import
 skills-manager init --prefer claude-code hub     # this-run conflict priority

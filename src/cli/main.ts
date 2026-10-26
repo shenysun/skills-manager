@@ -667,7 +667,7 @@ program.command('update')
   .option('-s, --skill <skill...>', 'skill(s) to update')
   .option('--source <key>', 'source group key from updates plan')
   .option('--plan', 'print update plan (candidates only)')
-  .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill (uncalibrated entries adopt their observed anchor, ADR-0013)')
+  .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill (git/marketplace: skill subdirectory tree SHA, not whole-repo HEAD; uncalibrated entries adopt their observed anchor, ADR-0013)')
   .action(async (opts, cmd) => {
     const s = services(cmd);
     if (opts.check) {
@@ -690,6 +690,8 @@ program.command('update')
         else upToDate.push(skill.name);
       }
       print({ checked: stale.length + failed.length + upToDate.length + skipped.length, stale, upToDate, failed, skipped });
+      // Growth tip (stderr): JSON stdout stays script-stable; the differentiator is the git/marketplace tree-SHA anchor.
+      console.error('Update signal (git/marketplace): skill subdirectory tree SHA — upstream noise outside the skill never lights an update.');
       // A failed check is a failed check — scripts read the exit code (adversary M6).
       if (failed.length > 0) process.exitCode = 1;
       return;

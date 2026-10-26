@@ -71,6 +71,7 @@ skills-manager init --dry-run          # 预览导入现有运行时 skill
 # 或对 agent 说：把我现有的 skills 导入 skills-manager
 skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡片（无绝对路径）
 skills-manager doctor --share          # 可粘贴的 hub 健康卡片（仅计数，无路径/技能名）
+skills-manager update --check          # 新鲜度：skill 子目录 tree-SHA（git）——不上游无关提交的狼来了
 skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
 ```
 
@@ -153,6 +154,7 @@ skills-manager list
 skills-manager add owner/repo --all --yes
 skills-manager distribute --to user --skill my-skill --agent claude-code
 skills-manager update --plan
+skills-manager update --check                     # tree-SHA 新鲜度（git/marketplace）
 skills-manager update --skill my-skill
 skills-manager init --dry-run                    # 预览运行时技能导入
 skills-manager init --prefer claude-code hub     # 本次导入的冲突优先级

@@ -80,6 +80,27 @@ describe('catalog info detected detail (manager-skill-first ticket 04)', () => {
 });
 
 describe('update --check (manager-skill-first ticket 03)', () => {
+  it('prints a stderr tip naming the skill subdirectory tree-SHA update signal', () => {
+    const source = path.join(root, 'source-tree-sha-tip');
+    mkdirSync(path.join(source, 'skills', 'tipped'), { recursive: true });
+    writeFileSync(path.join(source, 'skills', 'tipped', 'SKILL.md'), '---\nname: tipped\ndescription: tip\n---\n# tip\n');
+    run(['add', source, '--skill', 'tipped', '--yes']);
+    const raw = run(['update', '--check']);
+    expect(raw.status, raw.stderr).toBe(0);
+    expect(raw.stderr).toMatch(/skill subdirectory tree SHA/i);
+    expect(raw.stderr).toMatch(/never lights an update/i);
+    // JSON stdout contract unchanged for scripts.
+    const body = json(raw);
+    expect(body).toEqual(expect.objectContaining({
+      checked: expect.any(Number),
+      stale: expect.any(Array),
+      upToDate: expect.any(Array),
+      failed: expect.any(Array),
+      skipped: expect.any(Array),
+    }));
+    expect(body).not.toHaveProperty('signal');
+  });
+
   it('reports a local-source skill as stale after its source changes, fresh otherwise', () => {
     // Local sources hash the source tree against the hub fingerprint — no
     // network, which is exactly why this walkthrough stays hermetic.

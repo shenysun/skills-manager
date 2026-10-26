@@ -134,7 +134,7 @@ Map 档位-speak straight onto these — there are no flags for the user to reme
 ### Update from sources
 
 ```bash
-skills-manager update --check                     # freshness detection: stale / upToDate / failed / skipped
+skills-manager update --check                     # freshness; stderr tip = skill subdirectory tree SHA (git/marketplace)
 skills-manager update --plan                      # candidates only (url + subpath) — no freshness check
 skills-manager update --skill <name>
 skills-manager update --source <key>              # one repo group from the plan

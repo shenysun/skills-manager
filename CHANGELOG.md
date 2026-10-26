@@ -25,6 +25,11 @@
 - 测试：隐私断言（无路径/技能名）+ 互斥 + 默认 JSON 仍带 skillHome。
 - 文档：CLI / README 双语、manager skill 词条、ROADMAP 增长楔子。
 
+## 2026-10-26 (update --check tree-SHA signal tip)
+
+- **`update --check` stderr tip**：每次检查在 stderr 打印「git/marketplace 更新信号 = skill 子目录 tree SHA（不是整仓 HEAD）」——stdout JSON 分桶契约不变，脚本不受影响。
+- `--check` 帮助文案对齐；README / CLI 双语 Coming-from 与命令表补 `update --check` 一行。
+- 测试：stderr 含 tree SHA 提示；JSON 仍无 `signal` 字段。
 
 ## 2026-10-26 (audit security --format github)
 
