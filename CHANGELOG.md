@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-26 (CI example: audit security --strict)
+
+- **GitHub Actions 示例**：[`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 可拷贝进 hub 仓库做 PR/push CI 闸（仅 high 失败）。README / CLI 双语各补一行入口。
+- 测试：示例 YAML 可解析且含 `audit security --strict`，并锁定「不传 `--home`」以免空 hub 误过。
+
 ## 2026-10-26 (audit security --strict)
 
 - **`audit security --strict`（CI 闸）**：默认仍只报告、退出 0；加 `--strict` 时仅当存在 `severity: high` 的 finding 才退出 1（`warn`/`info` 不失败）。stdout JSON 形状不变。`add`/`update` 仍只打 stderr 摘要、永不阻断。

@@ -153,6 +153,8 @@ JSON on stdout (one report object, or an array when scanning several). Each repo
 
 `--strict` is the optional CI gate: same JSON stdout, but the process exits `1` when any finding has severity `high`. `warn` / `info` never fail under `--strict` (a lone `curl` mention must not break pipelines). Default without the flag stays exit `0` even when highs are present.
 
+Copy-paste GitHub Actions workflow: [`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) — run it from an existing hub root (`skills/` + `registry.yaml`); do not pass `--home` in CI (an explicit home auto-creates a missing hub and would exit 0 on an empty scan).
+
 The scanner is a `SecurityScannerPort` — a future SkillSpector / third-party adapter can replace `builtin-v1` without changing callers.
 
 ### get (the reference layer, ADR-0017)

@@ -153,6 +153,8 @@ stdout 输出 JSON（单个报告对象；扫描多个时为数组）。每份�
 
 `--strict` 是可选 CI 闸：stdout JSON 不变，但只要有任意 `severity: high` 的 finding，进程退出码为 `1`。`warn` / `info` 在 `--strict` 下也不失败（单独的 `curl` 提及不得打断流水线）。不加该旗标时，即使有 high 也保持退出 `0`。
 
+可拷贝的 GitHub Actions 工作流：[`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) ——在已有 hub 根目录跑（`skills/` + `registry.yaml`）；CI 里不要传 `--home`（显式 home 会自动创建缺失的 hub，空扫描会以 0 退出掩盖配置错误）。
+
 扫描器实现 `SecurityScannerPort`——未来 SkillSpector / 第三方适配器可替换 `builtin-v1`，无需改调用方。
 
 ### get（引用层，ADR-0017）
