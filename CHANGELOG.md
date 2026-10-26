@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-26 (star-300 growth cut: discovery + security + share)
+
+- **Discovery polish (#3)**：README EN/ZH 增加 npm/stars/license/node 徽章与相对 `gh skill` / `npx skills` / 桌面版的对比表；ROADMAP 记录 179→300★ 增长冲刺。
+- **装前安全扫描 MVP (#4)**：`builtin-v1` 只报告不阻断；`skills-manager audit security [skill…]` 输出 JSON；`add`/`update` 成功后 stderr 一行摘要；可插拔 `SecurityScannerPort`。
+- **终端 demo GIF (#5)**：Quick Start 嵌入 `docs/assets/demo.gif`（隐私向 throwaway hub 重录）。
+- **常驻成本分享卡 (#6)**：`skills-manager cost --share` 隐私安全粘贴卡（仅 kind/agent 标签 + 最贵技能 + 仓库链接）；README 迁移一行「从 npx skills / gh skill 过来？」。
+
 ## 2026-09-18 (dangling remote HEAD pull fix)
 
 - **修复自建远端 HEAD symref 悬空时新机 pull 兜底失败（ticket 08）**：`git init --bare`（不带 `-b main`）的远端 HEAD symref 默认指向从未被推送的分支，hub 推送的固定分支是 `main`——远端明明有内容，新机 pull 却报「远端还什么都没推过」且按指引永远无法自愈。修复：merge 目标改为四段解析链——本机 upstream → 同名远端分支（pull 合并的正是 `push -u origin HEAD` 推送的目标）→ 远端声明的 HEAD 分支 → 唯一远端分支（前三步均不中且远端多分支时非零退出，如实列出远端实际分支与本机分支并给出 `--set-upstream-to` 指引，绝不瞎猜）；分支枚举改读 fetch 后的 `refs/remotes/origin/`（本地读，无第二次网络往返，且正是 `origin/<name>` 合法目标的权威集合），fetch 升级为 `--prune`——远端已删分支不得以幽灵 tracking ref 残留成候选；「nothing has been pushed yet」措辞只在远端真的没有分支时出现（新错误码 `sync_remote_empty`，不可判定时错误码 `sync_merge_target_ambiguous` 如实列出远端分支与本机分支）。CLI 双语参考与 CONTEXT Hub sync 词条补 merge 目标解析链。
