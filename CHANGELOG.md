@@ -30,6 +30,11 @@
 - **`update --check` stderr tip**：每次检查在 stderr 打印「git/marketplace 更新信号 = skill 子目录 tree SHA（不是整仓 HEAD）」——stdout JSON 分桶契约不变，脚本不受影响。
 - `--check` 帮助文案对齐；README / CLI 双语 Coming-from 与命令表补 `update --check` 一行。
 - 测试：stderr 含 tree SHA 提示；JSON 仍无 `signal` 字段。
+## 2026-10-26 (sync status --share)
+
+- **`sync status --share`**：多机同步姿态的隐私安全粘贴卡（gitified? / remote yes|no / dirty / ahead-behind / last subject）——永不含 hub 绝对路径或 remote URL；Try/Reproduce CTA + 仓库链接。与 `--json` 互斥。未 git 化时 hint 点名 `sync init --remote <url>`。
+- Coming-from / 常用命令双语补 sync 两行；CLI 双语与 manager skill 词条同步。
+- 测试：git 化卡隐私断言 + 未 git 化卡 + `--json`/`--share` 互斥 + hint `--remote`。
 
 ## 2026-10-26 (audit security --format github)
 

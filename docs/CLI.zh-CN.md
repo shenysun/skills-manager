@@ -79,6 +79,7 @@ skills-manager preset apply frontend --agent claude-code
 skills-manager preset apply frontend --json
 skills-manager sync init --remote <url>
 skills-manager sync status [--json]
+skills-manager sync status --share
 skills-manager sync push
 skills-manager sync pull
 skills-manager archive old-skill
@@ -106,6 +107,7 @@ apply 是显式快照——之后的打标或更新不会自动推送。`categor
 ```sh
 skills-manager sync init --remote <url>   # git init（或 adopt）、canonical .gitignore、基线提交、挂 origin
 skills-manager sync status [--json]       # 只读零网络的同步状态探测
+skills-manager sync status --share        # 可粘贴分享卡（无 hub 路径 / remote URL）
 skills-manager sync push                  # add -A + 一次技能级汇总提交 + push
 skills-manager sync pull                  # fetch + merge（要求干净工作树）
 ```
@@ -114,7 +116,7 @@ hub 本身成为一个 git 仓库；对用户自选的任意远端（本地 bare
 
 `sync push` 暂存全部并做一次汇总提交（技能级计数：新增 / 更新 / 移除，registry 旗标；同 skill 内 rename 计为 update）后推送。干净树且远端已一致时输出「已是同步状态」并退出 0——绝不造空提交。`sync pull` 要求干净工作树（脏 → 非零退出，指引先 `sync push` 或手工处理；绝不 stash），随后 fetch + merge（允许 merge commit；不 rebase、不 ff-only）。merge 目标按优先级解析：本机 upstream（push 配置过时）→ 同名远端分支（pull 合并的正是 `push -u origin HEAD` 推送的目标——`sync init` 把每个新 hub 固定在 `main`，自建 bare 远端 HEAD symref 悬空也能解析）→ 远端声明的 HEAD 分支 → 唯一远端分支；全都无法判定时非零退出并如实列出远端实际分支名，绝不瞎猜——「还什么都没推过」只在远端真的一条分支都没有时出现。merge 带来变更时结尾输出技能级统计，且仅当确有新 skill 拉到时才附「新拉取的 skill 尚未分发」的纯文案提醒；本就最新时只输出一行 already up to date。唯一由工具自己解决的冲突：`registry.yaml` 是唯一冲突路径、本地内容是字节级占位 `skills: {}`、且本地历史仅有 init 基线提交这三条同时成立时，远端真实 registry 胜出并在输出中说明——该状态下本地不存在任何用户数据（未 push、无手工提交），否则任何真实 hub 的新机首拉都必然死在这一冲突上（ticket 07）。
 
-退出码语义：`push` / `pull` 在每道硬闸上都非零退出并带指引——未 git 化的 hub（先 `sync init`）、无 remote origin（`sync init --remote <url>` 或手工 `git remote add`）、无 git 身份（工具绝不代为配置）、未出生 HEAD、merge 冲突（冲突状态原样保留，经 `git -C <hub>` 自行解决——上述占位 registry 是唯一的自动解决例外）。`sync status` 是例外：未 git 化的 hub 友好提示并退出 0。`status` 报告 git 化与否、remote、脏文件数、ahead/behind（基于 remote-tracking ref、注明「上次 fetch」口径——它自己绝不 fetch）、最近同步 commit；`--json` 为机器可读形态。bootstrap 绝不 git 化 hub——同步是用户的显式选择。见 [ADR-0020](adr/0020-hub-git-sync-mvp.md)。
+退出码语义：`push` / `pull` 在每道硬闸上都非零退出并带指引——未 git 化的 hub（先 `sync init`）、无 remote origin（`sync init --remote <url>` 或手工 `git remote add`）、无 git 身份（工具绝不代为配置）、未出生 HEAD、merge 冲突（冲突状态原样保留，经 `git -C <hub>` 自行解决——上述占位 registry 是唯一的自动解决例外）。`sync status` 是例外：未 git 化的 hub 友好提示（点名 `sync init --remote <url>`）并退出 0。`status` 报告 git 化与否、remote、脏文件数、ahead/behind（基于 remote-tracking ref、注明「上次 fetch」口径——它自己绝不 fetch）、最近同步 commit；`--json` 为机器可读形态；`--share` 输出隐私安全粘贴卡（gitified?/remote yes|no/脏文件/ahead-behind/最近 subject——永不含 hub 路径或 remote URL）并带 Try/Reproduce CTA。bootstrap 绝不 git 化 hub——同步是用户的显式选择。见 [ADR-0020](adr/0020-hub-git-sync-mvp.md)。
 
 ### 副本过期与自动刷新（ADR-0008）
 

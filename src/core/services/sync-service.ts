@@ -38,7 +38,7 @@ export class SyncService {
   status(): SyncStatusResult {
     const root = this.home.root;
     if (!this.gitified()) {
-      return { home: root, gitified: false, hint: 'Run `sync init` to git-ify the hub for multi-machine sync.' };
+      return { home: root, gitified: false, hint: 'Run `sync init --remote <url>` to git-ify the hub for multi-machine sync.' };
     }
     if (!this.git.available()) {
       throw new SkillsManagerError(

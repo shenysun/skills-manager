@@ -143,7 +143,7 @@ describe('sync status (not git-ified hub)', () => {
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toMatch(/git: no/);
-    expect(result.stdout).toMatch(/sync init/);
+    expect(result.stdout).toMatch(/sync init --remote/);
   });
 
   it('stays exit 0 even when system git is missing (the answer needs no git)', () => {
@@ -181,7 +181,7 @@ describe('sync status --json', () => {
     const payload = JSON.parse(result.stdout);
     expect(payload.gitified).toBe(false);
     expect(payload.home).toBe(home);
-    expect(payload.hint).toMatch(/sync init/);
+    expect(payload.hint).toMatch(/sync init --remote/);
   });
 
   it('uses null for absent dimensions (no remote, no upstream, no commits) instead of omitting keys', () => {
@@ -246,5 +246,37 @@ describe('sync status (scope guarantees)', () => {
     });
     expect(result.status, result.stderr).toBe(0);
     expect(JSON.parse(result.stdout).home).toBe(home);
+  });
+});
+
+
+describe('sync status --share', () => {
+  it('prints a privacy-safe paste card without hub path or remote URL', () => {
+    const remote = makeBareRemote(root);
+    run(['sync', 'init', '--remote', remote]);
+    git(home, ['push', '-u', 'origin', 'HEAD']);
+    addSkill(home, 'dirty-skill');
+
+    const out = run(['sync', 'status', '--share']).stdout;
+
+    expect(out).toContain('Hub sync posture · skills-manager');
+    expect(out).toMatch(/git: yes · remote: yes · dirty: 1 · ahead 0 \/ behind 0/);
+    expect(out).toContain('last: sync: baseline commit');
+    expect(out).toContain('Try/Reproduce: skills-manager sync status --share');
+    expect(out).toContain('https://github.com/shenysun/skills-manager');
+    expect(out).not.toContain(home);
+    expect(out).not.toContain(remote);
+  });
+
+  it('on a not-yet-git-ified hub points at sync init --remote without leaking the hub path', () => {
+    const out = run(['sync', 'status', '--share']).stdout;
+    expect(out).toContain('Hub sync posture · skills-manager');
+    expect(out).toContain('git: no — run sync init --remote <url>');
+    expect(out).toContain('Try/Reproduce: skills-manager sync status --share');
+    expect(out).not.toContain(home);
+  });
+
+  it('rejects combining --share with --json', () => {
+    expect(run(['sync', 'status', '--share', '--json']).status).toBe(1);
   });
 });

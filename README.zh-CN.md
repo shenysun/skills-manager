@@ -73,6 +73,8 @@ skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡�
 skills-manager doctor --share          # 可粘贴的 hub 健康卡片（仅计数，无路径/技能名）
 skills-manager update --check          # 新鲜度：skill 子目录 tree-SHA（git）——不上游无关提交的狼来了
 skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
+skills-manager sync init --remote <url> # 多机 hub git 同步（相对安装器的差异化）
+skills-manager sync status --share      # 可粘贴分享的同步姿态卡片（无 hub 路径 / remote URL）
 ```
 
 `cost --share` 输出可直接粘贴的卡片（不含绝对路径）。示例形状：
@@ -169,6 +171,8 @@ skills-manager categories apply 前端 -a claude-code  # 只加载该领域
 skills-manager categories status                  # 已应用集合 + 漂移
 skills-manager cost                              # 常驻上下文成本账本（只报告不执行的收回建议）
 skills-manager cost --budget 2000                # 常驻上下文税超出 token 预算时失败（exit 1）
+skills-manager sync init --remote <url>          # 多机 hub git 同步
+skills-manager sync status --share               # 可粘贴分享的同步姿态卡片
 skills-manager archive old-skill
 ```
 

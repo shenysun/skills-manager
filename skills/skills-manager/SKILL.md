@@ -313,10 +313,11 @@ skills-manager sync init --remote <url>   # git init (or adopt), canonical .giti
 
 ```bash
 skills-manager sync push     # add -A + one skill-level summary commit + push
-skills-manager sync status   # read-only probe: git-ified?, remote, dirty count, ahead/behind, last sync commit
+skills-manager sync status          # read-only probe: git-ified?, remote, dirty count, ahead/behind, last sync commit
+skills-manager sync status --share  # privacy-safe paste card (no hub path / remote URL) for X / HN / chat
 ```
 
-`push` is snapshot-at-push-time — no write point ever auto-commits. With a clean tree and an up-to-date remote it reports "already in sync" and exits 0, never an empty commit. `status` is zero-network: ahead/behind reads the remote-tracking ref as of the last fetch and says so. `sync status --json` is the machine-readable form when you need to report sync posture in conversation.
+`push` is snapshot-at-push-time — no write point ever auto-commits. With a clean tree and an up-to-date remote it reports "already in sync" and exits 0, never an empty commit. `status` is zero-network: ahead/behind reads the remote-tracking ref as of the last fetch and says so. `sync status --json` is the machine-readable form when you need to report sync posture in conversation; `sync status --share` is the privacy-safe paste card (labels only — never hub path or remote URL).
 
 **New machine — get the content, then distribute yourself:**
 
