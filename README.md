@@ -74,6 +74,7 @@ skills-manager doctor --share          # privacy-safe hub health card (counts on
 skills-manager update --check          # freshness vs skill subtree tree-SHA (git) — no cry-wolf
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 skills-manager audit overlap           # which skills compete for the same request (wrong-skill triggers)
+skills-manager audit descriptions      # descriptions that will never trigger (no "use when", vague, too long)
 skills-manager sync init --remote <url> # multi-machine hub git sync (unique vs installers)
 skills-manager sync status --share      # privacy-safe paste card of sync posture
 ```
