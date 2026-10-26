@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type {
+  DoctorSecurity,
   SecurityFinding,
   SecurityFindingKind,
   SecurityScanReport,
@@ -154,6 +155,27 @@ export class SecurityScanService {
 
   scanSkills(skills: readonly string[]): SecurityScanReport[] {
     return skills.map((skill) => this.scanSkill(skill));
+  }
+
+  /**
+   * Doctor rollup over named hub skills (same set as `audit security` with no args).
+   * Always returns a structured account; empty hubs stay high=0.
+   */
+  hubSummary(skillNames: readonly string[]): DoctorSecurity {
+    if (skillNames.length === 0) {
+      return { scanner: this.scanner.id, scanned: 0, high: 0, skillsWithHigh: [] };
+    }
+    const reports = this.scanSkills(skillNames);
+    const skillsWithHigh = reports
+      .filter((report) => report.findings.some((f) => f.severity === 'high'))
+      .map((report) => report.skill)
+      .sort((a, b) => a.localeCompare(b));
+    return {
+      scanner: reports[0]?.scanner ?? this.scanner.id,
+      scanned: reports.length,
+      high: this.countHighFindings(reports),
+      skillsWithHigh,
+    };
   }
 
   /** Count findings with severity `high` across one or more reports. */

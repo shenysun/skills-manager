@@ -136,7 +136,7 @@ skills-manager cost --share     # privacy-safe paste card (no absolute paths) fo
 
 `cost --share` renders the same ledger as a short paste card: totals, path kinds with agent families (never absolute paths), the three heaviest skills, and a repo link — so people can share their skill tax without leaking home directories.
 
-Suggestions are **report-only** — nothing is ever executed. Three layers: archived-but-distributed skills (zero-controversy recalls) head the list, then the top-N most expensive descriptions, then scattered distributions (one skill across several paths — consolidate to one). Every suggestion carries a verbatim runnable `undistribute` command including the required `--to` (and `--project` for project paths). `doctor` consumes the same core as a structured `residentCost` field and warns only on scattered duplicates; the dashboard consumes it via `GET /api/cost`. See [ADR-0018](adr/0018-resident-cost-ledger.md).
+Suggestions are **report-only** — nothing is ever executed. Three layers: archived-but-distributed skills (zero-controversy recalls) head the list, then the top-N most expensive descriptions, then scattered distributions (one skill across several paths — consolidate to one). Every suggestion carries a verbatim runnable `undistribute` command including the required `--to` (and `--project` for project paths). `doctor` consumes the same core as a structured `residentCost` field and warns only on scattered duplicates; the dashboard consumes it via `GET /api/cost`. See [ADR-0018](adr/0018-resident-cost-ledger.md). The same doctor report also carries a structured `security` rollup (`scanner`, `scanned`, `high`, `skillsWithHigh`) and warns only when `high > 0`, pointing at `audit security --strict` and the copy-paste Action example.
 
 
 ### audit security (install/update security scan MVP)
@@ -154,6 +154,8 @@ JSON on stdout (one report object, or an array when scanning several). Each repo
 `--strict` is the optional CI gate: same JSON stdout, but the process exits `1` when any finding has severity `high`. `warn` / `info` never fail under `--strict` (a lone `curl` mention must not break pipelines). Default without the flag stays exit `0` even when highs are present.
 
 Copy-paste GitHub Actions workflow: [`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) — run it from an existing hub root (`skills/` + `registry.yaml`); do not pass `--home` in CI (an explicit home auto-creates a missing hub and would exit 0 on an empty scan).
+
+`doctor` always attaches the same hub rollup as `security` and warns only when `high > 0` (warn/info alone stay silent), so a one-glance health check surfaces the CI gate without running `audit` separately.
 
 The scanner is a `SecurityScannerPort` — a future SkillSpector / third-party adapter can replace `builtin-v1` without changing callers.
 

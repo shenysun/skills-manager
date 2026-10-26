@@ -136,7 +136,7 @@ skills-manager cost --share     # 可粘贴分享卡（无绝对路径），适�
 
 `cost --share` 把同一本账本收成短粘贴卡：总量、路径 kind + agent family（从不带绝对路径）、最重的三个 skill、仓库链接——分享「skill 税」时不泄露家目录。
 
-建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。
+建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。同一份 doctor 报告还带结构化 `security` 汇总（`scanner`、`scanned`、`high`、`skillsWithHigh`），仅当 `high > 0` 时告警，并指向 `audit security --strict` 与可拷贝的 Action 示例。
 
 
 ### audit security（装前安全扫描 MVP）
@@ -154,6 +154,8 @@ stdout 输出 JSON（单个报告对象；扫描多个时为数组）。每份�
 `--strict` 是可选 CI 闸：stdout JSON 不变，但只要有任意 `severity: high` 的 finding，进程退出码为 `1`。`warn` / `info` 在 `--strict` 下也不失败（单独的 `curl` 提及不得打断流水线）。不加该旗标时，即使有 high 也保持退出 `0`。
 
 可拷贝的 GitHub Actions 工作流：[`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) ——在已有 hub 根目录跑（`skills/` + `registry.yaml`）；CI 里不要传 `--home`（显式 home 会自动创建缺失的 hub，空扫描会以 0 退出掩盖配置错误）。
+
+`doctor` 始终附带同一 hub 汇总为 `security` 字段，且仅当 `high > 0` 时告警（仅有 warn/info 保持沉默），一眼健康检查即可指向 CI 闸，不必另跑 `audit`。
 
 扫描器实现 `SecurityScannerPort`——未来 SkillSpector / 第三方适配器可替换 `builtin-v1`，无需改调用方。
 

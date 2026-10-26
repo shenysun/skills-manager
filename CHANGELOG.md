@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26 (doctor security rollup)
+
+- **`doctor.security`**：报告恒带 hub 安全汇总（`scanner` / `scanned` / `high` / `skillsWithHigh`），与 `audit security` 无参扫描集一致；仅当 `high > 0` 时告警并指向 `audit security --strict` + `examples/github-actions/audit-security.yml`。warn/info 单独存在不告警（与 `--strict` 同口径）。
+- 测试：doctor 空库 / hubSummary 对齐 / 仅 warn 无告警 / high 一条告警。
+- 文档：CLI 双语、manager skill 词条。
+
 ## 2026-10-26 (CI example: audit security --strict)
 
 - **GitHub Actions 示例**：[`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 可拷贝进 hub 仓库做 PR/push CI 闸（仅 high 失败）。README / CLI 双语各补一行入口。

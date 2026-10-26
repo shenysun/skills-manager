@@ -40,9 +40,9 @@ skills-manager list --brief           # compact rows — use this in conversatio
 skills-manager get <name>             # zero-retention read: full SKILL.md (frontmatter + body) on stdout
 skills-manager get <name> --path      # absolute hub dir, for read-only borrowing of sibling files
 skills-manager status                 # distribution health: managed/outdated/foreign
-skills-manager doctor                 # warnings incl. imported-without-source queue
+skills-manager doctor                 # warnings incl. imported-without-source + security high rollup
 skills-manager cost [--top <n>] [--json] [--share]  # resident-cost ledger; --share = privacy-safe paste card
-skills-manager audit security [skill...]  # report-only install/update security scan (shell/network/credentials/secrets)
+skills-manager audit security [skill...] [--strict]  # report-only scan; --strict = CI gate on high
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
@@ -264,10 +264,12 @@ Summarize: adopted-from-lockfile count, sources written by approval, confirmed l
 
 ## Workflow: audit skill security (装前安全扫描)
 
-Skills can ship scripts and docs that call the shell, hit the network, or mention credential paths. `skills-manager audit security` is the **report-only** scan (never blocks install/update in v1): high-signal hits for shell exec, network calls, credential paths, and secret-looking strings. `add` / `update` already print one stderr summary line per skill; dig in when that line is not `clean`, or when the user asks whether a skill looks safe before distributing it.
+Skills can ship scripts and docs that call the shell, hit the network, or mention credential paths. `skills-manager audit security` is the **report-only** scan (never blocks install/update in v1): high-signal hits for shell exec, network calls, credential paths, and secret-looking strings. `add` / `update` already print one stderr summary line per skill; dig in when that line is not `clean`, or when the user asks whether a skill looks safe before distributing it. `doctor` always carries a `security` rollup and warns only when `high > 0`, pointing at `--strict` and the copy-paste Action example.
 
 ```sh
+skills-manager doctor                         # one-glance: security.high + warning when non-zero
 skills-manager audit security                 # every non-archived hub skill
+skills-manager audit security --strict        # CI gate: exit 1 on high only
 skills-manager audit security <name>          # one skill — JSON report on stdout
 ```
 
