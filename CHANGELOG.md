@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-26 (check: one-exit-code hub gates)
+
+- **`check [--budget <tokens>] [--freshness] [--json]`**：security(high) + provenance(imported) 离线必跑，预算与树 SHA 新鲜度可选；任一失败退出 1。新增 `examples/github-actions/hub-check.yml`。测试 + CLI 双语 + manager skill。
+
 ## 2026-10-26 (update --check --fail-on-stale)
 
 - **`update --check --fail-on-stale`**：树 SHA 新鲜度 CI 闸——`stale` 非空时退出 1（`failed` 本就退出 1）；结论一行走 stderr，stdout JSON 不变。无 `--check` 时拒绝该旗标。

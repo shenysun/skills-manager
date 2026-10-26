@@ -65,6 +65,7 @@ skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
 skills-manager provenance list
 skills-manager provenance list --fail-on-imported
+skills-manager check [--budget <tokens>] [--freshness] [--json]
 skills-manager provenance adopt
 skills-manager provenance adopt --dry-run --skill my-skill
 skills-manager categories set my-skill 前端 后端
@@ -183,6 +184,10 @@ skills-manager audit security --strict --format github  # CI 闸 + 注解
 `doctor` 始终附带同一 hub 汇总为 `security` 字段，且仅当 `high > 0` 时告警（仅有 warn/info 保持沉默），一眼健康检查即可指向 CI 闸，不必另跑 `audit`。
 
 扫描器实现 `SecurityScannerPort`——未来 SkillSpector / 第三方适配器可替换 `builtin-v1`，无需改调用方。
+
+### check（所有 hub 闸，一个退出码）
+
+`skills-manager check` 一次跑完 hub CI 闸，任一失败即退出 1：**security**（存在 high 发现，同 `audit security --strict`）与 **provenance**（imported-without-source，同 `provenance list --fail-on-imported`）始终离线运行；`--budget <tokens>` 追加常驻成本闸（同 `cost --budget`），`--freshness` 追加联网的树 SHA 检查（stale 或检测失败即失败，同 `update --check --fail-on-stale`）。每个闸一行 `PASS`/`FAIL` 加总结论；`--json` 输出 `{ ok, gates[] }`。可拷贝工作流：[`examples/github-actions/hub-check.yml`](../examples/github-actions/hub-check.yml)。
 
 ### get（引用层，ADR-0017）
 
