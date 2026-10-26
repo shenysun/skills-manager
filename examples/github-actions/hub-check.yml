@@ -7,6 +7,7 @@
 # Opt-in: `--budget <tokens>` (resident context tax) and `--freshness` (network tree-SHA
 # update check; set GH_TOKEN to avoid the 60 req/h anonymous GitHub limit).
 # Want PR-file annotations for security findings? Keep audit-security.yml alongside.
+# Want "this phrasing must pick skill X" assertions? Keep trigger-test.yml alongside.
 
 name: skills-manager hub check
 

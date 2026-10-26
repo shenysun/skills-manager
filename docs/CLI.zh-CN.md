@@ -224,7 +224,7 @@ skills-manager audit security --strict --format github  # CI 闸 + 注解
 
 ### check（所有 hub 闸，一个退出码）
 
-`skills-manager check` 一次跑完 hub CI 闸，任一失败即退出 1：**security**（存在 high 发现，同 `audit security --strict`）与 **provenance**（imported-without-source，同 `provenance list --fail-on-imported`）始终离线运行；`--budget <tokens>` 追加常驻成本闸（同 `cost --budget`），`--freshness` 追加联网的树 SHA 检查（stale 或检测失败即失败，同 `update --check --fail-on-stale`）。两个离线的 skill 质量闸也是可选的：`--overlap` 在任意两个 description 互相争抢时失败（同默认阈值 0.3 的 `audit overlap --strict`），`--descriptions` 在 description lint 出现 error 级发现时失败（同 `audit descriptions --strict`；warning 永不失败）。之所以默认关闭，是因为很多现有 hub 带着无害的 warning 和近似重复，默认开启会让今天能通过的 CI 直接变红。每个闸一行 `PASS`/`FAIL` 加总结论；`--json` 输出 `{ ok, gates[] }`。可拷贝工作流：[`examples/github-actions/hub-check.yml`](../examples/github-actions/hub-check.yml)。
+`skills-manager check` 一次跑完 hub CI 闸，任一失败即退出 1：**security**（存在 high 发现，同 `audit security --strict`）与 **provenance**（imported-without-source，同 `provenance list --fail-on-imported`）始终离线运行；`--budget <tokens>` 追加常驻成本闸（同 `cost --budget`），`--freshness` 追加联网的树 SHA 检查（stale 或检测失败即失败，同 `update --check --fail-on-stale`）。两个离线的 skill 质量闸也是可选的：`--overlap` 在任意两个 description 互相争抢时失败（同默认阈值 0.3 的 `audit overlap --strict`），`--descriptions` 在 description lint 出现 error 级发现时失败（同 `audit descriptions --strict`；warning 永不失败）。之所以默认关闭，是因为很多现有 hub 带着无害的 warning 和近似重复，默认开启会让今天能通过的 CI 直接变红。每个闸一行 `PASS`/`FAIL` 加总结论；`--json` 输出 `{ ok, gates[] }`。可拷贝工作流：[`examples/github-actions/hub-check.yml`](../examples/github-actions/hub-check.yml)。把示例用户措辞钉到某个 skill：[`examples/github-actions/trigger-test.yml`](../examples/github-actions/trigger-test.yml)（`trigger test "<request>" --expect <skill>`；按你的 hub 改断言）。
 
 ### get（引用层，ADR-0017）
 

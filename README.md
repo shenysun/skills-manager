@@ -21,6 +21,7 @@ Manage your agent skills **from the conversation**: one `npx` command installs t
 - **The resident-cost ledger** — every distributed skill's frontmatter charges each message; `skills-manager cost` accounts it per runtime path (approximate, `≈`) with report-only recall suggestions. Undistributed = zero. See [ADR-0018](docs/adr/0018-resident-cost-ledger.md).
 - **Provenance backfill** — imported skills without a source get one through lockfile-evidence adoption, agent-driven search, and your approval.
 - **The manager skill** — every management action happens in agent conversation ([ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)); the CLI underneath is a plain JSON engine.
+- **Skill routing you can CI** — `check` (plus `--overlap` / `--descriptions`), `audit overlap` / `audit descriptions`, and `trigger test "<request>" --expect <skill>` pin which skill a phrasing should pick. Offline, no model. Copy [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) + [`trigger-test.yml`](examples/github-actions/trigger-test.yml).
 
 
 ## Why this instead of `gh skill` / `npx skills` / the desktop app?
@@ -33,6 +34,7 @@ Manage your agent skills **from the conversation**: one `npx` command installs t
 | Non-GitHub sources | git / URL / zip / marketplace / well-known | GitHub (+ `--from-local`) | GitHub-centric | Marketplace + git |
 | Update signal | **Skill subtree tree-SHA** (no false positives) | Frontmatter tree SHA | Lockfile / metadata | App sync |
 | Context cost | Built-in **resident cost ledger** | — | — | — |
+| Skill quality / routing CI | `check` · `audit overlap/descriptions` · `trigger test --expect` | — | — | — |
 | Multi-machine | Hub git sync (`sync push/pull`) | — | — | Device-code backup |
 | Install | `npx skills-manager-cli` | `gh extension` | `npx skills` | Desktop download |
 
@@ -47,6 +49,28 @@ npx skills-manager-cli
 ![skills-manager demo](docs/assets/demo.gif)
 
 *`--help` and the resident context-cost ledger (`cost`) in action. After bootstrap, try `cost --share` and `doctor` — both are printed as pasteable demos.*
+
+Skill quality in the terminal (asciinema-style; no GIF required):
+
+```text
+$ skills-manager check --overlap --descriptions
+check: PASS (4/4 gates)
+
+$ skills-manager audit overlap
+Description overlap (idf-jaccard ≥ 0.3) — 1 pair(s) across 12 skill(s)
+
+  0.41  jest-unit-tests ↔ testing-conventions
+        shared: jest, unit, test
+        fix:    Draw a boundary in each description…
+
+$ skills-manager trigger test "fill PDF form fields" --expect pdf-forms
+Trigger test (idf-jaccard) — request: "fill PDF form fields"
+  scanned 12 skill(s); showing 12
+
+  #1  0.312  pdf-forms
+        shared: pdf, form, field
+  expect pdf-forms: PASS — pdf-forms ranked #1 (score 0.312)
+```
 
 That is the whole setup. Bootstrap creates the skill hub (`~/.skills-manager`), installs the **manager skill** into it from the bundled copy, and mounts it (symlink) into the agents it detects on your machine — you confirm the list in the one prompt it shows.
 
@@ -72,9 +96,11 @@ skills-manager init --dry-run          # preview importing existing runtime skil
 skills-manager cost --share            # privacy-safe paste card of your resident skill tax
 skills-manager doctor --share          # privacy-safe hub health card (counts only)
 skills-manager update --check          # freshness vs skill subtree tree-SHA (git) — no cry-wolf
+skills-manager check --overlap --descriptions  # one exit code: security + provenance + description quality
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 skills-manager audit overlap           # which skills compete for the same request (wrong-skill triggers)
 skills-manager audit descriptions      # descriptions that will never trigger (no "use when", vague, too long)
+skills-manager trigger test "…" --expect my-skill  # CI: this phrasing must rank my-skill #1 (or within --top N)
 skills-manager sync init --remote <url> # multi-machine hub git sync (unique vs installers)
 skills-manager sync status --share      # privacy-safe paste card of sync posture
 ```
@@ -91,17 +117,24 @@ Reproduce: skills-manager cost --share
 https://github.com/shenysun/skills-manager
 ```
 
-**CI?** Drop [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) into `.github/workflows/` on a hub repo (`skills/` + `registry.yaml`). It runs `audit security --strict --format github` on PR/push — fails only on high-severity findings, and annotates the PR Files tab.
+**CI / skill quality?** Start with the one-exit-code hub gate, then pin routing:
+
+1. [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) — `check` (security + provenance; add `--budget` / `--freshness` / `--overlap` / `--descriptions` as you like).
+2. [`examples/github-actions/trigger-test.yml`](examples/github-actions/trigger-test.yml) — `trigger test "<request>" --expect <skill>` assertions (edit the sample phrasings for your hub).
+3. Optional: [`audit-security.yml`](examples/github-actions/audit-security.yml) when you want PR Files annotations for highs (`--format github`).
 
 Every gate exits 1 on failure and writes its verdict to stderr, so stdout (text/JSON) stays stable:
 
 | Gate | Command | Fails when | Network |
 | --- | --- | --- | --- |
+| **Hub (all-in-one)** | `check [--budget] [--freshness] [--overlap] [--descriptions]` | any enabled gate fails (security + provenance always) — copy [`hub-check.yml`](examples/github-actions/hub-check.yml) | only with `--freshness` |
+| Overlap | `audit overlap --strict` / `check --overlap` | any two descriptions compete for the same request | no |
+| Descriptions | `audit descriptions --strict` / `check --descriptions` | any error-level description lint finding | no |
+| **Routing** | `trigger test "<request>" --expect <skill> [--top N]` | expected skill is not #1 (or not in top N) — copy [`trigger-test.yml`](examples/github-actions/trigger-test.yml) | no |
 | Security | `audit security --strict` | any high-severity finding | no |
 | Provenance | `provenance list --fail-on-imported` | an imported skill has no usable source (can't get updates) | no |
 | Resident cost | `cost --budget <tokens>` | total resident tokens exceed the budget | no |
 | Freshness | `update --check --fail-on-stale` | any skill is stale, or a check fails | yes (`GH_TOKEN` helps) |
-| **All of the above** | `check [--budget <tokens>] [--freshness]` | any enabled gate fails (security + provenance always; budget/freshness opt-in) — copy [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) | only with `--freshness` |
 
 Details: [docs/CLI.md](docs/CLI.md).
 

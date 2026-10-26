@@ -21,6 +21,7 @@
 - **常驻成本账本**——每个已分发 skill 的 frontmatter 都在按条消息计费；`skills-manager cost` 按运行时路径记账（近似口径，`≈` 展示）并给出只报告不执行的收回建议。未分发 = 零常驻。见 [ADR-0018](docs/adr/0018-resident-cost-ledger.md)。
 - **来源可回填**——没有来源的导入 skill，经锁文件证据采纳、agent 搜索、你批准三层流程补齐 provenance。
 - **manager skill**——所有管理动作都在 agent 对话里完成（[ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)）；底层 CLI 是纯 JSON 引擎。
+- **可进 CI 的 skill 路由**——`check`（加 `--overlap` / `--descriptions`）、`audit overlap` / `audit descriptions`，以及 `trigger test "<request>" --expect <skill>`，把「这句话该命中哪个 skill」钉死。离线、不调模型。拷贝 [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) + [`trigger-test.yml`](examples/github-actions/trigger-test.yml)。
 
 
 ## 为什么选它，而不是 `gh skill` / `npx skills` / 桌面版？
@@ -33,6 +34,7 @@
 | 非 GitHub 源 | git / URL / zip / marketplace / well-known | GitHub（+ `--from-local`） | 偏 GitHub | Marketplace + git |
 | 更新信号 | **skill 子目录 tree-SHA**（不误报） | frontmatter tree SHA | lockfile / metadata | App 同步 |
 | 上下文成本 | 内置**常驻成本账本** | — | — | — |
+| Skill 质量 / 路由 CI | `check` · `audit overlap/descriptions` · `trigger test --expect` | — | — | — |
 | 多机同步 | Hub git 化（`sync push/pull`） | — | — | 设备码备份 |
 | 安装 | `npx skills-manager-cli` | `gh extension` | `npx skills` | 桌面安装包 |
 
@@ -47,6 +49,28 @@ npx skills-manager-cli
 ![skills-manager demo](docs/assets/demo.gif)
 
 *演示：`--help` 与常驻上下文成本账本（`cost`）。bootstrap 结束后还会打印可粘贴的 `cost --share` 与 `doctor` demo。*
+
+终端里的 skill 质量（asciinema 风格；不必录 GIF）：
+
+```text
+$ skills-manager check --overlap --descriptions
+check: PASS (4/4 gates)
+
+$ skills-manager audit overlap
+Description overlap (idf-jaccard ≥ 0.3) — 1 pair(s) across 12 skill(s)
+
+  0.41  jest-unit-tests ↔ testing-conventions
+        shared: jest, unit, test
+        fix:    Draw a boundary in each description…
+
+$ skills-manager trigger test "fill PDF form fields" --expect pdf-forms
+Trigger test (idf-jaccard) — request: "fill PDF form fields"
+  scanned 12 skill(s); showing 12
+
+  #1  0.312  pdf-forms
+        shared: pdf, form, field
+  expect pdf-forms: PASS — pdf-forms ranked #1 (score 0.312)
+```
 
 这就是全部的安装步骤。bootstrap 会创建技能库（`~/.skills-manager`），从包内副本把 **manager skill** 种进库，并（以软链接）挂载到它检测到的 agent——展示一次多选让你确认清单。
 
@@ -72,9 +96,11 @@ skills-manager init --dry-run          # 预览导入现有运行时 skill
 skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡片（无绝对路径）
 skills-manager doctor --share          # 可粘贴的 hub 健康卡片（仅计数，无路径/技能名）
 skills-manager update --check          # 新鲜度：skill 子目录 tree-SHA（git）——不上游无关提交的狼来了
+skills-manager check --overlap --descriptions  # 一个退出码：安全 + 来源 + description 质量
 skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
 skills-manager audit overlap           # 哪些 skill 在抢同一个请求（误触发错的 skill）
 skills-manager audit descriptions      # 永远不会被触发的 description（缺「何时用」、太含糊、太长）
+skills-manager trigger test "…" --expect my-skill  # CI：这句话必须把 my-skill 排到第 1（或 --top N 内）
 skills-manager sync init --remote <url> # 多机 hub git 同步（相对安装器的差异化）
 skills-manager sync status --share      # 可粘贴分享的同步姿态卡片（无 hub 路径 / remote URL）
 ```
@@ -91,17 +117,24 @@ Reproduce: skills-manager cost --share
 https://github.com/shenysun/skills-manager
 ```
 
-**上 CI？** 把 [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 拷进 hub 仓库的 `.github/workflows/`（仓库根需是 `skills/` + `registry.yaml`）。PR/push 时跑 `audit security --strict --format github`——仅 high 严重度发现会失败，并在 PR Files 页打注解。
+**上 CI / skill 质量？** 先上一个退出码的 hub 闸，再钉路由：
+
+1. [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) ——`check`（安全 + 来源；按需加 `--budget` / `--freshness` / `--overlap` / `--descriptions`）。
+2. [`examples/github-actions/trigger-test.yml`](examples/github-actions/trigger-test.yml) ——`trigger test "<request>" --expect <skill>` 断言（把示例措辞改成你 hub 里的）。
+3. 可选：[`audit-security.yml`](examples/github-actions/audit-security.yml)——需要 PR Files 注解时用（`--format github`）。
 
 每个闸失败即退出 1，结论写 stderr，stdout（文本/JSON）保持稳定：
 
 | 闸 | 命令 | 何时失败 | 联网 |
 | --- | --- | --- | --- |
+| **Hub（一把梭）** | `check [--budget] [--freshness] [--overlap] [--descriptions]` | 任一启用的闸失败（安全 + 来源必跑）——拷贝 [`hub-check.yml`](examples/github-actions/hub-check.yml) | 仅 `--freshness` 时 |
+| 重叠 | `audit overlap --strict` / `check --overlap` | 任意两个 description 争抢同一请求 | 否 |
+| Description | `audit descriptions --strict` / `check --descriptions` | 出现 error 级 description lint 发现 | 否 |
+| **路由** | `trigger test "<request>" --expect <skill> [--top N]` | 期望 skill 不是第 1（或不在前 N）——拷贝 [`trigger-test.yml`](examples/github-actions/trigger-test.yml) | 否 |
 | 安全 | `audit security --strict` | 存在 high 严重度发现 | 否 |
 | 来源 | `provenance list --fail-on-imported` | 有导入 skill 缺可用来源（拿不到更新） | 否 |
 | 常驻成本 | `cost --budget <tokens>` | 常驻总 token 超出预算 | 否 |
 | 新鲜度 | `update --check --fail-on-stale` | 任一 skill 过期，或检测失败 | 是（建议设 `GH_TOKEN`） |
-| **以上全部** | `check [--budget <tokens>] [--freshness]` | 任一启用的闸失败（安全 + 来源必跑；预算/新鲜度按需开启）——可直接拷贝 [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) | 仅 `--freshness` 时 |
 
 详见 [docs/CLI.zh-CN.md](docs/CLI.zh-CN.md)。
 
