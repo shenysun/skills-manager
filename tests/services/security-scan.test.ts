@@ -144,3 +144,46 @@ describe('BuiltinSecurityScanner / SecurityScanService walk', () => {
     expect(line.toLowerCase()).not.toMatch(/block|denied|refused/);
   });
 });
+
+describe('SecurityScanService --strict gate helpers', () => {
+  let root: string;
+  let homeRoot: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'security-strict-'));
+    homeRoot = path.join(root, 'home');
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  function writeSkill(name: string, body: string) {
+    const dir = path.join(homeRoot, 'skills', name);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'SKILL.md'), body);
+  }
+
+  it('countHighFindings / failsStrict trip only on high severity', () => {
+    writeSkill('warn-only', '---\nname: warn-only\ndescription: d\n---\ncurl https://example.com\n');
+    writeSkill('high-risk', '---\nname: high-risk\ndescription: d\n---\nbash -c "echo x"\n');
+    writeSkill('clean', '---\nname: clean\ndescription: d\n---\n# Safe\n');
+    const fs = createNodeFileSystem();
+    const home = createSkillHome(homeRoot);
+    const service = new SecurityScanService(fs, home);
+    const warnOnly = service.scanSkill('warn-only');
+    const high = service.scanSkill('high-risk');
+    const clean = service.scanSkill('clean');
+
+    expect(warnOnly.findings.every((f) => f.severity !== 'high')).toBe(true);
+    expect(service.countHighFindings([warnOnly])).toBe(0);
+    expect(service.failsStrict([warnOnly])).toBe(false);
+
+    expect(service.countHighFindings([high])).toBeGreaterThan(0);
+    expect(service.failsStrict([high])).toBe(true);
+
+    expect(service.failsStrict([clean, warnOnly])).toBe(false);
+    expect(service.failsStrict([clean, warnOnly, high])).toBe(true);
+    expect(service.countHighFindings([high, high])).toBe(service.countHighFindings([high]) * 2);
+  });
+});

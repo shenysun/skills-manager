@@ -70,6 +70,7 @@ npx skills-manager-cli                 # 引导创建 hub + manager skill
 skills-manager init --dry-run          # 预览导入现有运行时 skill
 # 或对 agent 说：把我现有的 skills 导入 skills-manager
 skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡片（无绝对路径）
+skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
 ```
 
 运行时副本改为由 hub 托管；原文件会先备份。

@@ -687,13 +687,15 @@ program.command('update')
 
 const audit = program.command('audit').description('Report-only audits over hub skills (security today; more subcommands later)');
 audit.command('security')
-  .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (never blocks)')
+  .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (report-only by default)')
   .argument('[skills...]', 'canonical skill names; omit to scan every non-archived hub skill')
-  .action((skills: string[], _opts, cmd) => {
+  .option('--strict', 'exit 1 when any high-severity finding is present (warn/info never fail; default stays report-only)')
+  .action((skills: string[], opts: { strict?: boolean }, cmd) => {
     const s = services(cmd);
     const names = skills.length > 0 ? skills : s.registry.listSkills().map((skill) => skill.name);
     const reports = s.security.scanSkills(names);
     print(reports.length === 1 ? reports[0] : reports);
+    if (opts.strict && s.security.failsStrict(reports)) process.exitCode = 1;
   });
 
 const distribute = program.command('distribute')

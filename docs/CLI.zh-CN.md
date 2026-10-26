@@ -49,6 +49,7 @@ skills-manager cost --json
 skills-manager cost --top 10
 skills-manager audit security
 skills-manager audit security my-skill
+skills-manager audit security --strict
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -143,11 +144,14 @@ skills-manager cost --share     # 可粘贴分享卡（无绝对路径），适�
 ```sh
 skills-manager audit security              # 扫描技能库中所有未归档 skill
 skills-manager audit security my-skill     # 指定一个（或多个）skill 名
+skills-manager audit security --strict     # CI 闸：仅 high 严重度发现时退出 1
 ```
 
-只报告不阻断：扫描 skill 目录树中的高信号风险——shell 执行模式（`bash -c`、`child_process`、`subprocess`、`eval` 等）、网络调用（`curl`/`wget`/`fetch`/…）、凭据路径提及（`~/.ssh`、`.aws/credentials`、`.env` 等）、以及明显像密钥的字符串（AWS key id、私钥头、`sk-…`、`api_key="…"`）。v1 默认永不阻断 install / update。
+默认只报告不阻断：扫描 skill 目录树中的高信号风险——shell 执行模式（`bash -c`、`child_process`、`subprocess`、`eval` 等）、网络调用（`curl`/`wget`/`fetch`/…）、凭据路径提及（`~/.ssh`、`.aws/credentials`、`.env` 等）、以及明显像密钥的字符串（AWS key id、私钥头、`sk-…`、`api_key="…"`）。install / update 仍只打 stderr 摘要，永不阻断。
 
 stdout 输出 JSON（单个报告对象；扫描多个时为数组）。每份报告含 `scanner`（当前为 `builtin-v1`）、`findings[]`（`kind`、`severity`、相对 `path`、1-based `line`、`excerpt`、`rule`）以及按 kind 汇总的 `summary`。`add` / `update` 成功后还会对每个已安装/已更新的 skill 在 stderr 打一行摘要，保持既有 stdout JSON 可解析。
+
+`--strict` 是可选 CI 闸：stdout JSON 不变，但只要有任意 `severity: high` 的 finding，进程退出码为 `1`。`warn` / `info` 在 `--strict` 下也不失败（单独的 `curl` 提及不得打断流水线）。不加该旗标时，即使有 high 也保持退出 `0`。
 
 扫描器实现 `SecurityScannerPort`——未来 SkillSpector / 第三方适配器可替换 `builtin-v1`，无需改调用方。
 

@@ -70,6 +70,7 @@ npx skills-manager-cli                 # bootstrap the hub + manager skill
 skills-manager init --dry-run          # preview importing existing runtime skills
 # or ask your agent: Import my existing skills into skills-manager
 skills-manager cost --share            # privacy-safe paste card of your resident skill tax
+skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 ```
 
 Runtime copies become hub-backed; originals are backed up first.
