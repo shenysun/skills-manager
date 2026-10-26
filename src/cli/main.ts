@@ -94,6 +94,8 @@ const webCommand = (cmd: Command, description: string) =>
     .option('--host <host>', 'host', '127.0.0.1')
     .option('--no-open', 'do not open a browser')
     .action(async (opts, self) => {
+      const port = Number(opts.port);
+      if (!/^\d+$/.test(String(opts.port)) || port > 65535) throw new Error(`--port expects an integer from 0 to 65535, got "${opts.port}"`);
       const globalOpts = (self.optsWithGlobals() as { home?: string });
       // Single entry point (ADR-0014): the dashboard never creates the hub — bootstrap does.
       const probe = createRuntimeServices({ home: globalOpts.home }, projectRoot);
@@ -106,7 +108,7 @@ const webCommand = (cmd: Command, description: string) =>
       selfCheckManagerSkill(probe);
       // Lazy: fastify/shiki/markdown load only for the dashboard command, not on every CLI invocation.
       const { startDashboardServer } = await import('../dashboard/server/main.js');
-      return startDashboardServer({ home: globalOpts.home, port: Number(opts.port), host: opts.host, open: opts.open, projectRoot });
+      return startDashboardServer({ home: globalOpts.home, port, host: opts.host, open: opts.open, projectRoot });
     });
 
 webCommand(program.command('web'), 'Start the local web dashboard');
