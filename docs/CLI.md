@@ -50,6 +50,7 @@ skills-manager cost --top 10
 skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
+skills-manager audit security --strict --format github
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -145,15 +146,19 @@ Suggestions are **report-only** — nothing is ever executed. Three layers: arch
 skills-manager audit security              # scan every non-archived hub skill
 skills-manager audit security my-skill     # one (or more) skill name(s)
 skills-manager audit security --strict     # CI gate: exit 1 on high-severity findings
+skills-manager audit security --format github   # Actions ::error/::warning/::notice (PR Files UI)
+skills-manager audit security --strict --format github  # CI gate + annotations
 ```
 
 Report-only scan of a skill tree for high-signal risks: shell exec patterns (`bash -c`, `child_process`, `subprocess`, `eval`, …), network calls (`curl`/`wget`/`fetch`/…), credential path mentions (`~/.ssh`, `.aws/credentials`, `.env`, …), and obvious secret-looking strings (AWS key ids, private-key headers, `sk-…`, `api_key="…"`). Install/update stay report-only (stderr summary only).
 
-JSON on stdout (one report object, or an array when scanning several). Each report carries `scanner` (today `builtin-v1`), `findings[]` (`kind`, `severity`, relative `path`, 1-based `line`, `excerpt`, `rule`), and a `summary` count per kind. `add` / `update` also print one stderr summary line per installed/updated skill so the existing JSON stdout stays parseable.
+Default stdout is JSON (one report object, or an array when scanning several). Each report carries `scanner` (today `builtin-v1`), `findings[]` (`kind`, `severity`, relative `path`, 1-based `line`, `excerpt`, `rule`), and a `summary` count per kind. `add` / `update` also print one stderr summary line per installed/updated skill so the existing JSON stdout stays parseable.
 
-`--strict` is the optional CI gate: same JSON stdout, but the process exits `1` when any finding has severity `high`. `warn` / `info` never fail under `--strict` (a lone `curl` mention must not break pipelines). Default without the flag stays exit `0` even when highs are present.
+`--format github` switches stdout to GitHub Actions workflow commands (`::error` / `::warning` / `::notice`) with hub-relative `file=skills/<name>/…` paths so findings light up on the PR Files tab. Combine with `--strict` for a CI gate that both fails the job and annotates the diff. `%` / newlines / carriage returns in paths and excerpts are percent-encoded per Actions rules. Unknown `--format` values error with `invalid_format_flag`.
 
-Copy-paste GitHub Actions workflow: [`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) — run it from an existing hub root (`skills/` + `registry.yaml`); do not pass `--home` in CI (an explicit home auto-creates a missing hub and would exit 0 on an empty scan).
+`--strict` is the optional CI gate: exit `1` when any finding has severity `high` (works with either format). `warn` / `info` never fail under `--strict` (a lone `curl` mention must not break pipelines). Default without the flag stays exit `0` even when highs are present.
+
+Copy-paste GitHub Actions workflow: [`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) — runs `audit security --strict --format github` from an existing hub root (`skills/` + `registry.yaml`); do not pass `--home` in CI (an explicit home auto-creates a missing hub and would exit 0 on an empty scan).
 
 `doctor` always attaches the same hub rollup as `security` and warns only when `high > 0` (warn/info alone stay silent), so a one-glance health check surfaces the CI gate without running `audit` separately.
 

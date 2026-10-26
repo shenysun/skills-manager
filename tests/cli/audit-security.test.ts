@@ -84,4 +84,36 @@ describe('audit security', () => {
     const result = run(['audit', 'security', 'safe', '--strict']);
     expect(result.status, result.stderr).toBe(0);
   });
+
+  it('--format github prints Actions annotations instead of JSON', () => {
+    writeSourceSkill(
+      'risky',
+      '---\nname: risky\ndescription: d\n---\nbash -c "echo hi"\n',
+    );
+    expect(run(['add', sourceRoot, '--all', '--yes']).status).toBe(0);
+    const result = run(['audit', 'security', 'risky', '--format', 'github']);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/^::error file=skills\/risky\/SKILL\.md,line=\d+,title=bash_c::/);
+    expect(result.stdout).not.toMatch(/\{\s*"skill"/);
+  });
+
+  it('--format github with --strict still exits 1 on high findings', () => {
+    writeSourceSkill(
+      'risky',
+      '---\nname: risky\ndescription: d\n---\nbash -c "echo hi"\n',
+    );
+    expect(run(['add', sourceRoot, '--all', '--yes']).status).toBe(0);
+    const result = run(['audit', 'security', 'risky', '--strict', '--format', 'github']);
+    expect(result.status, result.stderr).toBe(1);
+    expect(result.stdout).toMatch(/::error /);
+  });
+
+  it('--format rejects unknown values', () => {
+    writeSourceSkill('safe', '---\nname: safe\ndescription: d\n---\n# safe\n');
+    expect(run(['add', sourceRoot, '--all', '--yes']).status).toBe(0);
+    const result = run(['audit', 'security', 'safe', '--format', 'sarif']);
+    expect(result.status, result.stderr).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(/json or github/);
+  });
+
 });

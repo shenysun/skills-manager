@@ -122,5 +122,5 @@ export type { GetTarget } from './get-service.js';
 export { CostLedgerService, charApproxTokens } from './cost-ledger-service.js';
 export type { CostLedger, CostPathGroup, CostSkillLine, CostLedgerError } from './cost-ledger-service.js';
 export type { BackupInfo } from './backup-service.js';
-export { SecurityScanService, BuiltinSecurityScanner, scanText, BUILTIN_SCANNER_ID } from './security-scan.js';
+export { SecurityScanService, BuiltinSecurityScanner, scanText, summarizeFindings, formatGithubAnnotations, BUILTIN_SCANNER_ID } from './security-scan.js';
 export type { SecurityScannerPort } from '../ports/security-scanner.js';

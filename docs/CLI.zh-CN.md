@@ -50,6 +50,7 @@ skills-manager cost --top 10
 skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
+skills-manager audit security --strict --format github
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -145,15 +146,19 @@ skills-manager cost --share     # 可粘贴分享卡（无绝对路径），适�
 skills-manager audit security              # 扫描技能库中所有未归档 skill
 skills-manager audit security my-skill     # 指定一个（或多个）skill 名
 skills-manager audit security --strict     # CI 闸：仅 high 严重度发现时退出 1
+skills-manager audit security --format github   # Actions ::error/::warning/::notice（PR Files 页）
+skills-manager audit security --strict --format github  # CI 闸 + 注解
 ```
 
 默认只报告不阻断：扫描 skill 目录树中的高信号风险——shell 执行模式（`bash -c`、`child_process`、`subprocess`、`eval` 等）、网络调用（`curl`/`wget`/`fetch`/…）、凭据路径提及（`~/.ssh`、`.aws/credentials`、`.env` 等）、以及明显像密钥的字符串（AWS key id、私钥头、`sk-…`、`api_key="…"`）。install / update 仍只打 stderr 摘要，永不阻断。
 
-stdout 输出 JSON（单个报告对象；扫描多个时为数组）。每份报告含 `scanner`（当前为 `builtin-v1`）、`findings[]`（`kind`、`severity`、相对 `path`、1-based `line`、`excerpt`、`rule`）以及按 kind 汇总的 `summary`。`add` / `update` 成功后还会对每个已安装/已更新的 skill 在 stderr 打一行摘要，保持既有 stdout JSON 可解析。
+默认 stdout 为 JSON（单个报告对象；扫描多个时为数组）。每份报告含 `scanner`（当前为 `builtin-v1`）、`findings[]`（`kind`、`severity`、相对 `path`、1-based `line`、`excerpt`、`rule`）以及按 kind 汇总的 `summary`。`add` / `update` 成功后还会对每个已安装/已更新的 skill 在 stderr 打一行摘要，保持既有 stdout JSON 可解析。
 
-`--strict` 是可选 CI 闸：stdout JSON 不变，但只要有任意 `severity: high` 的 finding，进程退出码为 `1`。`warn` / `info` 在 `--strict` 下也不失败（单独的 `curl` 提及不得打断流水线）。不加该旗标时，即使有 high 也保持退出 `0`。
+`--format github` 把 stdout 换成 GitHub Actions 工作流命令（`::error` / `::warning` / `::notice`），`file=` 使用 hub 相对路径 `skills/<name>/…`，让 finding 直接亮在 PR Files 页。与 `--strict` 联用即可既失败又注解。路径与摘录中的 `%` / 换行 / 回车按 Actions 规则做百分号编码。未知 `--format` 值报错 `invalid_format_flag`。
 
-可拷贝的 GitHub Actions 工作流：[`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) ——在已有 hub 根目录跑（`skills/` + `registry.yaml`）；CI 里不要传 `--home`（显式 home 会自动创建缺失的 hub，空扫描会以 0 退出掩盖配置错误）。
+`--strict` 是可选 CI 闸：只要有任意 `severity: high` 的 finding，进程退出码为 `1`（与任一 format 均可联用）。`warn` / `info` 在 `--strict` 下也不失败（单独的 `curl` 提及不得打断流水线）。不加该旗标时，即使有 high 也保持退出 `0`。
+
+可拷贝的 GitHub Actions 工作流：[`examples/github-actions/audit-security.yml`](../examples/github-actions/audit-security.yml) ——跑 `audit security --strict --format github`，在已有 hub 根目录（`skills/` + `registry.yaml`）；CI 里不要传 `--home`（显式 home 会自动创建缺失的 hub，空扫描会以 0 退出掩盖配置错误）。
 
 `doctor` 始终附带同一 hub 汇总为 `security` 字段，且仅当 `high > 0` 时告警（仅有 warn/info 保持沉默），一眼健康检查即可指向 CI 闸，不必另跑 `audit`。
 

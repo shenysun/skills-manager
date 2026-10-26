@@ -7,6 +7,7 @@ import {
   BUILTIN_SCANNER_ID,
   BuiltinSecurityScanner,
   SecurityScanService,
+  formatGithubAnnotations,
   scanText,
 } from '../../src/core/services/security-scan.js';
 import { createSkillHome } from '../../src/core/services/skill-home-service.js';
@@ -185,5 +186,65 @@ describe('SecurityScanService --strict gate helpers', () => {
     expect(service.failsStrict([clean, warnOnly])).toBe(false);
     expect(service.failsStrict([clean, warnOnly, high])).toBe(true);
     expect(service.countHighFindings([high, high])).toBe(service.countHighFindings([high]) * 2);
+  });
+});
+
+describe('formatGithubAnnotations', () => {
+  it('emits error/warning/notice lines with hub-relative skills/ paths', () => {
+    const out = formatGithubAnnotations([
+      {
+        skill: 'risky',
+        root: '/hub/skills/risky',
+        scanner: BUILTIN_SCANNER_ID,
+        findings: [
+          { kind: 'shell_exec', severity: 'high', path: 'SKILL.md', line: 4, excerpt: 'bash -c "x"', rule: 'bash_c' },
+          { kind: 'network', severity: 'warn', path: 'scripts/fetch.js', line: 2, excerpt: 'curl https://x', rule: 'curl_wget' },
+          { kind: 'secret_like', severity: 'info', path: 'NOTES.md', line: 1, excerpt: 'maybe later', rule: 'api_key_assign' },
+        ],
+        summary: { shell_exec: 1, network: 1, credential_path: 0, secret_like: 1, total: 3 },
+      },
+    ]);
+    const lines = out.split('\n');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe('::error file=skills/risky/SKILL.md,line=4,title=bash_c::shell_exec: bash -c "x"');
+    expect(lines[1]).toBe('::warning file=skills/risky/scripts/fetch.js,line=2,title=curl_wget::network: curl https://x');
+    expect(lines[2]).toBe('::notice file=skills/risky/NOTES.md,line=1,title=api_key_assign::secret_like: maybe later');
+  });
+
+  it('returns empty string when there are no findings', () => {
+    expect(formatGithubAnnotations([])).toBe('');
+    expect(
+      formatGithubAnnotations([
+        {
+          skill: 'safe',
+          root: '/hub/skills/safe',
+          scanner: BUILTIN_SCANNER_ID,
+          findings: [],
+          summary: { shell_exec: 0, network: 0, credential_path: 0, secret_like: 0, total: 0 },
+        },
+      ]),
+    ).toBe('');
+  });
+
+  it('escapes % and newlines in workflow-command values', () => {
+    const out = formatGithubAnnotations([
+      {
+        skill: 'odd',
+        root: '/hub/skills/odd',
+        scanner: BUILTIN_SCANNER_ID,
+        findings: [
+          {
+            kind: 'shell_exec',
+            severity: 'high',
+            path: 'SKILL.md',
+            line: 1,
+            excerpt: '100% done\nok',
+            rule: 'bash_c',
+          },
+        ],
+        summary: { shell_exec: 1, network: 0, credential_path: 0, secret_like: 0, total: 1 },
+      },
+    ]);
+    expect(out).toContain('100%25 done%0Aok');
   });
 });

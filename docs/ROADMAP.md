@@ -9,7 +9,7 @@
 - **Ship first**: repo discovery (description/topics/homepage) + README badges + competitor comparison table.
 - **Then**: demo asset + outbound posts + shareable wedges (`audit security`, `cost --share`, migration one-liner, `audit security --strict`).
 - Track in `.scratch/star-300/plan.md` (local).
-- **Growth shipped (2026-10-26+)**: discovery polish · demo GIF · `audit security` · `cost --share` · migration one-liner · `audit security --strict` · CI example workflow · `doctor.security` rollup (high → `--strict` / Action pointer).
+- **Growth shipped (2026-10-26+)**: discovery polish · demo GIF · `audit security` · `cost --share` · migration one-liner · `audit security --strict` · CI example workflow · `doctor.security` rollup · `audit security --format github` (Actions annotations on PR Files).
 
 ## 已完成
 
@@ -36,7 +36,7 @@
 ## 缓做
 
 - **create/push**：gh skill publish（GitHub 绑定）与 asm publish（自建 registry）各占一头；我们的通用位（任意 git host + well-known）存在但优先级靠后。
-- **装前安全扫描**：MVP + `--strict` shipped — `audit security` + install/update stderr summary，builtin-v1 高信号规则，`SecurityScannerPort` 可插拔；`--strict` 仅对 `high` 退出 1（默认仍只报告）；SkillSpector / 第三方赢家稳定后再接适配器。
+- **装前安全扫描**：MVP + `--strict` + `--format github` shipped — `audit security` + install/update stderr summary，builtin-v1 高信号规则，`SecurityScannerPort` 可插拔；`--strict` 仅对 `high` 退出 1；`--format github` 输出 Actions 注解；SkillSpector / 第三方赢家稳定后再接适配器（SARIF 仍缓做）。
 - **Migration CLI**（超出 README 一行）：从 `npx skills` / `gh skill` lockfiles → hub 的专用迁移命令仍缓做——当前 `init --dry-run` + agent「Import my existing skills」足够。
 
 ## 维护约定
