@@ -44,6 +44,10 @@ Pick this when you want **one library, many agents, conversation-driven ops**, a
 npx skills-manager-cli
 ```
 
+![skills-manager demo](docs/assets/demo.gif)
+
+*`--help` and the resident context-cost ledger (`cost`) in action.*
+
 That is the whole setup. Bootstrap creates the skill hub (`~/.skills-manager`), installs the **manager skill** into it from the bundled copy, and mounts it (symlink) into the agents it detects on your machine — you confirm the list in the one prompt it shows.
 
 Then go back to your agent and say:
