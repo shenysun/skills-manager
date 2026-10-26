@@ -73,6 +73,18 @@ skills-manager cost --share            # privacy-safe paste card of your residen
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 ```
 
+`cost --share` prints a paste-ready card (no absolute paths). Example shape:
+
+```text
+Resident skill tax · char-approx · skills-manager
+≈1.2k tokens / message · 12 skill(s) · 2 path(s)
+Paths: user/claude-code+zed · project/cursor
+Heaviest: big-skill ≈400 · mid ≈200 · small ≈80
+Try: npx skills-manager-cli
+Reproduce: skills-manager cost --share
+https://github.com/shenysun/skills-manager
+```
+
 **CI?** Drop [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) into `.github/workflows/` on a hub repo (`skills/` + `registry.yaml`). It runs `audit security --strict --format github` on PR/push — fails only on high-severity findings, and annotates the PR Files tab.
 
 Runtime copies become hub-backed; originals are backed up first.

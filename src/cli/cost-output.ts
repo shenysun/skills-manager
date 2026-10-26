@@ -70,7 +70,7 @@ export function renderPresetCostLine(cost: ScopedPathCost): string {
 /**
  * Privacy-safe paste card for `skills-manager cost --share` (growth wedge):
  * no absolute paths, agent-family labels only, top skills by total tokens,
- * a one-line CTA + repo URL. Same ledger, thinner surface.
+ * Try/Reproduce CTA + repo URL (not a circular "Share: cost --share"). Same ledger, thinner surface.
  */
 export function renderCostShare(ledger: CostLedger): string {
   const skillTotals = new Map<string, number>();
@@ -104,7 +104,8 @@ export function renderCostShare(ledger: CostLedger): string {
     lines.push(`Watch: ${watch.join(' · ')}`);
   }
   if (ledger.unmanaged > 0) lines.push(`${ledger.unmanaged} unmanaged skill(s) not counted`);
-  lines.push('Share: skills-manager cost --share');
+  lines.push('Try: npx skills-manager-cli');
+  lines.push('Reproduce: skills-manager cost --share');
   lines.push('https://github.com/shenysun/skills-manager');
   return `${lines.join('\n')}\n`;
 }
