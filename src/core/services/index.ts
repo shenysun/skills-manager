@@ -128,3 +128,5 @@ export { findDescriptionOverlaps, renderOverlapReport, descriptionTerms } from '
 export type { OverlapReport, OverlapPair, OverlapInput } from './description-overlap.js';
 export { lintDescription, lintDescriptions, renderDescriptionLint, DESCRIPTION_MAX_CHARS } from './description-lint.js';
 export type { DescriptionLint, DescriptionLintReport, LintFinding } from './description-lint.js';
+export { rankTriggers, takeTop, expectSatisfied, renderTriggerRank } from './trigger-rank.js';
+export type { TriggerSkill, TriggerHit, TriggerRankReport } from './trigger-rank.js';

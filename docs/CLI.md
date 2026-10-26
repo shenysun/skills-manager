@@ -56,6 +56,7 @@ skills-manager audit security --strict
 skills-manager audit security --strict --format github
 skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
 skills-manager audit descriptions [skills...] [--strict] [--json]
+skills-manager trigger test "<request>" [--expect <skill>] [--top <n>] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -221,6 +222,20 @@ Copy-paste GitHub Actions workflow: [`examples/github-actions/audit-security.yml
 `doctor` always attaches the same hub rollup as `security` and warns only when `high > 0` (warn/info alone stay silent), so a one-glance health check surfaces the CI gate without running `audit` separately.
 
 The scanner is a `SecurityScannerPort` — a future SkillSpector / third-party adapter can replace `builtin-v1` without changing callers.
+
+### trigger test (would this request pick the right skill?)
+
+```sh
+skills-manager trigger test "fill PDF form fields"                 # rank every non-archived hub skill
+skills-manager trigger test "write jest unit tests" --top 5        # only show the top 5
+skills-manager trigger test "draft release notes" --expect release-notes   # CI: exit 1 unless that skill is #1
+skills-manager trigger test "write unit tests with Jest" --expect testing-conventions --top 2  # allow a top-N window
+skills-manager trigger test "…" --json
+```
+
+Agents choose a skill by matching the user's message against every skill's `name + description`. `trigger test` does that match offline and deterministically: the same IDF-weighted Jaccard over `descriptionTerms` that `audit overlap` uses, scoring the request against each hub skill. Output is a ranked list (`#1`, `#2`, …) with the shared distinctive terms.
+
+`--expect <skill>` is the CI assertion. Without `--top`, that skill must rank first. With `--top N`, it must appear somewhere in the top N (and the listing is truncated to N). Unknown `--expect` names are refused up front. `--json` emits `{ method, request, scanned, hits[{ skill, score, shared, rank }], expect? }`. No network, no model — safe for pre-commit and Actions.
 
 ### check (all hub gates, one exit code)
 

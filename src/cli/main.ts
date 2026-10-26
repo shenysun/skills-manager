@@ -7,6 +7,7 @@ import { isUpdatableSourceType } from '../core/services/update-service.js';
 import { parseFormatFlag } from '../core/services/url-payload.js';
 import { findDescriptionOverlaps, renderOverlapReport } from '../core/services/description-overlap.js';
 import { lintDescriptions, renderDescriptionLint } from '../core/services/description-lint.js';
+import { rankTriggers, takeTop, expectSatisfied, renderTriggerRank } from '../core/services/trigger-rank.js';
 import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
@@ -860,6 +861,44 @@ audit.command('descriptions')
     else process.stdout.write(renderDescriptionLint(report));
     if (opts.strict && report.errors > 0) {
       process.stderr.write(`Description lint: ${report.errors} error(s) — FAIL (--strict)\n`);
+      process.exitCode = 1;
+    }
+  });
+
+
+const trigger = program.command('trigger').description('Offline checks for which hub skills a sample user request would match (reuse description-term IDF scoring)');
+trigger.command('test')
+  .description('Rank hub skills against a sample user request; with --expect, exit 1 unless that skill ranks first (or within --top N)')
+  .argument('<request>', 'sample user request / message to rank against')
+  .option('--expect <skill>', 'canonical skill name that must rank first (or within --top when set); CI assertion')
+  .option('--top <n>', 'only show / assert within the top N hits (integer ≥ 1)')
+  .option('--json', 'machine-readable report')
+  .action((request: string, opts: { expect?: string; top?: string; json?: boolean }, cmd) => {
+    let top: number | undefined;
+    if (opts.top !== undefined) {
+      top = Number.parseInt(opts.top, 10);
+      if (!Number.isInteger(top) || top < 1) throw new Error(`--top expects an integer ≥ 1, got "${opts.top}"`);
+    }
+    const s = services(cmd);
+    const skills = s.registry.listSkills().map((skill) => ({ name: skill.name, description: skill.description }));
+    if (opts.expect && !skills.some((skill) => skill.name === opts.expect)) {
+      throw new Error(`Skill not found: ${opts.expect}. Run \`skills-manager list\` to see hub skills.`);
+    }
+    const report = rankTriggers(request, skills);
+    const shown = takeTop(report, top);
+    const verdict = opts.expect ? expectSatisfied(report, opts.expect, top) : undefined;
+    if (opts.json) {
+      print({
+        ...shown,
+        expect: verdict
+          ? { skill: opts.expect, ok: verdict.ok, detail: verdict.detail, rank: verdict.hit?.rank ?? null, score: verdict.hit?.score ?? null }
+          : undefined,
+      });
+    } else {
+      process.stdout.write(renderTriggerRank(report, { expect: opts.expect, top }));
+    }
+    if (verdict && !verdict.ok) {
+      process.stderr.write(`Trigger test: FAIL — ${verdict.detail}\n`);
       process.exitCode = 1;
     }
   });
