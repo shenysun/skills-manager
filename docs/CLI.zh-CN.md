@@ -149,6 +149,8 @@ skills-manager cost --budget 2000  # 常驻总 token 超过 2000 时退出 1（C
 skills-manager update --check --fail-on-stale  # 任一 skill 过期时退出 1（树 SHA 新鲜度 CI 闸；检测失败本就退出 1；stdout JSON 不变）
 ```
 
+`cost`（`--top`/`--budget` 不是非负整数、`--json` 与 `--share` 同用）与 `update`（`--fail-on-stale` 未带 `--check`）的参数错误会在解析 hub 之前报出：在全新的 CI runner 上写错参数，看到的是参数本身的错误，而不是「No skill home」。
+
 `cost` 是只读的常驻成本账本：每个已分发 skill 经 frontmatter `name + description` 按条消息计费的常驻 token 成本，按**物理运行时路径**分组（user 与 project 同账；共享路径只计一次并标注 agent family；foreign 条目不逐条计费，只汇总为一行未计数数量）。计数口径为 **char-approx**（CJK 字符 ×1、其余 ÷4，零依赖）——量级参考而非精确计数：展示数字一律 `≈` 前缀（`≈1.2k` 风格缩写），JSON 携带 `method: "char-approx"`。JSON 为三层结构：`paths[]`（各含 `runtimeDir`、`kind`、`agents`、per-skill 行）、顶层 `totalTokens`、以及 `suggestions` 对象。不可读条目（含 broken symlink）计 0 并进 `errors`；缺 description 的条目标记 `incomplete`。
 
 `cost --share` 把同一本账本收成短粘贴卡：总量、路径 kind + agent family（从不带绝对路径）、最重的三个 skill，末尾是 `Try:` / `Reproduce:` 页脚与仓库链接——分享「skill 税」时不泄露家目录，也不再循环写「Share: cost --share」。
