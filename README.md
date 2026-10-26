@@ -75,6 +75,7 @@ skills-manager update --check          # freshness vs skill subtree tree-SHA (gi
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 skills-manager audit overlap           # which skills compete for the same request (wrong-skill triggers)
 skills-manager audit descriptions      # descriptions that will never trigger (no "use when", vague, too long)
+skills-manager audit descriptions --fix # proposed rewrites as a diff; --write applies them
 skills-manager sync init --remote <url> # multi-machine hub git sync (unique vs installers)
 skills-manager sync status --share      # privacy-safe paste card of sync posture
 ```

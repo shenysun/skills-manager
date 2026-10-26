@@ -128,3 +128,5 @@ export { findDescriptionOverlaps, renderOverlapReport, descriptionTerms } from '
 export type { OverlapReport, OverlapPair, OverlapInput } from './description-overlap.js';
 export { lintDescription, lintDescriptions, renderDescriptionLint, DESCRIPTION_MAX_CHARS } from './description-lint.js';
 export type { DescriptionLint, DescriptionLintReport, LintFinding } from './description-lint.js';
+export { fixDescription, fixDescriptions, boundaryProposals, renderProposals, replaceFrontmatterDescription } from './description-fix.js';
+export type { DescriptionProposal } from './description-fix.js';
