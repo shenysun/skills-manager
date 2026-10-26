@@ -173,6 +173,7 @@ skills-manager cost                              # 常驻上下文成本账本�
 skills-manager cost --budget 2000                # 常驻上下文税超出 token 预算时失败（exit 1）
 skills-manager sync init --remote <url>          # 多机 hub git 同步
 skills-manager sync status --share               # 可粘贴分享的同步姿态卡片
+skills-manager update --check --fail-on-stale    # 任一 hub skill 相对上游树 SHA 过期时失败（exit 1）
 skills-manager archive old-skill
 ```
 

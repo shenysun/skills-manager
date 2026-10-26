@@ -675,8 +675,10 @@ program.command('update')
   .option('--source <key>', 'source group key from updates plan')
   .option('--plan', 'print update plan (candidates only)')
   .option('--check', 'run upstream freshness detection: stale / upToDate / failed / skipped per skill (git/marketplace: skill subdirectory tree SHA, not whole-repo HEAD; uncalibrated entries adopt their observed anchor, ADR-0013)')
+  .option('--fail-on-stale', 'with --check: also exit 1 when any skill is stale (failed checks already exit 1; CI / hub-freshness gate)')
   .action(async (opts, cmd) => {
     const s = services(cmd);
+    if (opts.failOnStale && !opts.check) throw new Error('--fail-on-stale requires --check');
     if (opts.check) {
       const detection = new DetectionService({ githubApi: new GitHubApiClient(), http: new HttpDownloadClient(), fs: new NodeFileSystem() });
       const listed = s.registry.listSkills({ includeArchived: false });
@@ -701,6 +703,16 @@ program.command('update')
       console.error('Update signal (git/marketplace): skill subdirectory tree SHA — upstream noise outside the skill never lights an update.');
       // A failed check is a failed check — scripts read the exit code (adversary M6).
       if (failed.length > 0) process.exitCode = 1;
+      // Optional CI gate: stale skills are informational by default; --fail-on-stale
+      // turns the tree-SHA freshness signal into a nonzero exit (stdout JSON unchanged).
+      if (opts.failOnStale) {
+        if (stale.length > 0) {
+          process.stderr.write(`Update check: ${stale.length} stale skill(s) — FAIL (--fail-on-stale); run \`skills-manager update --plan\` then update\n`);
+          process.exitCode = 1;
+        } else if (failed.length === 0) {
+          process.stderr.write('Update check: no stale skills — within freshness gate\n');
+        }
+      }
       return;
     }
     if (opts.plan || (!opts.skill && !opts.source)) return print(s.update.plan());

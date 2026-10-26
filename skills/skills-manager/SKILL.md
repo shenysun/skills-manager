@@ -135,6 +135,7 @@ Map 档位-speak straight onto these — there are no flags for the user to reme
 
 ```bash
 skills-manager update --check                     # freshness; stderr tip = skill subdirectory tree SHA (git/marketplace)
+skills-manager update --check --fail-on-stale     # CI gate: also exit 1 when any skill is stale (failed already exits 1)
 skills-manager update --plan                      # candidates only (url + subpath) — no freshness check
 skills-manager update --skill <name>
 skills-manager update --source <key>              # one repo group from the plan
@@ -142,7 +143,7 @@ skills-manager update --source <key>              # one repo group from the plan
 
 Only skills with `source.url` **and** `source.subpath` are candidates — which is why backfill (below) always writes both.
 
-`--check` answers "is anything actually new": it compares each candidate's anchored tree SHA against the GitHub Trees API (one call per repo, through the logged-in `gh` when present), so present its `stale` list as the real update set. `failed` rows mean the check did not complete — each row carries the log path (`<home>/.skills/dashboard.log`) with the timestamped cause; usual suspects are network flaps and, without a logged-in `gh`, the 60 req/h anonymous API limit. `--plan` lists candidates without checking — don't present a plan entry as "has an update".
+`--check` answers "is anything actually new": it compares each candidate's anchored tree SHA against the GitHub Trees API (one call per repo, through the logged-in `gh` when present), so present its `stale` list as the real update set. `failed` rows mean the check did not complete — each row carries the log path (`<home>/.skills/dashboard.log`) with the timestamped cause; usual suspects are network flaps and, without a logged-in `gh`, the 60 req/h anonymous API limit. `--fail-on-stale` turns that freshness signal into a CI gate (exit 1 when `stale` is non-empty; stdout JSON unchanged; `failed` already exits 1 without the flag). `--plan` lists candidates without checking — don't present a plan entry as "has an update".
 
 Git installs and updates are shallow (`--depth 1`); a network-class clone failure (HTTP/2 stream reset and friends) is retried once over HTTP/1.1 automatically. Detection anchors on the skill sub-directory's tree SHA, so an unrelated upstream commit (a README bump) does not flag an update. When the dashboard shows 检测失败 (detection failed), read `<home>/.skills/dashboard.log` for the timestamped cause — usual suspects are network flaps and, without a logged-in `gh`, the 60 req/h anonymous API limit.
 
