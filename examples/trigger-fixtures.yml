@@ -1,0 +1,18 @@
+# Sample trigger fixtures for `skills-manager trigger test --fixtures`.
+# Edit request / expect / top for YOUR hub. Copy-paste Actions workflow:
+#   examples/github-actions/trigger-fixtures.yml
+#
+# Each entry: { request, expect, top? }
+#   expect — canonical skill that must rank first (or within top N)
+#   top    — optional window (same meaning as CLI --top)
+
+name: hub trigger smoke
+fixtures:
+  - request: fill PDF form fields from a scanned document
+    expect: pdf-forms
+  - request: draft release notes from the merged pull requests
+    expect: release-notes
+  # Competing descriptions: allow a top-2 window instead of requiring #1.
+  - request: write unit tests with Jest fixtures and mocks
+    expect: testing-conventions
+    top: 2

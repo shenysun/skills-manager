@@ -57,6 +57,7 @@ skills-manager audit security --strict --format github
 skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
 skills-manager audit descriptions [skills...] [--strict] [--json]
 skills-manager trigger test "<request>" [--expect <skill>] [--top <n>] [--json]
+skills-manager trigger test --fixtures <file> [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -230,12 +231,15 @@ skills-manager trigger test "填写 PDF 表单字段"                 # 给所�
 skills-manager trigger test "写 jest 单元测试" --top 5          # 只看前 5
 skills-manager trigger test "写 release notes" --expect release-notes   # CI：该 skill 不是第 1 就退出 1
 skills-manager trigger test "用 Jest 写单元测试" --expect testing-conventions --top 2  # 允许进前 N
+skills-manager trigger test --fixtures examples/trigger-fixtures.yml       # 多条说法、一条命令（适合 CI）
 skills-manager trigger test "…" --json
 ```
 
 agent 选 skill 时，是拿用户消息去匹配每个 skill 的 `name + description`。`trigger test` 离线、确定性地做同一次匹配：与 `audit overlap` 相同的 IDF 加权 Jaccard（基于 `descriptionTerms`），用请求去给每个 hub skill 打分。输出是带共享区分词的排名列表（`#1`、`#2`…）。
 
 `--expect <skill>` 是 CI 断言。不带 `--top` 时，该 skill 必须排第 1；带 `--top N` 时，只要出现在前 N 即可（列表也截到 N）。未知的 `--expect` 名称会直接拒绝。`--json` 输出 `{ method, request, scanned, hits[{ skill, score, shared, rank }], expect? }`。不联网、不调模型，适合 pre-commit 和 Actions。
+
+`--fixtures <file>` 是批量断言：YAML（`.yaml`/`.yml`）或 JSON，内容可以是 `{ request, expect, top? }` 数组，或 `{ name?, fixtures: [...] }`。一次调用跑完所有用例，任一失败即退出 1——CI 不必写一长串重复的 `trigger test`。样例文件：[`examples/trigger-fixtures.yml`](../examples/trigger-fixtures.yml)；可复制的 workflow：[`examples/github-actions/trigger-fixtures.yml`](../examples/github-actions/trigger-fixtures.yml)。不要把 `--fixtures` 和位置参数 `<request>`，或 CLI 级的 `--expect`/`--top` 一起用（这些字段写在 fixtures 每条里）。`--json` 输出 `{ method, file, name?, scanned, total, passed, failed, results[] }`。
 
 ### check（所有 hub 闸，一个退出码）
 
