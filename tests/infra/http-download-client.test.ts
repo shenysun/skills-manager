@@ -1,3 +1,4 @@
+import { createServer, type Server } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { DownloadRequest } from '../../src/core/ports/http-download.js';
 import { HttpDownloadClient } from '../../src/infra/http-download-client.js';
@@ -79,13 +80,23 @@ describe('HttpDownloadClient (real adapter, local servers)', () => {
     expect(thrown?.message).toMatch(/404/);
   });
 
-  it('fails a stalled connection with download_connect_timeout', () => {
-    // 192.0.2.0/24 is RFC 5737 documentation space — never routable, so the
-    // connect attempt can only ever end by timeout.
-    const request = { ...LOOSE, connectTimeoutMs: 300, idleTimeoutMs: 5_000 };
-    expect(() => new HttpDownloadClient().download('http://192.0.2.1:9/SKILL.md', request)).toThrow(
-      expect.objectContaining({ code: 'download_connect_timeout' }),
-    );
+  it('fails a stalled connection with download_connect_timeout', async () => {
+    // Accept TCP but never speak TLS. connectTimeoutMs covers the handshake
+    // (secureConnect never fires), so the child stays in phase "connecting"
+    // and reports download_connect_timeout — deterministic on 127.0.0.1, no
+    // reliance on RFC 5737 blackholes that some networks still "connect" to
+    // (which flipped this assertion to download_idle_timeout).
+    const server: Server = createServer(() => { /* accept and ignore */ });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as { port: number };
+    try {
+      const request = { ...LOOSE, connectTimeoutMs: 300, idleTimeoutMs: 5_000 };
+      expect(() => new HttpDownloadClient().download(`https://127.0.0.1:${port}/SKILL.md`, request)).toThrow(
+        expect.objectContaining({ code: 'download_connect_timeout' }),
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+    }
   });
 
   it('fails a server that accepts but never responds with download_idle_timeout', async () => {
