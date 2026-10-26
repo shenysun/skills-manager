@@ -124,3 +124,5 @@ export type { CostLedger, CostPathGroup, CostSkillLine, CostLedgerError } from '
 export type { BackupInfo } from './backup-service.js';
 export { SecurityScanService, BuiltinSecurityScanner, scanText, summarizeFindings, formatGithubAnnotations, BUILTIN_SCANNER_ID } from './security-scan.js';
 export type { SecurityScannerPort } from '../ports/security-scanner.js';
+export { lintDescription, lintDescriptions, renderDescriptionLint, DESCRIPTION_MAX_CHARS } from './description-lint.js';
+export type { DescriptionLint, DescriptionLintReport, LintFinding } from './description-lint.js';

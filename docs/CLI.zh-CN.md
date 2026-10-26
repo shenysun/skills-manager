@@ -54,6 +54,7 @@ skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
+skills-manager audit descriptions [skills...] [--strict] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -157,6 +158,29 @@ skills-manager update --check --fail-on-stale  # 任一 skill 过期时退出 1�
 
 建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。同一份 doctor 报告还带结构化 `security` 汇总（`scanner`、`scanned`、`high`、`skillsWithHigh`），仅当 `high > 0` 时告警，并指向 `audit security --strict` 与可拷贝的 Action 示例。
 
+
+### audit descriptions（这个 skill 到底会不会被触发？）
+
+```sh
+skills-manager audit descriptions            # 检查所有未归档 hub skill，最差的排在前面
+skills-manager audit descriptions a b        # 只检查这些 skill
+skills-manager audit descriptions --strict   # CI 闸：有 error 级问题即退出 1（warning 永不失败）
+skills-manager audit descriptions --json
+```
+
+agent 决定是否加载某个 skill 之前，只看得到它的 description，description 写得弱，这个 skill 就永远不会被触发。这项 lint 对照 Agent Skills 规范和 Anthropic 的编写指南检查每条 description，离线、结果确定：
+
+| 规则 | 级别 | 何时触发 |
+| --- | --- | --- |
+| `missing` | error | description 为空（只能按名字调用） |
+| `too-long` | error | 超过 1024 字符 |
+| `xml-tag` | error | 含 XML/HTML 标签 |
+| `name-format` | error | 名字不是不超过 64 位的小写字母、数字、连字符，或含 `anthropic`/`claude` |
+| `no-trigger` | warn | 从不说明*何时*使用（「Use when …」「when the user …」、当/用于/只要…使用） |
+| `point-of-view` | warn | 用第一或第二人称写（「I can …」「You can use …」） |
+| `vague` | warn | 少于 40 字符，或具体词少于 4 个（「Helps with documents」） |
+
+每个 skill 得一个 0–100 分（每个 error 扣 40，每个 warning 扣 15），每条发现都附修复建议。只报告，从不改 description。`--json` 输出 `{ scanned, errors, warnings, skills[] }`。带 `--strict` 时结论写 stderr。
 
 ### audit security（装前安全扫描 MVP）
 

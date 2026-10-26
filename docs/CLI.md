@@ -54,6 +54,7 @@ skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
+skills-manager audit descriptions [skills...] [--strict] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -157,6 +158,29 @@ skills-manager update --check --fail-on-stale  # exit 1 when any skill is stale 
 
 Suggestions are **report-only** — nothing is ever executed. Three layers: archived-but-distributed skills (zero-controversy recalls) head the list, then the top-N most expensive descriptions, then scattered distributions (one skill across several paths — consolidate to one). Every suggestion carries a verbatim runnable `undistribute` command including the required `--to` (and `--project` for project paths). `doctor` consumes the same core as a structured `residentCost` field and warns only on scattered duplicates; the dashboard consumes it via `GET /api/cost`. See [ADR-0018](adr/0018-resident-cost-ledger.md). The same doctor report also carries a structured `security` rollup (`scanner`, `scanned`, `high`, `skillsWithHigh`) and warns only when `high > 0`, pointing at `audit security --strict` and the copy-paste Action example.
 
+
+### audit descriptions (will this skill ever trigger?)
+
+```sh
+skills-manager audit descriptions            # lint every non-archived hub skill, worst first
+skills-manager audit descriptions a b        # only these skills
+skills-manager audit descriptions --strict   # CI gate: exit 1 on error-level findings (warnings never fail)
+skills-manager audit descriptions --json
+```
+
+The description is all an agent sees before it decides to load a skill, so a weak one means the skill never triggers. This lint checks each description against the Agent Skills spec and Anthropic's authoring guidance, offline and deterministically:
+
+| Rule | Level | Fires when |
+| --- | --- | --- |
+| `missing` | error | the description is empty (the skill can only be called by name) |
+| `too-long` | error | it is over 1024 chars |
+| `xml-tag` | error | it contains an XML/HTML tag |
+| `name-format` | error | the name is not ≤ 64 lowercase letters, digits and hyphens, or contains `anthropic`/`claude` |
+| `no-trigger` | warn | it never says *when* to use the skill ("Use when …", "when the user …", 当/用于/只要…使用) |
+| `point-of-view` | warn | it is written in first or second person ("I can …", "You can use …") |
+| `vague` | warn | it is under 40 chars or has fewer than 4 concrete terms ("Helps with documents") |
+
+Each skill gets a 0–100 score (−40 per error, −15 per warning) and every finding comes with a fix. The lint is report-only and never edits a description. `--json` gives `{ scanned, errors, warnings, skills[] }`. With `--strict`, the verdict goes to stderr.
 
 ### audit security (install/update security scan MVP)
 
