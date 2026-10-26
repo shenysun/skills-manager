@@ -99,6 +99,7 @@ Every gate exits 1 on failure and writes its verdict to stderr, so stdout (text/
 | Provenance | `provenance list --fail-on-imported` | an imported skill has no usable source (can't get updates) | no |
 | Resident cost | `cost --budget <tokens>` | total resident tokens exceed the budget | no |
 | Freshness | `update --check --fail-on-stale` | any skill is stale, or a check fails | yes (`GH_TOKEN` helps) |
+| **All of the above** | `check [--budget <tokens>] [--freshness]` | any enabled gate fails (security + provenance always; budget/freshness opt-in) — copy [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) | only with `--freshness` |
 
 Details: [docs/CLI.md](docs/CLI.md).
 

@@ -99,6 +99,7 @@ https://github.com/shenysun/skills-manager
 | 来源 | `provenance list --fail-on-imported` | 有导入 skill 缺可用来源（拿不到更新） | 否 |
 | 常驻成本 | `cost --budget <tokens>` | 常驻总 token 超出预算 | 否 |
 | 新鲜度 | `update --check --fail-on-stale` | 任一 skill 过期，或检测失败 | 是（建议设 `GH_TOKEN`） |
+| **以上全部** | `check [--budget <tokens>] [--freshness]` | 任一启用的闸失败（安全 + 来源必跑；预算/新鲜度按需开启）——可直接拷贝 [`examples/github-actions/hub-check.yml`](examples/github-actions/hub-check.yml) | 仅 `--freshness` 时 |
 
 详见 [docs/CLI.zh-CN.md](docs/CLI.zh-CN.md)。
 
