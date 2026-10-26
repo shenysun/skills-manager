@@ -189,3 +189,26 @@ describe('v1 has no filter flags (filtering is --json\'s job)', () => {
     expect(run(['cost', '--skill', 'alpha']).status).toBe(1);
   });
 });
+
+describe('cost --budget', () => {
+  it('exits 1 with a stderr verdict when the resident total exceeds the budget, stdout JSON unchanged', () => {
+    run(['add', sourceRoot, '--all', '--yes']);
+    run(['distribute', '--to', 'user', '-a', 'zed', '-s', 'alpha', '-s', 'beta']);
+    const result = run(['cost', '--json', '--budget', '1']);
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).totalTokens).toBeGreaterThan(1);
+    expect(result.stderr).toMatch(/Resident budget: \d+ \/ 1 tokens — OVER/);
+  });
+
+  it('exits 0 when within budget', () => {
+    run(['add', sourceRoot, '--all', '--yes']);
+    run(['distribute', '--to', 'user', '-a', 'zed', '-s', 'alpha']);
+    const result = run(['cost', '--budget', '1000']);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toMatch(/within budget/);
+  });
+
+  it('rejects a non-integer budget', () => {
+    expect(run(['cost', '--budget', 'lots']).status).toBe(1);
+  });
+});

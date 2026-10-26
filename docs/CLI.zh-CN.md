@@ -131,6 +131,7 @@ skills-manager cost              # 人读视图：路径组 → per-skill 行 �
 skills-manager cost --json       # 完整账本的 JSON（机器形态）
 skills-manager cost --top 10     # 加宽最贵 description 清单（默认 5）
 skills-manager cost --share     # 可粘贴分享卡（无绝对路径），适合发 X / HN / 聊天
+skills-manager cost --budget 2000  # 常驻总 token 超过 2000 时退出 1（CI / pre-commit 闸；结论走 stderr，stdout 不变）
 ```
 
 `cost` 是只读的常驻成本账本：每个已分发 skill 经 frontmatter `name + description` 按条消息计费的常驻 token 成本，按**物理运行时路径**分组（user 与 project 同账；共享路径只计一次并标注 agent family；foreign 条目不逐条计费，只汇总为一行未计数数量）。计数口径为 **char-approx**（CJK 字符 ×1、其余 ÷4，零依赖）——量级参考而非精确计数：展示数字一律 `≈` 前缀（`≈1.2k` 风格缩写），JSON 携带 `method: "char-approx"`。JSON 为三层结构：`paths[]`（各含 `runtimeDir`、`kind`、`agents`、per-skill 行）、顶层 `totalTokens`、以及 `suggestions` 对象。不可读条目（含 broken symlink）计 0 并进 `errors`；缺 description 的条目标记 `incomplete`。
