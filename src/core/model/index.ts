@@ -282,6 +282,39 @@ export type DoctorReport = {
 };
 
 /** Skills still missing a usable source, split by how they entered the hub (provenance backfill queue). */
+export type SecurityFindingKind = 'shell_exec' | 'network' | 'credential_path' | 'secret_like';
+
+export type SecuritySeverity = 'info' | 'warn' | 'high';
+
+/** One high-signal hit inside a skill tree (report-only; never blocks install). */
+export type SecurityFinding = {
+  kind: SecurityFindingKind;
+  severity: SecuritySeverity;
+  /** Path relative to the skill root. */
+  path: string;
+  /** 1-based line number in the file. */
+  line: number;
+  excerpt: string;
+  rule: string;
+};
+
+export type SecurityScanSummary = {
+  shell_exec: number;
+  network: number;
+  credential_path: number;
+  secret_like: number;
+  total: number;
+};
+
+/** Report from a SecurityScannerPort implementation (builtin-v1 or a plug-in). */
+export type SecurityScanReport = {
+  skill: string;
+  root: string;
+  scanner: string;
+  findings: SecurityFinding[];
+  summary: SecurityScanSummary;
+};
+
 export type ProvenancePending = {
   importedWithoutSource: Array<{ skill: SkillName; importedAt: string | null }>;
   locallyAuthored: SkillName[];

@@ -25,6 +25,7 @@ import { GetService } from './get-service.js';
 import { CostLedgerService } from './cost-ledger-service.js';
 import { SyncService } from './sync-service.js';
 import { ManagerSkillService } from './manager-skill-service.js';
+import { SecurityScanService } from './security-scan.js';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
 import type { GitPort } from '../ports/git.js';
@@ -86,7 +87,8 @@ export function createCoreServices(options: CoreServicesOptions) {
   const get = new GetService(options.fs, home, registry);
   const sync = new SyncService(options.fs, options.git, home);
   const packageService = new PackageService(options.fs, options.processRunner, options.projectRoot);
-  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, get, cost, sync, package: packageService };
+  const security = new SecurityScanService(options.fs, home);
+  return { home, skillHome, registry, source, views, catalog, distribute, install, update, doctor, activity, archive, adopt, migration, init, backups, skillLock, provenance, managerSkill, get, cost, sync, security, package: packageService };
 }
 
 export { createSkillHome, SkillHomeService } from './skill-home-service.js';
@@ -120,3 +122,5 @@ export type { GetTarget } from './get-service.js';
 export { CostLedgerService, charApproxTokens } from './cost-ledger-service.js';
 export type { CostLedger, CostPathGroup, CostSkillLine, CostLedgerError } from './cost-ledger-service.js';
 export type { BackupInfo } from './backup-service.js';
+export { SecurityScanService, BuiltinSecurityScanner, scanText, BUILTIN_SCANNER_ID } from './security-scan.js';
+export type { SecurityScannerPort } from '../ports/security-scanner.js';
