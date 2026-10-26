@@ -152,6 +152,7 @@ skills-manager categories set my-skill 前端       # 打领域类别标签
 skills-manager categories apply 前端 -a claude-code  # 只加载该领域
 skills-manager categories status                  # 已应用集合 + 漂移
 skills-manager cost                              # 常驻上下文成本账本（只报告不执行的收回建议）
+skills-manager cost --budget 2000                # 常驻上下文税超出 token 预算时失败（exit 1）
 skills-manager archive old-skill
 ```
 

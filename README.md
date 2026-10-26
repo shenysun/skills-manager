@@ -152,6 +152,7 @@ skills-manager categories set my-skill frontend     # tag with a domain category
 skills-manager categories apply frontend -a claude-code  # load only that domain
 skills-manager categories status                  # applied sets + drift
 skills-manager cost                              # resident context-cost ledger (report-only recall suggestions)
+skills-manager cost --budget 2000                # fail (exit 1) when resident context tax exceeds a token budget
 skills-manager archive old-skill
 ```
 

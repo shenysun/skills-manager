@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26 (cost --budget)
+
+- **`cost --budget <tokens>`**：常驻上下文预算闸——总常驻 token 超预算时退出 1，结论一行走 stderr（stdout 的 JSON / 卡片 / 人读视图不变），可与 `--json` / `--share` 联用，适合 CI / pre-commit 防 skill 膨胀。非负整数校验。
+- 测试：超预算 exit 1 + JSON 不变、预算内 exit 0、非法值拒绝。
+- 文档：README / CLI 双语、manager skill 词条、ROADMAP。
+
 ## 2026-10-26 (audit security --format github)
 
 - **`audit security --format github`**：stdout 输出 GitHub Actions 工作流命令（`::error` / `::warning` / `::notice`），`file=skills/<name>/…`，让 finding 直接亮在 PR Files 页；默认可选 `json` 不变。与 `--strict` 可联用。`%`/换行/回车按 Actions 规则百分号编码；未知 format → `invalid_format_flag`。

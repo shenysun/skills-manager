@@ -131,6 +131,7 @@ skills-manager cost              # human view: path groups → per-skill lines �
 skills-manager cost --json       # the full ledger as JSON (the machine form)
 skills-manager cost --top 10     # widen the expensive-descriptions list (default 5)
 skills-manager cost --share     # privacy-safe paste card (no absolute paths) for X / HN / chat
+skills-manager cost --budget 2000  # exit 1 when total resident tokens exceed 2000 (CI / pre-commit gate; verdict on stderr, stdout unchanged)
 ```
 
 `cost` is the read-only resident-cost account: the per-message token cost every distributed skill charges via its frontmatter `name + description`, grouped by **physical runtime path** (user and project both; a shared path counted once with its agent family noted; foreign entries appear only as an uncounted-count line). Counting is **char-approx** (CJK characters ×1, all others ÷4, zero dependencies) — a magnitude reference, never an exact count: every displayed number is `≈`-prefixed (`≈1.2k` style) and the JSON carries `method: "char-approx"`. The JSON is three-layer: `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill lines), the top-level `totalTokens`, and a `suggestions` object. Unreadable entries (broken symlinks included) count 0 and surface in `errors`; entries missing a description are flagged `incomplete`.

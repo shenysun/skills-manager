@@ -594,14 +594,23 @@ program.command('cost')
   .option('--json', 'machine-readable output for agents')
   .option('--share', 'privacy-safe paste card (no absolute paths) for X / HN / chat')
   .option('--top <n>', 'how many of the most expensive descriptions to list', '5')
+  .option('--budget <tokens>', 'exit 1 when total resident tokens exceed this budget (CI / pre-commit gate)')
   .action((opts, cmd) => {
     const s = services(cmd);
     const top = Number.parseInt(opts.top, 10);
     if (!Number.isInteger(top) || top < 0) throw new Error(`--top expects a non-negative integer, got "${opts.top}"`);
     if (opts.json && opts.share) throw new Error('use either --json or --share, not both');
+    const budget = opts.budget === undefined ? null : Number(opts.budget);
+    if (budget !== null && (!Number.isInteger(budget) || budget < 0)) throw new Error(`--budget expects a non-negative integer token count, got "${opts.budget}"`);
     const ledger = s.cost.ledger(top);
-    if (opts.json) return print(ledger);
-    process.stdout.write(opts.share ? renderCostShare(ledger) : renderCostLedger(ledger));
+    if (opts.json) print(ledger);
+    else process.stdout.write(opts.share ? renderCostShare(ledger) : renderCostLedger(ledger));
+    // Budget gate on stderr so stdout (JSON / card) stays script-stable.
+    if (budget !== null) {
+      const over = ledger.totalTokens > budget;
+      process.stderr.write(`Resident budget: ${ledger.totalTokens} / ${budget} tokens — ${over ? 'OVER (exit 1); see Suggestions or run `skills-manager cost` for recalls' : 'within budget'}\n`);
+      if (over) process.exitCode = 1;
+    }
   });
 
 program.command('add')
