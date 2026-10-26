@@ -6,6 +6,7 @@ import { RegistryService } from './registry-service.js';
 import { DistributeService } from './distribute-service.js';
 import { CatalogService } from './catalog-service.js';
 import { CostLedgerService } from './cost-ledger-service.js';
+import { SecurityScanService } from './security-scan.js';
 
 const CATALOG_STALE_DAYS = 90;
 
@@ -18,6 +19,7 @@ export class DoctorService {
     private readonly distribute: DistributeService,
     private readonly catalog: CatalogService,
     private readonly costLedger: CostLedgerService,
+    private readonly security: SecurityScanService,
   ) {}
 
   check(): DoctorReport {
@@ -50,6 +52,16 @@ export class DoctorService {
     if (scattered.length > 0) {
       warnings.push(`${scattered.length} scattered skill(s) distributed across several runtime paths; run \`skills-manager cost\` for the resident-cost account and consolidation hints`);
     }
+    // Same pattern for security: rollup always present; warn only on high.
+    // Scan set matches `audit security` with no args (non-archived hub skills).
+    const security = this.security.hubSummary(this.registry.listSkills().map((skill) => skill.name));
+    if (security.high > 0) {
+      const skillNoun = security.skillsWithHigh.length === 1 ? 'skill' : 'skills';
+      const findingNoun = security.high === 1 ? 'finding' : 'findings';
+      warnings.push(
+        `${security.high} high-severity security ${findingNoun} across ${security.skillsWithHigh.length} ${skillNoun}; run \`skills-manager audit security --strict\` (CI example: examples/github-actions/audit-security.yml)`,
+      );
+    }
     return {
       skillHome: this.home.root,
       skillCount: this.registry.listCanonicalSkills().length,
@@ -60,6 +72,7 @@ export class DoctorService {
       catalog,
       importedWithoutSource,
       residentCost,
+      security,
     };
   }
 

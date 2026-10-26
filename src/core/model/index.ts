@@ -266,6 +266,17 @@ export type CostLedger = {
   errors: CostLedgerError[];
 };
 
+/** Hub security rollup for doctor (always present; illness only when high > 0). */
+export type DoctorSecurity = {
+  scanner: string;
+  /** Non-archived hub skills scanned this check. */
+  scanned: number;
+  /** Count of severity=high findings across those skills. */
+  high: number;
+  /** Skills that have at least one high finding (sorted). */
+  skillsWithHigh: string[];
+};
+
 export type DoctorReport = {
   skillHome: string;
   skillCount: number;
@@ -277,6 +288,8 @@ export type DoctorReport = {
   /** The resident-cost account (ADR-0018), always present and sourced from the
    *  ledger core — doctor reports illnesses, the ledger reports accounts. */
   residentCost: CostLedger;
+  /** Hub security rollup — always present; doctor warns only when high > 0. */
+  security: DoctorSecurity;
   /** Imported entries with no evidence-adopted or supplied source: true snapshots whose upstream is unknown (ADR-0006, ADR-0011). */
   importedWithoutSource: Array<{ skill: string; importedAt: string | null }>;
 };

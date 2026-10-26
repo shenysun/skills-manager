@@ -9,7 +9,7 @@
 - **Ship first**: repo discovery (description/topics/homepage) + README badges + competitor comparison table.
 - **Then**: demo asset + outbound posts + shareable wedges (`audit security`, `cost --share`, migration one-liner, `audit security --strict`).
 - Track in `.scratch/star-300/plan.md` (local).
-- **Growth shipped (2026-10-26+)**: discovery polish · demo GIF · `audit security` · `cost --share` · migration one-liner · `audit security --strict` · CI example workflow (`examples/github-actions/audit-security.yml`).
+- **Growth shipped (2026-10-26+)**: discovery polish · demo GIF · `audit security` · `cost --share` · migration one-liner · `audit security --strict` · CI example workflow · `doctor.security` rollup (high → `--strict` / Action pointer).
 
 ## 已完成
 
