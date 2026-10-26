@@ -229,6 +229,8 @@ skills-manager web --home ~/.skills-manager
 skills-manager web --no-open
 ```
 
+`--port` (default `4777`) must be an integer from 0 to 65535; anything else exits 1 with a flag error before the hub is checked or a server starts.
+
 The dashboard serves a local Vue/Vite UI backed by Fastify routes. Mutating dashboard operations write activity records to `.skills/activity.jsonl` and leave disk changes visible for `git diff`.
 
 ## Development

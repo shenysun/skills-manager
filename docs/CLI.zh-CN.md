@@ -229,6 +229,8 @@ skills-manager web --home ~/.skills-manager
 skills-manager web --no-open
 ```
 
+`--port`（默认 `4777`）必须是 0–65535 的整数；否则在检查 hub、启动服务之前就以参数错误退出 1。
+
 控制台由 Fastify 路由驱动，提供本地 Vue/Vite 界面。控制台中的写操作会向 `.skills/activity.jsonl` 写入活动记录，磁盘变更保持对 `git diff` 可见。
 
 ## 开发
