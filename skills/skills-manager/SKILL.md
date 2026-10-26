@@ -44,6 +44,7 @@ skills-manager doctor                 # warnings incl. imported-without-source +
 skills-manager doctor --share         # privacy-safe hub health paste card (counts only)
 skills-manager cost [--top <n>] [--json] [--share] [--budget <tokens>]  # resident-cost ledger; --share = privacy-safe paste card
 skills-manager audit security [skill...] [--strict] [--format json|github]  # report-only; --strict = CI gate; --format github = Actions annotations
+skills-manager audit overlap [skill...] [--threshold 0-1] [--strict] [--json]  # pairs whose descriptions compete; run it when the user says the wrong skill fires or one never triggers, then propose boundary wording for them to approve (never edit descriptions unasked)
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
@@ -273,6 +274,7 @@ skills-manager doctor                         # one-glance: security.high + warn
 skills-manager audit security                 # every non-archived hub skill
 skills-manager audit security --strict        # CI gate: exit 1 on high only
 skills-manager check [--budget <n>] [--freshness]  # all hub CI gates, one exit code
+skills-manager audit overlap                  # skills whose descriptions compete (wrong skill picked); report-only
 skills-manager audit security --format github # Actions annotations for the PR Files tab
 skills-manager audit security <name>          # one skill — JSON report on stdout (default)
 ```

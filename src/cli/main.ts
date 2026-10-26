@@ -5,6 +5,7 @@ import { createRuntimeServices, projectRootFromImportMeta } from '../infra/runti
 import { isInsecureHttpSource, normalizeGitSourceUrl } from '../core/services/source-service.js';
 import { isUpdatableSourceType } from '../core/services/update-service.js';
 import { parseFormatFlag } from '../core/services/url-payload.js';
+import { findDescriptionOverlaps, renderOverlapReport } from '../core/services/description-overlap.js';
 import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
@@ -782,7 +783,7 @@ program.command('check')
     if (!ok) process.exitCode = 1;
   });
 
-const audit = program.command('audit').description('Report-only audits over hub skills (security today; more subcommands later)');
+const audit = program.command('audit').description('Report-only audits over hub skills (security, description overlap)');
 audit.command('security')
   .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (report-only by default)')
   .argument('[skills...]', 'canonical skill names; omit to scan every non-archived hub skill')
@@ -803,6 +804,31 @@ audit.command('security')
       print(reports.length === 1 ? reports[0] : reports);
     }
     if (opts.strict && s.security.failsStrict(reports)) process.exitCode = 1;
+  });
+
+audit.command('overlap')
+  .description('Find skills whose descriptions compete for the same trigger words (the agent may pick the wrong one); offline, report-only')
+  .argument('[skills...]', 'canonical skill names; omit to compare every non-archived hub skill')
+  .option('--threshold <score>', 'minimum overlap score from 0 to 1 to report', '0.3')
+  .option('--strict', 'exit 1 when any pair is reported (CI gate)')
+  .option('--json', 'machine-readable report')
+  .action((skills: string[], opts: { threshold: string; strict?: boolean; json?: boolean }, cmd) => {
+    const threshold = Number(opts.threshold);
+    if (!/^(0(\.\d+)?|1(\.0+)?|\.\d+)$/.test(opts.threshold) || !(threshold >= 0 && threshold <= 1)) {
+      throw new Error(`--threshold expects a number from 0 to 1, got "${opts.threshold}"`);
+    }
+    const s = services(cmd);
+    const all = s.registry.listSkills();
+    const missing = skills.filter((name) => !all.some((skill) => skill.name === name));
+    if (missing.length > 0) throw new Error(`Skill not found: ${missing.join(', ')}. Run \`skills-manager list\` to see hub skills.`);
+    const picked = skills.length > 0 ? all.filter((skill) => skills.includes(skill.name)) : all;
+    const report = findDescriptionOverlaps(picked.map((skill) => ({ name: skill.name, description: skill.description })), threshold);
+    if (opts.json) print(report);
+    else process.stdout.write(renderOverlapReport(report));
+    if (opts.strict && report.pairs.length > 0) {
+      process.stderr.write(`Overlap: ${report.pairs.length} competing pair(s) — FAIL (--strict); sharpen the descriptions above\n`);
+      process.exitCode = 1;
+    }
   });
 
 const distribute = program.command('distribute')
