@@ -64,6 +64,7 @@ skills-manager edit my-skill --source-url https://github.com/owner/repo
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
 skills-manager provenance list
+skills-manager provenance list --fail-on-imported
 skills-manager provenance adopt
 skills-manager provenance adopt --dry-run --skill my-skill
 skills-manager categories set my-skill frontend backend
@@ -205,7 +206,7 @@ Mirror writes count toward the content fingerprint like any edit — stale copy 
 
 ### provenance (source backfill)
 
-`provenance list` shows every skill still missing a usable source, split into **imported-without-source** (entered via init, no evidence or supplied source) and **locally authored** (never imported, no upstream recorded); archived skills are excluded. `provenance adopt` re-runs the import-time evidence adoption over that legacy imported queue — the same gate init applies, minus the "fresh import this run" condition. Two evidence channels, frontmatter first (ADR-0017): the skill's own SKILL.md `metadata:` mirror covers gh skill installs as well as skills-manager's own writes; the `npx skills` lockfile (ADR-0011) covers the rest. It never guesses: skills carrying neither are skipped (`no_evidence`). `--dry-run` previews; `--skill` limits. Guessed sources are not this command's job — candidates found by searching belong to an agent session and land through `edit` only after the user approves each one (ADR-0012). See [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md).
+`provenance list` shows every skill still missing a usable source, split into **imported-without-source** (entered via init, no evidence or supplied source) and **locally authored** (never imported, no upstream recorded); archived skills are excluded. `--fail-on-imported` is the CI / hub-hygiene gate: exit 1 when the imported-without-source bucket is non-empty (those skills cannot get tree-SHA updates); locally authored never fails; verdict on stderr, stdout listing/JSON unchanged. `provenance adopt` re-runs the import-time evidence adoption over that legacy imported queue — the same gate init applies, minus the "fresh import this run" condition. Two evidence channels, frontmatter first (ADR-0017): the skill's own SKILL.md `metadata:` mirror covers gh skill installs as well as skills-manager's own writes; the `npx skills` lockfile (ADR-0011) covers the rest. It never guesses: skills carrying neither are skipped (`no_evidence`). `--dry-run` previews; `--skill` limits. Guessed sources are not this command's job — candidates found by searching belong to an agent session and land through `edit` only after the user approves each one (ADR-0012). See [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md).
 
 ### init (reverse import)
 

@@ -408,13 +408,27 @@ provenance.command('adopt')
 provenance.command('list')
   .description('List skills still missing a source: imported-without-source vs locally authored')
   .option('--json', 'machine-readable output for agents')
+  .option('--fail-on-imported', 'exit 1 when any imported-without-source skill remains (CI / hub-hygiene gate; locally authored never fails)')
   .action((opts, cmd) => {
     const pending = services(cmd).provenance.pending();
-    if (opts.json) return print(pending);
-    console.log(`Imported without source (${pending.importedWithoutSource.length}):`);
-    for (const item of pending.importedWithoutSource) console.log(`  ${item.skill}${item.importedAt ? ` (imported ${item.importedAt})` : ''}`);
-    console.log(`Locally authored, no upstream recorded (${pending.locallyAuthored.length}):`);
-    for (const skill of pending.locallyAuthored) console.log(`  ${skill}`);
+    if (opts.json) print(pending);
+    else {
+      console.log(`Imported without source (${pending.importedWithoutSource.length}):`);
+      for (const item of pending.importedWithoutSource) console.log(`  ${item.skill}${item.importedAt ? ` (imported ${item.importedAt})` : ''}`);
+      console.log(`Locally authored, no upstream recorded (${pending.locallyAuthored.length}):`);
+      for (const skill of pending.locallyAuthored) console.log(`  ${skill}`);
+    }
+    // Hygiene gate: imported skills without a source cannot get tree-SHA updates.
+    // Locally authored skills are intentional and never trip this flag.
+    if (opts.failOnImported) {
+      const n = pending.importedWithoutSource.length;
+      if (n > 0) {
+        process.stderr.write(`Provenance: ${n} imported skill(s) still missing a source — FAIL (--fail-on-imported); run \`skills-manager provenance adopt\` or \`edit --source-*\`\n`);
+        process.exitCode = 1;
+      } else {
+        process.stderr.write('Provenance: no imported-without-source skills — within hygiene gate\n');
+      }
+    }
   });
 
 // Hub git-ification for multi-machine sync (ADR-0020): each command thin, git

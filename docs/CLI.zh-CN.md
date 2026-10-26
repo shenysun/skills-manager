@@ -64,6 +64,7 @@ skills-manager edit my-skill --source-url https://github.com/owner/repo
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill --source-ref v1.2.3
 skills-manager provenance list
+skills-manager provenance list --fail-on-imported
 skills-manager provenance adopt
 skills-manager provenance adopt --dry-run --skill my-skill
 skills-manager categories set my-skill 前端 后端
@@ -205,7 +206,7 @@ registry 保持唯一 source of truth；SKILL.md frontmatter 的 `metadata:` 块
 
 ### provenance（来源补齐）
 
-`provenance list` 列出所有仍缺可用来源的技能，分为 **imported-without-source**（经 init 进入、无证据也无补录来源）与 **本地自建**（从未导入、无上游记录）两类；已归档技能不列入。`provenance adopt` 对该存量导入队列重跑导入时的证据采纳 —— 与 init 同一套门禁，仅去掉「本轮新导入」条件。两条证据通道、frontmatter 优先（ADR-0017）：SKILL.md 自身的 `metadata:` 镜像覆盖 gh skill 装的与 skills-manager 自己写的；`npx skills` 锁文件（ADR-0011）覆盖其余。它从不猜测：两条通道都无证据的技能直接跳过（`no_evidence`）。`--dry-run` 仅预览；`--skill` 限定范围。搜索得来的候选不归这个命令管 —— 猜测性来源属于 agent 会话，经用户逐条拍板后才能通过 `edit` 写入（ADR-0012）。见 [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md)。
+`provenance list` 列出所有仍缺可用来源的技能，分为 **imported-without-source**（经 init 进入、无证据也无补录来源）与 **本地自建**（从未导入、无上游记录）两类；已归档技能不列入。`--fail-on-imported` 是 CI / hub 卫生闸：imported-without-source 非空时退出 1（这类 skill 拿不到树 SHA 更新）；本地自建永不触发失败；结论走 stderr，stdout 列表/JSON 不变。`provenance adopt` 对该存量导入队列重跑导入时的证据采纳 —— 与 init 同一套门禁，仅去掉「本轮新导入」条件。两条证据通道、frontmatter 优先（ADR-0017）：SKILL.md 自身的 `metadata:` 镜像覆盖 gh skill 装的与 skills-manager 自己写的；`npx skills` 锁文件（ADR-0011）覆盖其余。它从不猜测：两条通道都无证据的技能直接跳过（`no_evidence`）。`--dry-run` 仅预览；`--skill` 限定范围。搜索得来的候选不归这个命令管 —— 猜测性来源属于 agent 会话，经用户逐条拍板后才能通过 `edit` 写入（ADR-0012）。见 [ADR-0012](adr/0012-provenance-backfill-agent-assisted.md)。
 
 ### init（反向导入）
 

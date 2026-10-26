@@ -159,7 +159,7 @@ skills-manager edit <skill> --title "New title" --description "…" --category <
 ### Maintenance
 
 ```bash
-skills-manager provenance list [--json]           # the backfill queue (see workflow)
+skills-manager provenance list [--json] [--fail-on-imported]  # backfill queue; --fail-on-imported = CI gate on imported-without-source
 skills-manager provenance adopt [--dry-run] [--skill <name>]
 skills-manager archive <skill>                    # keep content, hide from lists
 skills-manager rebuild-collections

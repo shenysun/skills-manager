@@ -6,6 +6,13 @@
 - 测试：全 upToDate 退出 0、有 stale 默认仍 0 / 加旗标退出 1、缺 `--check` 拒绝。
 - 文档：README / CLI 双语、manager skill、ROADMAP。
 
+## 2026-10-26 (provenance list --fail-on-imported)
+
+- **`provenance list --fail-on-imported`**：hub 卫生 CI 闸——`importedWithoutSource` 非空时退出 1（这类 skill 无法树 SHA 更新）；**本地自建永不失败**；结论走 stderr，stdout 列表/JSON 不变。
+- 测试：有导入缺来源 → exit 1；清空导入队列仅剩本地自建 → exit 0。
+
+- 文档：README / CLI 双语、manager skill、ROADMAP。
+
 ## 2026-10-26 (cost --budget)
 
 - **`cost --budget <tokens>`**：常驻上下文预算闸——总常驻 token 超预算时退出 1，结论一行走 stderr（stdout 的 JSON / 卡片 / 人读视图不变），可与 `--json` / `--share` 联用，适合 CI / pre-commit 防 skill 膨胀。非负整数校验。

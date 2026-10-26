@@ -165,6 +165,7 @@ skills-manager backup list                       # inspect init backups
 skills-manager backup restore my-skill           # roll one import back
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager provenance list                   # skills still missing a source
+skills-manager provenance list --fail-on-imported # fail (exit 1) when any imported skill still lacks a source
 skills-manager provenance adopt                  # backfill lockfile evidence
 skills-manager categories set my-skill frontend     # tag with a domain category
 skills-manager categories apply frontend -a claude-code  # load only that domain
