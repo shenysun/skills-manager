@@ -160,3 +160,40 @@ describe('update --check buckets and exit code (adversary M4/M6/L6)', () => {
     expect(rows.every((row: { archived: unknown }) => typeof row.archived === 'boolean')).toBe(true);
   });
 });
+
+describe('update --check --fail-on-stale', () => {
+  it('exits 0 when every sourced skill is upToDate (stderr gate line, JSON unchanged)', () => {
+    const source = path.join(root, 'source-fresh');
+    mkdirSync(path.join(source, 'skills', 'steady'), { recursive: true });
+    writeFileSync(path.join(source, 'skills', 'steady', 'SKILL.md'), '---\nname: steady\ndescription: v1\n---\n# v1\n');
+    run(['add', source, '--skill', 'steady', '--yes']);
+
+    const raw = run(['update', '--check', '--fail-on-stale']);
+    expect(raw.status, raw.stderr).toBe(0);
+    const body = json(raw);
+    expect(body.stale).toEqual([]);
+    expect(body.upToDate).toContain('steady');
+    expect(raw.stderr).toMatch(/no stale skills/);
+  });
+
+  it('exits 1 when a skill is stale, keeping the JSON report on stdout', () => {
+    const source = path.join(root, 'source-stale-gate');
+    mkdirSync(path.join(source, 'skills', 'watched'), { recursive: true });
+    writeFileSync(path.join(source, 'skills', 'watched', 'SKILL.md'), '---\nname: watched\ndescription: v1\n---\n# v1\n');
+    run(['add', source, '--skill', 'watched', '--yes']);
+    writeFileSync(path.join(source, 'skills', 'watched', 'SKILL.md'), '---\nname: watched\ndescription: v2\n---\n# v2\n');
+
+    const without = run(['update', '--check']);
+    expect(without.status, 'stale alone stays exit 0').toBe(0);
+    expect(json(without).stale.map((row: { skill: string }) => row.skill)).toContain('watched');
+
+    const withGate = run(['update', '--check', '--fail-on-stale']);
+    expect(withGate.status).toBe(1);
+    expect(json(withGate).stale.map((row: { skill: string }) => row.skill)).toContain('watched');
+    expect(withGate.stderr).toMatch(/1 stale skill/);
+  });
+
+  it('rejects --fail-on-stale without --check', () => {
+    expect(run(['update', '--fail-on-stale']).status).toBe(1);
+  });
+});

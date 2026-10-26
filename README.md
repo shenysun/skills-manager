@@ -173,6 +173,7 @@ skills-manager cost                              # resident context-cost ledger 
 skills-manager cost --budget 2000                # fail (exit 1) when resident context tax exceeds a token budget
 skills-manager sync init --remote <url>          # multi-machine hub git sync
 skills-manager sync status --share               # privacy-safe paste card of sync posture
+skills-manager update --check --fail-on-stale    # fail (exit 1) when any hub skill is stale vs upstream tree-SHA
 skills-manager archive old-skill
 ```
 
