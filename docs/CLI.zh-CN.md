@@ -47,6 +47,8 @@ skills-manager redistribute --refresh --to project --project ./repo
 skills-manager status
 skills-manager cost --json
 skills-manager cost --top 10
+skills-manager audit security
+skills-manager audit security my-skill
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -131,6 +133,20 @@ skills-manager cost --top 10     # 加宽最贵 description 清单（默认 5）
 `cost` 是只读的常驻成本账本：每个已分发 skill 经 frontmatter `name + description` 按条消息计费的常驻 token 成本，按**物理运行时路径**分组（user 与 project 同账；共享路径只计一次并标注 agent family；foreign 条目不逐条计费，只汇总为一行未计数数量）。计数口径为 **char-approx**（CJK 字符 ×1、其余 ÷4，零依赖）——量级参考而非精确计数：展示数字一律 `≈` 前缀（`≈1.2k` 风格缩写），JSON 携带 `method: "char-approx"`。JSON 为三层结构：`paths[]`（各含 `runtimeDir`、`kind`、`agents`、per-skill 行）、顶层 `totalTokens`、以及 `suggestions` 对象。不可读条目（含 broken symlink）计 0 并进 `errors`；缺 description 的条目标记 `incomplete`。
 
 建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。
+
+
+### audit security（装前安全扫描 MVP）
+
+```sh
+skills-manager audit security              # 扫描技能库中所有未归档 skill
+skills-manager audit security my-skill     # 指定一个（或多个）skill 名
+```
+
+只报告不阻断：扫描 skill 目录树中的高信号风险——shell 执行模式（`bash -c`、`child_process`、`subprocess`、`eval` 等）、网络调用（`curl`/`wget`/`fetch`/…）、凭据路径提及（`~/.ssh`、`.aws/credentials`、`.env` 等）、以及明显像密钥的字符串（AWS key id、私钥头、`sk-…`、`api_key="…"`）。v1 默认永不阻断 install / update。
+
+stdout 输出 JSON（单个报告对象；扫描多个时为数组）。每份报告含 `scanner`（当前为 `builtin-v1`）、`findings[]`（`kind`、`severity`、相对 `path`、1-based `line`、`excerpt`、`rule`）以及按 kind 汇总的 `summary`。`add` / `update` 成功后还会对每个已安装/已更新的 skill 在 stderr 打一行摘要，保持既有 stdout JSON 可解析。
+
+扫描器实现 `SecurityScannerPort`——未来 SkillSpector / 第三方适配器可替换 `builtin-v1`，无需改调用方。
 
 ### get（引用层，ADR-0017）
 

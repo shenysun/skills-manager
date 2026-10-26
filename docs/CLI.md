@@ -47,6 +47,8 @@ skills-manager redistribute --refresh --to project --project ./repo
 skills-manager status
 skills-manager cost --json
 skills-manager cost --top 10
+skills-manager audit security
+skills-manager audit security my-skill
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -131,6 +133,20 @@ skills-manager cost --top 10     # widen the expensive-descriptions list (defaul
 `cost` is the read-only resident-cost account: the per-message token cost every distributed skill charges via its frontmatter `name + description`, grouped by **physical runtime path** (user and project both; a shared path counted once with its agent family noted; foreign entries appear only as an uncounted-count line). Counting is **char-approx** (CJK characters ×1, all others ÷4, zero dependencies) — a magnitude reference, never an exact count: every displayed number is `≈`-prefixed (`≈1.2k` style) and the JSON carries `method: "char-approx"`. The JSON is three-layer: `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill lines), the top-level `totalTokens`, and a `suggestions` object. Unreadable entries (broken symlinks included) count 0 and surface in `errors`; entries missing a description are flagged `incomplete`.
 
 Suggestions are **report-only** — nothing is ever executed. Three layers: archived-but-distributed skills (zero-controversy recalls) head the list, then the top-N most expensive descriptions, then scattered distributions (one skill across several paths — consolidate to one). Every suggestion carries a verbatim runnable `undistribute` command including the required `--to` (and `--project` for project paths). `doctor` consumes the same core as a structured `residentCost` field and warns only on scattered duplicates; the dashboard consumes it via `GET /api/cost`. See [ADR-0018](adr/0018-resident-cost-ledger.md).
+
+
+### audit security (install/update security scan MVP)
+
+```sh
+skills-manager audit security              # scan every non-archived hub skill
+skills-manager audit security my-skill     # one (or more) skill name(s)
+```
+
+Report-only scan of a skill tree for high-signal risks: shell exec patterns (`bash -c`, `child_process`, `subprocess`, `eval`, …), network calls (`curl`/`wget`/`fetch`/…), credential path mentions (`~/.ssh`, `.aws/credentials`, `.env`, …), and obvious secret-looking strings (AWS key ids, private-key headers, `sk-…`, `api_key="…"`). Never blocks install or update in v1.
+
+JSON on stdout (one report object, or an array when scanning several). Each report carries `scanner` (today `builtin-v1`), `findings[]` (`kind`, `severity`, relative `path`, 1-based `line`, `excerpt`, `rule`), and a `summary` count per kind. `add` / `update` also print one stderr summary line per installed/updated skill so the existing JSON stdout stays parseable.
+
+The scanner is a `SecurityScannerPort` — a future SkillSpector / third-party adapter can replace `builtin-v1` without changing callers.
 
 ### get (the reference layer, ADR-0017)
 

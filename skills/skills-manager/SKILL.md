@@ -42,6 +42,7 @@ skills-manager get <name> --path      # absolute hub dir, for read-only borrowin
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source queue
 skills-manager cost [--top <n>] [--json]  # resident-cost ledger: per-path cost + report-only recall suggestions
+skills-manager audit security [skill...]  # report-only install/update security scan (shell/network/credentials/secrets)
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
 skills-manager backup list
@@ -260,6 +261,17 @@ skills-manager doctor
 ```
 
 Summarize: adopted-from-lockfile count, sources written by approval, confirmed locally-authored, skipped, and the before/after of the doctor queue.
+
+## Workflow: audit skill security (装前安全扫描)
+
+Skills can ship scripts and docs that call the shell, hit the network, or mention credential paths. `skills-manager audit security` is the **report-only** scan (never blocks install/update in v1): high-signal hits for shell exec, network calls, credential paths, and secret-looking strings. `add` / `update` already print one stderr summary line per skill; dig in when that line is not `clean`, or when the user asks whether a skill looks safe before distributing it.
+
+```sh
+skills-manager audit security                 # every non-archived hub skill
+skills-manager audit security <name>          # one skill — JSON report on stdout
+```
+
+Present findings with path + line + rule; do not refuse install on the user's behalf — ask them. A future SkillSpector-class scanner can replace the builtin via the same port.
 
 ## Workflow: audit resident context cost
 

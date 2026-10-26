@@ -157,6 +157,19 @@ function staleOrErroredCount(s: ReturnType<typeof services>): number {
   return Object.values(s.distribute.staleSummary()).reduce((total, count) => total + count, 0);
 }
 
+
+/** Report-only security scan after install/update: one stderr line per skill so stdout JSON stays parseable. */
+function remindSecurityScan(s: ReturnType<typeof services>, skills: readonly string[]) {
+  if (skills.length === 0) return;
+  for (const skill of skills) {
+    try {
+      console.error(s.security.formatSummaryLine(s.security.scanSkill(skill)));
+    } catch {
+      /* scan must never break the install/update that already succeeded */
+    }
+  }
+}
+
 function remindStaleTargets(s: ReturnType<typeof services>) {
   const stale = staleOrErroredCount(s);
   if (stale > 0) {
@@ -625,6 +638,7 @@ program.command('add')
     const result = s.install.installFromSourceSelection({ source, selectors, overwrite: Boolean(opts.yes), allowInsecureHttp, format });
     s.activity.record({ action: 'cli-add', summary: `Installed ${result.installed.join(', ')}`, details: { source, installed: result.installed } });
     print({ ...result, plan: { ...result.plan, source: redactCheckout(result.plan.source), selected: result.plan.selected.map(redactDiscovered) } });
+    remindSecurityScan(s, result.installed);
     remindStaleTargets(s);
   });
 
@@ -664,7 +678,20 @@ program.command('update')
     const result = opts.source ? s.update.updateSource(opts.source) : s.update.updateSkills(opts.skill);
     s.activity.record({ action: 'cli-update', summary: `Updated ${result.updated.join(', ')}`, details: result });
     print(result);
+    remindSecurityScan(s, result.updated);
     remindStaleTargets(s);
+  });
+
+
+const audit = program.command('audit').description('Report-only audits over hub skills (security today; more subcommands later)');
+audit.command('security')
+  .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (never blocks)')
+  .argument('[skills...]', 'canonical skill names; omit to scan every non-archived hub skill')
+  .action((skills: string[], _opts, cmd) => {
+    const s = services(cmd);
+    const names = skills.length > 0 ? skills : s.registry.listSkills().map((skill) => skill.name);
+    const reports = s.security.scanSkills(names);
+    print(reports.length === 1 ? reports[0] : reports);
   });
 
 const distribute = program.command('distribute')

@@ -35,7 +35,7 @@
 ## 缓做
 
 - **create/push**：gh skill publish（GitHub 绑定）与 asm publish（自建 registry）各占一头；我们的通用位（任意 git host + well-known）存在但优先级靠后。
-- **装前安全扫描**：生态未收敛（SkillSpector 等），做成 install/update 可插拔 hook，等赢家出现再接。
+- **装前安全扫描**：MVP shipped — `audit security` + install/update stderr summary，builtin-v1 高信号规则，`SecurityScannerPort` 可插拔；SkillSpector / 第三方赢家稳定后再接适配器（仍默认不阻断）。
 
 ## 维护约定
 
