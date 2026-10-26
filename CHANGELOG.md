@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-27 (skill quality: audit overlap + audit descriptions + check)
+
+### Added
+- `audit overlap`: competing skill descriptions (#25)
+- `audit descriptions`: description lint against the Agent Skills spec (#26)
+- `check`: hub CI gates in one exit code, with opt-in --budget/--freshness/--overlap/--descriptions (#20, #27)
+### Fixed
+- cost/update flag errors reported before hub resolution (#21)
+- dashboard --port validated as an integer 0–65535 (#24)
+### Docs
+- README CI gates table EN/zh, including `check` (#22, #23)
+
 ## 2026-10-26 (check: one-exit-code hub gates)
 
 - **`check [--budget <tokens>] [--freshness] [--json]`**：security(high) + provenance(imported) 离线必跑，预算与树 SHA 新鲜度可选；任一失败退出 1。新增 `examples/github-actions/hub-check.yml`。测试 + CLI 双语 + manager skill。
