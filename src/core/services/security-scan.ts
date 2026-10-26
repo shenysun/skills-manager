@@ -156,6 +156,26 @@ export class SecurityScanService {
     return skills.map((skill) => this.scanSkill(skill));
   }
 
+  /** Count findings with severity `high` across one or more reports. */
+  countHighFindings(reports: readonly SecurityScanReport[]): number {
+    let n = 0;
+    for (const report of reports) {
+      for (const finding of report.findings) {
+        if (finding.severity === 'high') n += 1;
+      }
+    }
+    return n;
+  }
+
+  /**
+   * Whether `--strict` should fail the process.
+   * Only `high` findings trip the gate; `warn`/`info` stay report-only
+   * even under `--strict` (curl mentions alone must not break CI).
+   */
+  failsStrict(reports: readonly SecurityScanReport[]): boolean {
+    return this.countHighFindings(reports) > 0;
+  }
+
   /** One stderr-friendly line for install/update (report-only wording). */
   formatSummaryLine(report: SecurityScanReport): string {
     const { skill, summary } = report;

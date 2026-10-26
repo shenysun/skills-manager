@@ -7,8 +7,9 @@
 
 - **Goal**: GitHub stars 179 → 300 without paid/spam tactics.
 - **Ship first**: repo discovery (description/topics/homepage) + README badges + competitor comparison table.
-- **Then**: demo asset + outbound posts + shareable wedges (`audit security`, `cost --share`, migration one-liner).
+- **Then**: demo asset + outbound posts + shareable wedges (`audit security`, `cost --share`, migration one-liner, `audit security --strict`).
 - Track in `.scratch/star-300/plan.md` (local).
+- **Growth shipped (2026-10-26+)**: discovery polish · demo GIF · `audit security` · `cost --share` · migration one-liner · `audit security --strict` (this PR).
 
 ## 已完成
 
@@ -32,12 +33,11 @@
 
 （已清空——原 #6/#7 多机同步与 skills.sh find 已完成（feature `sync-find`），见「已完成」。）
 
-- **Growth: `cost --share`**（进行中 / 本分支）：隐私安全粘贴卡——总量、path kind+agent family、最重 skill、仓库链接；无绝对路径。
-
 ## 缓做
 
 - **create/push**：gh skill publish（GitHub 绑定）与 asm publish（自建 registry）各占一头；我们的通用位（任意 git host + well-known）存在但优先级靠后。
-- **装前安全扫描**：MVP shipped — `audit security` + install/update stderr summary，builtin-v1 高信号规则，`SecurityScannerPort` 可插拔；SkillSpector / 第三方赢家稳定后再接适配器（仍默认不阻断）。
+- **装前安全扫描**：MVP + `--strict` shipped — `audit security` + install/update stderr summary，builtin-v1 高信号规则，`SecurityScannerPort` 可插拔；`--strict` 仅对 `high` 退出 1（默认仍只报告）；SkillSpector / 第三方赢家稳定后再接适配器。
+- **Migration CLI**（超出 README 一行）：从 `npx skills` / `gh skill` lockfiles → hub 的专用迁移命令仍缓做——当前 `init --dry-run` + agent「Import my existing skills」足够。
 
 ## 维护约定
 

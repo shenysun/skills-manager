@@ -49,6 +49,7 @@ skills-manager cost --json
 skills-manager cost --top 10
 skills-manager audit security
 skills-manager audit security my-skill
+skills-manager audit security --strict
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -143,11 +144,14 @@ Suggestions are **report-only** — nothing is ever executed. Three layers: arch
 ```sh
 skills-manager audit security              # scan every non-archived hub skill
 skills-manager audit security my-skill     # one (or more) skill name(s)
+skills-manager audit security --strict     # CI gate: exit 1 on high-severity findings
 ```
 
-Report-only scan of a skill tree for high-signal risks: shell exec patterns (`bash -c`, `child_process`, `subprocess`, `eval`, …), network calls (`curl`/`wget`/`fetch`/…), credential path mentions (`~/.ssh`, `.aws/credentials`, `.env`, …), and obvious secret-looking strings (AWS key ids, private-key headers, `sk-…`, `api_key="…"`). Never blocks install or update in v1.
+Report-only scan of a skill tree for high-signal risks: shell exec patterns (`bash -c`, `child_process`, `subprocess`, `eval`, …), network calls (`curl`/`wget`/`fetch`/…), credential path mentions (`~/.ssh`, `.aws/credentials`, `.env`, …), and obvious secret-looking strings (AWS key ids, private-key headers, `sk-…`, `api_key="…"`). Install/update stay report-only (stderr summary only).
 
 JSON on stdout (one report object, or an array when scanning several). Each report carries `scanner` (today `builtin-v1`), `findings[]` (`kind`, `severity`, relative `path`, 1-based `line`, `excerpt`, `rule`), and a `summary` count per kind. `add` / `update` also print one stderr summary line per installed/updated skill so the existing JSON stdout stays parseable.
+
+`--strict` is the optional CI gate: same JSON stdout, but the process exits `1` when any finding has severity `high`. `warn` / `info` never fail under `--strict` (a lone `curl` mention must not break pipelines). Default without the flag stays exit `0` even when highs are present.
 
 The scanner is a `SecurityScannerPort` — a future SkillSpector / third-party adapter can replace `builtin-v1` without changing callers.
 

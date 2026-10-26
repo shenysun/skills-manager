@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26 (audit security --strict)
+
+- **`audit security --strict`（CI 闸）**：默认仍只报告、退出 0；加 `--strict` 时仅当存在 `severity: high` 的 finding 才退出 1（`warn`/`info` 不失败）。stdout JSON 形状不变。`add`/`update` 仍只打 stderr 摘要、永不阻断。
+- 测试：服务层 `countHighFindings`/`failsStrict` + CLI 四条（默认不失败 / high 失败 / 仅 warn 通过 / clean 通过）。
+- 文档：CLI 双语、README 迁移块一行、ROADMAP 增长楔子收口。
+
 ## 2026-10-26 (star-300 growth cut: discovery + security + share)
 
 - **Discovery polish (#3)**：README EN/ZH 增加 npm/stars/license/node 徽章与相对 `gh skill` / `npx skills` / 桌面版的对比表；ROADMAP 记录 179→300★ 增长冲刺。
