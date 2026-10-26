@@ -1,6 +1,13 @@
 # Skills Manager
 
+[![npm](https://img.shields.io/npm/v/skills-manager-cli?color=cb3837)](https://www.npmjs.com/package/skills-manager-cli)
+[![npm downloads](https://img.shields.io/npm/dm/skills-manager-cli)](https://www.npmjs.com/package/skills-manager-cli)
+[![GitHub stars](https://img.shields.io/github/stars/shenysun/skills-manager?style=social)](https://github.com/shenysun/skills-manager/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js](https://img.shields.io/node/v/skills-manager-cli)](https://nodejs.org)
+
 **English** | [简体中文](README.zh-CN.md)
+
 
 Manage your agent skills **from the conversation**: one `npx` command installs the manager skill, and from then on you just ask your agent — install, import, distribute, update, backfill provenance. Works with any skill-loading agent (Claude Code, Codex, Cursor, …).
 
@@ -14,6 +21,22 @@ Manage your agent skills **from the conversation**: one `npx` command installs t
 - **The resident-cost ledger** — every distributed skill's frontmatter charges each message; `skills-manager cost` accounts it per runtime path (approximate, `≈`) with report-only recall suggestions. Undistributed = zero. See [ADR-0018](docs/adr/0018-resident-cost-ledger.md).
 - **Provenance backfill** — imported skills without a source get one through lockfile-evidence adoption, agent-driven search, and your approval.
 - **The manager skill** — every management action happens in agent conversation ([ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)); the CLI underneath is a plain JSON engine.
+
+
+## Why this instead of `gh skill` / `npx skills` / the desktop app?
+
+| | **skills-manager** | `gh skill` | `npx skills` | [desktop skills-manager](https://github.com/xingkongliang/skills-manager) |
+|---|---|---|---|---|
+| Primary UI | **Agent conversation** (manager skill) + CLI | GitHub CLI | CLI | Desktop GUI |
+| Hub model | Single `~/.skills-manager` → distribute subset | Per-agent / shared `.agents/skills` | Per install | Hub + presets |
+| Agents covered | **70+** (catalog snapshot) | ~48 | Depends on target | ~54 |
+| Non-GitHub sources | git / URL / zip / marketplace / well-known | GitHub (+ `--from-local`) | GitHub-centric | Marketplace + git |
+| Update signal | **Skill subtree tree-SHA** (no false positives) | Frontmatter tree SHA | Lockfile / metadata | App sync |
+| Context cost | Built-in **resident cost ledger** | — | — | — |
+| Multi-machine | Hub git sync (`sync push/pull`) | — | — | Device-code backup |
+| Install | `npx skills-manager-cli` | `gh extension` | `npx skills` | Desktop download |
+
+Pick this when you want **one library, many agents, conversation-driven ops**, and honest update/cost signals — not another one-shot installer.
 
 ## Quick Start
 

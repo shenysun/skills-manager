@@ -3,6 +3,13 @@
 > 依据：2026-09 竞品调研（[competitors-2026-09.md](research/competitors-2026-09.md) + [competitors-deep-dive-2026-09.md](research/competitors-deep-dive-2026-09.md) §11）。
 > 本文只记录**排序决策与状态**；论证细节一律回到两份调研文档。新会话/agent 以本文为「下一步做什么」的入口。
 
+## Growth sprint — 300★ (2026-10-26)
+
+- **Goal**: GitHub stars 179 → 300 without paid/spam tactics.
+- **Ship first**: repo discovery (description/topics/homepage) + README badges + competitor comparison table.
+- **Then**: demo asset + outbound posts + one shareable product wedge (create/push or install security hook).
+- Track in `.scratch/star-300/plan.md` (local).
+
 ## 已完成
 
 - **#1 SEO / 命名防御**（2026-09-16 完成）：README 双语定位区分（vs xingkongliang 桌面版）+ 五条差异化主张；package.json description/keywords 重写。

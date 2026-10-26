@@ -1,6 +1,13 @@
 # Skills Manager
 
+[![npm](https://img.shields.io/npm/v/skills-manager-cli?color=cb3837)](https://www.npmjs.com/package/skills-manager-cli)
+[![npm downloads](https://img.shields.io/npm/dm/skills-manager-cli)](https://www.npmjs.com/package/skills-manager-cli)
+[![GitHub stars](https://img.shields.io/github/stars/shenysun/skills-manager?style=social)](https://github.com/shenysun/skills-manager/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js](https://img.shields.io/node/v/skills-manager-cli)](https://nodejs.org)
+
 [English](README.md) | **简体中文**
+
 
 在**对话里**管理你的 agent skills：一条 `npx` 命令装上 manager skill，之后一切都直接吩咐你的 agent——安装、导入、分发、更新、补齐来源。任何会加载 skills 的 agent 都能用（Claude Code、Codex、Cursor、…）。
 
@@ -14,6 +21,22 @@
 - **常驻成本账本**——每个已分发 skill 的 frontmatter 都在按条消息计费；`skills-manager cost` 按运行时路径记账（近似口径，`≈` 展示）并给出只报告不执行的收回建议。未分发 = 零常驻。见 [ADR-0018](docs/adr/0018-resident-cost-ledger.md)。
 - **来源可回填**——没有来源的导入 skill，经锁文件证据采纳、agent 搜索、你批准三层流程补齐 provenance。
 - **manager skill**——所有管理动作都在 agent 对话里完成（[ADR-0014](docs/adr/0014-manager-skill-first-bootstrap.md)）；底层 CLI 是纯 JSON 引擎。
+
+
+## 为什么选它，而不是 `gh skill` / `npx skills` / 桌面版？
+
+| | **skills-manager** | `gh skill` | `npx skills` | [桌面版 skills-manager](https://github.com/xingkongliang/skills-manager) |
+|---|---|---|---|---|
+| 主界面 | **Agent 对话**（manager skill）+ CLI | GitHub CLI | CLI | 桌面 GUI |
+| 模型 | 单一 `~/.skills-manager` → 分发子集 | 按 agent / 共享 `.agents/skills` | 按次安装 | Hub + presets |
+| Agent 覆盖 | **70+**（catalog 快照） | ~48 | 视目标而定 | ~54 |
+| 非 GitHub 源 | git / URL / zip / marketplace / well-known | GitHub（+ `--from-local`） | 偏 GitHub | Marketplace + git |
+| 更新信号 | **skill 子目录 tree-SHA**（不误报） | frontmatter tree SHA | lockfile / metadata | App 同步 |
+| 上下文成本 | 内置**常驻成本账本** | — | — | — |
+| 多机同步 | Hub git 化（`sync push/pull`） | — | — | 设备码备份 |
+| 安装 | `npx skills-manager-cli` | `gh extension` | `npx skills` | 桌面安装包 |
+
+适合「**一个库、多 agent、对话驱动**，更新与成本信号要诚实」的场景——不是又一个一次性安装器。
 
 ## 快速开始
 
