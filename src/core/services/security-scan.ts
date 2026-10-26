@@ -91,6 +91,30 @@ export function summarizeFindings(findings: readonly SecurityFinding[]): Securit
   return summary;
 }
 
+/** Escape a value for GitHub Actions workflow-command properties / message. */
+function escapeGithubWorkflow(value: string): string {
+  return value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
+/**
+ * GitHub Actions annotations for PR file UI (`::error` / `::warning` / `::notice`).
+ * Paths are hub-relative `skills/<name>/…` so annotations resolve when the hub is the repo root.
+ * Pure — CLI prints the joined lines; `--strict` exit policy is unchanged.
+ */
+export function formatGithubAnnotations(reports: readonly SecurityScanReport[]): string {
+  const lines: string[] = [];
+  for (const report of reports) {
+    for (const finding of report.findings) {
+      const cmd = finding.severity === 'high' ? 'error' : finding.severity === 'warn' ? 'warning' : 'notice';
+      const file = escapeGithubWorkflow(`skills/${report.skill}/${finding.path}`);
+      const title = escapeGithubWorkflow(finding.rule);
+      const message = escapeGithubWorkflow(`${finding.kind}: ${finding.excerpt}`);
+      lines.push(`::${cmd} file=${file},line=${finding.line},title=${title}::${message}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 function isScannableFile(name: string): boolean {
   if (name === 'SKILL.md' || name === 'Dockerfile') return true;
   return TEXT_EXT.test(name);

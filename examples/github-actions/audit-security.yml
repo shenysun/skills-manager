@@ -5,7 +5,8 @@
 # which would make an empty scan exit 0 and hide a misconfigured job.
 #
 # Fails only on severity=high findings; warn/info never fail.
-# Requires skills-manager-cli with `audit security --strict`
+# `--format github` emits Actions annotations so highs show on the PR Files tab.
+# Requires skills-manager-cli with `audit security --strict` + `--format github`
 # (on main since 2026-10-26; use @latest after that npm cut).
 
 name: skills-manager audit security
@@ -28,4 +29,4 @@ jobs:
         with:
           node-version: 22
       - name: Audit skill hub (fail on high)
-        run: npx --yes skills-manager-cli audit security --strict
+        run: npx --yes skills-manager-cli audit security --strict --format github

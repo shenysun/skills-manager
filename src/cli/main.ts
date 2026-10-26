@@ -16,6 +16,7 @@ import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 import type { AppliedCategorySet } from '../core/model/index.js';
 import { renderCostLedger, renderCostShare, renderPresetCostLine } from './cost-output.js';
+import { formatGithubAnnotations } from '../core/services/security-scan.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
@@ -690,11 +691,21 @@ audit.command('security')
   .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (report-only by default)')
   .argument('[skills...]', 'canonical skill names; omit to scan every non-archived hub skill')
   .option('--strict', 'exit 1 when any high-severity finding is present (warn/info never fail; default stays report-only)')
-  .action((skills: string[], opts: { strict?: boolean }, cmd) => {
+  .option('--format <format>', 'json (default) or github (Actions ::error/::warning/::notice annotations for the PR file UI)', 'json')
+  .action((skills: string[], opts: { strict?: boolean; format?: string }, cmd) => {
+    const format = opts.format ?? 'json';
+    if (format !== 'json' && format !== 'github') {
+      throw new SkillsManagerError('invalid_format_flag', `--format must be json or github (got ${JSON.stringify(format)})`);
+    }
     const s = services(cmd);
     const names = skills.length > 0 ? skills : s.registry.listSkills().map((skill) => skill.name);
     const reports = s.security.scanSkills(names);
-    print(reports.length === 1 ? reports[0] : reports);
+    if (format === 'github') {
+      const annotations = formatGithubAnnotations(reports);
+      if (annotations) console.log(annotations);
+    } else {
+      print(reports.length === 1 ? reports[0] : reports);
+    }
     if (opts.strict && s.security.failsStrict(reports)) process.exitCode = 1;
   });
 

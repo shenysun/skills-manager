@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-26 (audit security --format github)
+
+- **`audit security --format github`**：stdout 输出 GitHub Actions 工作流命令（`::error` / `::warning` / `::notice`），`file=skills/<name>/…`，让 finding 直接亮在 PR Files 页；默认可选 `json` 不变。与 `--strict` 可联用。`%`/换行/回车按 Actions 规则百分号编码；未知 format → `invalid_format_flag`。
+- 示例工作流改为 `audit security --strict --format github`。
+- 测试：`formatGithubAnnotations` 三例 + CLI 三条（annotations / strict+github / 未知 format）+ 工作流断言锁定 `--format github`。
+- 文档：CLI 双语、README 双语、manager skill 词条、ROADMAP 增长楔子收口。
+
 ## 2026-10-26 (doctor security rollup)
 
 - **`doctor.security`**：报告恒带 hub 安全汇总（`scanner` / `scanned` / `high` / `skillsWithHigh`），与 `audit security` 无参扫描集一致；仅当 `high > 0` 时告警并指向 `audit security --strict` + `examples/github-actions/audit-security.yml`。warn/info 单独存在不告警（与 `--strict` 同口径）。

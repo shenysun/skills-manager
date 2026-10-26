@@ -73,7 +73,7 @@ skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡�
 skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
 ```
 
-**上 CI？** 把 [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 拷进 hub 仓库的 `.github/workflows/`（仓库根需是 `skills/` + `registry.yaml`）。PR/push 时跑 `audit security --strict`，仅 high 严重度发现会失败。
+**上 CI？** 把 [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 拷进 hub 仓库的 `.github/workflows/`（仓库根需是 `skills/` + `registry.yaml`）。PR/push 时跑 `audit security --strict --format github`——仅 high 严重度发现会失败，并在 PR Files 页打注解。
 
 运行时副本改为由 hub 托管；原文件会先备份。
 

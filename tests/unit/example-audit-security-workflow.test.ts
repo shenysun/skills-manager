@@ -6,8 +6,8 @@ import { parse } from 'yaml';
 
 /**
  * Copy-paste CI wedge: the example workflow must stay a valid, minimal
- * `audit security --strict` gate and must not pass `--home` (explicit home
- * auto-creates a missing hub → empty scan exits 0).
+ * `audit security --strict --format github` gate and must not pass `--home`
+ * (explicit home auto-creates a missing hub → empty scan exits 0).
  */
 
 const examplePath = path.resolve(
@@ -30,12 +30,14 @@ describe('examples/github-actions/audit-security.yml', () => {
     expect(doc.jobs?.audit?.steps?.some((s) => s.uses?.startsWith('actions/setup-node@'))).toBe(true);
   });
 
-  it('runs audit security --strict via npx, without --home', () => {
+  it('runs audit security --strict --format github via npx, without --home', () => {
     const runs = (doc.jobs?.audit?.steps ?? [])
       .map((s) => s.run ?? '')
       .filter(Boolean);
     expect(runs.length).toBe(1);
-    expect(runs[0]).toMatch(/npx\s+--yes\s+skills-manager-cli\s+audit\s+security\s+--strict\b/);
+    expect(runs[0]).toMatch(
+      /npx\s+--yes\s+skills-manager-cli\s+audit\s+security\s+--strict\s+--format\s+github\b/,
+    );
     expect(runs[0]).not.toMatch(/--home\b/);
   });
 });
