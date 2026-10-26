@@ -91,6 +91,17 @@ https://github.com/shenysun/skills-manager
 
 **上 CI？** 把 [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 拷进 hub 仓库的 `.github/workflows/`（仓库根需是 `skills/` + `registry.yaml`）。PR/push 时跑 `audit security --strict --format github`——仅 high 严重度发现会失败，并在 PR Files 页打注解。
 
+每个闸失败即退出 1，结论写 stderr，stdout（文本/JSON）保持稳定：
+
+| 闸 | 命令 | 何时失败 | 联网 |
+| --- | --- | --- | --- |
+| 安全 | `audit security --strict` | 存在 high 严重度发现 | 否 |
+| 来源 | `provenance list --fail-on-imported` | 有导入 skill 缺可用来源（拿不到更新） | 否 |
+| 常驻成本 | `cost --budget <tokens>` | 常驻总 token 超出预算 | 否 |
+| 新鲜度 | `update --check --fail-on-stale` | 任一 skill 过期，或检测失败 | 是（建议设 `GH_TOKEN`） |
+
+详见 [docs/CLI.zh-CN.md](docs/CLI.zh-CN.md)。
+
 运行时副本改为由 hub 托管；原文件会先备份。
 
 ## 工作原理
