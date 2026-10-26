@@ -16,6 +16,7 @@ import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 import type { AppliedCategorySet } from '../core/model/index.js';
 import { renderCostLedger, renderCostShare, renderPresetCostLine } from './cost-output.js';
+import { renderDoctorShare } from './doctor-output.js';
 import { formatGithubAnnotations } from '../core/services/security-scan.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
@@ -112,17 +113,24 @@ webCommand(program.command('dashboard', { hidden: true }), 'Deprecated alias for
 
 program.command('doctor')
   .description('Run health checks')
+  .option('--share', 'privacy-safe paste card (counts only — no paths / skill names) for X / HN / chat')
   .option('--migrate-views', 'distribute leftover hub views to user runtimes')
   .option('--delete-views', 'with --migrate-views, remove generated view symlinks')
   .option('--force', 'with --migrate-views, overwrite unmanaged runtime paths')
   .action((opts, cmd) => {
     const s = services(cmd);
+    if (opts.share && opts.migrateViews) throw new Error('use either --share or --migrate-views, not both');
     if (opts.migrateViews) {
       const migrated = s.distribute.migrateViews({ deleteViews: Boolean(opts.deleteViews), force: Boolean(opts.force) });
       s.activity.record({ action: 'cli-migrate-views', summary: 'Migrated leftover hub views', details: migrated });
       return print({ migrated, doctor: s.doctor.check() });
     }
-    print(s.doctor.check());
+    const report = s.doctor.check();
+    if (opts.share) {
+      process.stdout.write(renderDoctorShare(report));
+      return;
+    }
+    print(report);
   });
 
 program.command('status')

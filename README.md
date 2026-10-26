@@ -70,6 +70,7 @@ npx skills-manager-cli                 # bootstrap the hub + manager skill
 skills-manager init --dry-run          # preview importing existing runtime skills
 # or ask your agent: Import my existing skills into skills-manager
 skills-manager cost --share            # privacy-safe paste card of your resident skill tax
+skills-manager doctor --share          # privacy-safe hub health card (counts only)
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
 ```
 
@@ -147,6 +148,7 @@ Skill home resolution priority:
 npx skills-manager-cli                            # bootstrap (default when no subcommand)
 skills-manager bootstrap --agent claude-code      # scripted bootstrap / mount later
 skills-manager doctor
+skills-manager doctor --share                     # privacy-safe hub health paste card
 skills-manager list
 skills-manager add owner/repo --all --yes
 skills-manager distribute --to user --skill my-skill --agent claude-code

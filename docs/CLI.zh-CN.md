@@ -30,6 +30,7 @@ bootstrap（ADR-0014）只做四件事：确保技能库存在；从 npm 包内�
 ```sh
 skills-manager web --home ./my-skill-home
 skills-manager doctor --home ./my-skill-home
+skills-manager doctor --share
 skills-manager catalog info --home ./my-skill-home
 skills-manager catalog refresh --home ./my-skill-home
 skills-manager list --home ./my-skill-home
@@ -137,6 +138,8 @@ skills-manager cost --budget 2000  # 常驻总 token 超过 2000 时退出 1（C
 `cost` 是只读的常驻成本账本：每个已分发 skill 经 frontmatter `name + description` 按条消息计费的常驻 token 成本，按**物理运行时路径**分组（user 与 project 同账；共享路径只计一次并标注 agent family；foreign 条目不逐条计费，只汇总为一行未计数数量）。计数口径为 **char-approx**（CJK 字符 ×1、其余 ÷4，零依赖）——量级参考而非精确计数：展示数字一律 `≈` 前缀（`≈1.2k` 风格缩写），JSON 携带 `method: "char-approx"`。JSON 为三层结构：`paths[]`（各含 `runtimeDir`、`kind`、`agents`、per-skill 行）、顶层 `totalTokens`、以及 `suggestions` 对象。不可读条目（含 broken symlink）计 0 并进 `errors`；缺 description 的条目标记 `incomplete`。
 
 `cost --share` 把同一本账本收成短粘贴卡：总量、路径 kind + agent family（从不带绝对路径）、最重的三个 skill，末尾是 `Try:` / `Reproduce:` 页脚与仓库链接——分享「skill 税」时不泄露家目录，也不再循环写「Share: cost --share」。
+
+`doctor --share` 是并行的 hub 健康粘贴卡：skill / managed / outdated / foreign 计数、常驻成本量级、security high 计数 + scanner id、告警条数——从不带 `skillHome`、断链路径、技能名或告警原文。页脚为 `Try:` / `Reproduce:` + 仓库链接。
 
 建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。同一份 doctor 报告还带结构化 `security` 汇总（`scanner`、`scanned`、`high`、`skillsWithHigh`），仅当 `high > 0` 时告警，并指向 `audit security --strict` 与可拷贝的 Action 示例。
 
