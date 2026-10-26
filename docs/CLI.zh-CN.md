@@ -38,6 +38,7 @@ skills-manager get my-skill
 skills-manager get my-skill --path
 skills-manager add <source> --all --yes
 skills-manager update --plan
+skills-manager update --check
 skills-manager update --skill my-skill
 skills-manager update --source '<source-key>'
 skills-manager distribute --to user --skill my-skill --agent claude-code --agent zed
@@ -124,6 +125,14 @@ hub 本身成为一个 git 仓库；对用户自选的任意远端（本地 bare
 - `skills-manager redistribute --refresh`（`--outdated` 的别名）刷新全部过期副本目标，可用 `--to` / `--project` 过滤；输出 `Refreshed N, errored M.`
 - `add` / `update` 在仍有其他过期目标时，末尾追加一行提醒。
 - 仪表盘的技能行显示带数量的过期徽标和一键刷新按钮。
+
+### update --check（诚实新鲜度）
+
+```sh
+skills-manager update --check
+```
+
+JSON 分桶：`stale` / `upToDate` / `failed` / `skipped`（及 `checked`）。**git / marketplace** 源的更新信号是 **skill 子目录 tree SHA**——该 skill 目录外的上游提交不会点亮更新（README 差异化主张）。URL / well-known / local 源仍用各自锚点（内容摘要 / 指纹）。`--check` 同时在 **stderr** 打印 tree-SHA 提示，stdout JSON 保持脚本稳定。
 
 ### cost（常驻成本账本，ADR-0018）
 

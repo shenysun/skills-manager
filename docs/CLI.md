@@ -38,6 +38,7 @@ skills-manager get my-skill
 skills-manager get my-skill --path
 skills-manager add <source> --all --yes
 skills-manager update --plan
+skills-manager update --check
 skills-manager update --skill my-skill
 skills-manager update --source '<source-key>'
 skills-manager distribute --to user --skill my-skill --agent claude-code --agent zed
@@ -124,6 +125,14 @@ Exit-code semantics: `push` / `pull` exit nonzero with guidance on every hard ga
 - `skills-manager redistribute --refresh` (alias of `--outdated`) refreshes every stale copy target, optionally filtered by `--to` / `--project`; it prints `Refreshed N, errored M.`
 - `add` / `update` print a one-line trailing reminder when other stale targets remain.
 - The dashboard shows a stale badge with a count and a one-click refresh button per skill row.
+
+### update --check (honest freshness)
+
+```sh
+skills-manager update --check
+```
+
+JSON buckets: `stale` / `upToDate` / `failed` / `skipped` (and `checked`). For **git / marketplace** sources the update signal is the **skill subdirectory tree SHA** — upstream commits outside that skill never light an update (the README differentiator). URL / well-known / local sources keep their own anchors (content digest / fingerprint). `--check` also prints that tree-SHA tip on **stderr** so stdout JSON stays script-stable.
 
 ### cost (the resident-cost ledger, ADR-0018)
 
