@@ -73,6 +73,8 @@ skills-manager cost --share            # privacy-safe paste card of your residen
 skills-manager doctor --share          # privacy-safe hub health card (counts only)
 skills-manager update --check          # freshness vs skill subtree tree-SHA (git) — no cry-wolf
 skills-manager audit security --strict  # CI gate: fail only on high-severity findings
+skills-manager sync init --remote <url> # multi-machine hub git sync (unique vs installers)
+skills-manager sync status --share      # privacy-safe paste card of sync posture
 ```
 
 `cost --share` prints a paste-ready card (no absolute paths). Example shape:
@@ -169,6 +171,8 @@ skills-manager categories apply frontend -a claude-code  # load only that domain
 skills-manager categories status                  # applied sets + drift
 skills-manager cost                              # resident context-cost ledger (report-only recall suggestions)
 skills-manager cost --budget 2000                # fail (exit 1) when resident context tax exceeds a token budget
+skills-manager sync init --remote <url>          # multi-machine hub git sync
+skills-manager sync status --share               # privacy-safe paste card of sync posture
 skills-manager archive old-skill
 ```
 

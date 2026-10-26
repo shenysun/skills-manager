@@ -17,6 +17,7 @@ import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 import type { AppliedCategorySet } from '../core/model/index.js';
 import { renderCostLedger, renderCostShare, renderPresetCostLine } from './cost-output.js';
 import { renderDoctorShare } from './doctor-output.js';
+import { renderSyncShare } from './sync-output.js';
 import { formatGithubAnnotations } from '../core/services/security-scan.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
@@ -441,9 +442,15 @@ sync.command('init')
 sync.command('status')
   .description('Read-only sync status: git-ification, remote, dirty files, ahead/behind (last fetch), last sync commit — zero network')
   .option('--json', 'machine-readable output for agents')
+  .option('--share', 'privacy-safe paste card (no hub path / remote URL) for X / HN / chat')
   .action((opts, cmd) => {
     const result = services(cmd).sync.status();
+    if (opts.json && opts.share) throw new Error('use either --json or --share, not both');
     if (opts.json) return print(result);
+    if (opts.share) {
+      process.stdout.write(renderSyncShare(result));
+      return;
+    }
     // Read-only probe: no activity record — status itself must not dirty the hub.
     console.log(`hub: ${result.home}`);
     if (!result.gitified) {
