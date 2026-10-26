@@ -1,0 +1,29 @@
+# Copy-paste CI gate for a skills-manager hub repo — every hub gate, one exit code.
+# Repo root (or `defaults.run.working-directory`) must already be a hub:
+#   skills/          +  registry.yaml
+# Do NOT pass `--home` here — an explicit home auto-creates a missing hub.
+#
+# `check` always runs: audit security (high only) + provenance (imported-without-source).
+# Opt-in: `--budget <tokens>` (resident context tax) and `--freshness` (network tree-SHA
+# update check; set GH_TOKEN to avoid the 60 req/h anonymous GitHub limit).
+# Want PR-file annotations for security findings? Keep audit-security.yml alongside.
+
+name: skills-manager hub check
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Hub gates
+        run: npx --yes skills-manager-cli check --budget 4000 --freshness
+        env:
+          GH_TOKEN: ${{ github.token }}

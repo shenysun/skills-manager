@@ -738,6 +738,48 @@ program.command('update')
   });
 
 
+// One exit code for CI: the offline hub gates (security high, imported-without-source)
+// always run; the resident budget and the networked freshness check are opt-in.
+program.command('check')
+  .description('Run the hub CI gates in one go: audit security (high) + provenance (imported-without-source), plus optional --budget and --freshness; exit 1 if any gate fails')
+  .option('--budget <tokens>', 'also fail when total resident tokens exceed this budget (same as cost --budget)')
+  .option('--freshness', 'also run update --check (network) and fail on stale or failed detection')
+  .option('--json', 'machine-readable gate results')
+  .action(async (opts, cmd) => {
+    const budget = opts.budget === undefined ? null : Number(opts.budget);
+    if (budget !== null && (!Number.isInteger(budget) || budget < 0)) throw new Error(`--budget expects a non-negative integer token count, got "${opts.budget}"`);
+    const s = services(cmd);
+    const gates: Array<{ gate: string; ok: boolean; detail: string }> = [];
+    const names = s.registry.listSkills().map((skill) => skill.name);
+    const high = s.security.countHighFindings(s.security.scanSkills(names));
+    gates.push({ gate: 'security', ok: high === 0, detail: `${high} high finding(s) across ${names.length} skill(s)${high ? ' — run `skills-manager audit security --strict`' : ''}` });
+    const imported = s.provenance.pending().importedWithoutSource.length;
+    gates.push({ gate: 'provenance', ok: imported === 0, detail: `${imported} imported skill(s) missing a source${imported ? ' — run `skills-manager provenance adopt`' : ''}` });
+    if (budget !== null) {
+      const total = s.cost.ledger(0).totalTokens;
+      gates.push({ gate: 'budget', ok: total <= budget, detail: `${total} / ${budget} resident tokens${total > budget ? ' — run `skills-manager cost` for recalls' : ''}` });
+    }
+    if (opts.freshness) {
+      const detection = new DetectionService({ githubApi: new GitHubApiClient(), http: new HttpDownloadClient(), fs: new NodeFileSystem() });
+      const listed = s.registry.listSkills({ includeArchived: false });
+      const outcomes = await detection.detect(s, listed);
+      let stale = 0;
+      let failed = 0;
+      for (const outcome of outcomes.values()) {
+        if (outcome.detection === 'failed') failed += 1;
+        else if (outcome.detection !== 'skipped' && outcome.hasUpdate) stale += 1;
+      }
+      gates.push({ gate: 'freshness', ok: stale === 0 && failed === 0, detail: `${stale} stale, ${failed} failed (tree-SHA)${stale || failed ? ' — run `skills-manager update --check`' : ''}` });
+    }
+    const ok = gates.every((g) => g.ok);
+    if (opts.json) print({ ok, gates });
+    else {
+      for (const g of gates) console.log(`${g.ok ? 'PASS' : 'FAIL'} ${g.gate}: ${g.detail}`);
+      console.log(`check: ${ok ? 'PASS' : 'FAIL'} (${gates.filter((g) => g.ok).length}/${gates.length} gates)`);
+    }
+    if (!ok) process.exitCode = 1;
+  });
+
 const audit = program.command('audit').description('Report-only audits over hub skills (security today; more subcommands later)');
 audit.command('security')
   .description('Scan skill tree(s) for high-signal risks: shell exec, network calls, credential paths, secret-like strings (report-only by default)')
