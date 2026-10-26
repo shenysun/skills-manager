@@ -54,6 +54,7 @@ skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
+skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -158,6 +159,18 @@ skills-manager update --check --fail-on-stale  # exit 1 when any skill is stale 
 
 Suggestions are **report-only** — nothing is ever executed. Three layers: archived-but-distributed skills (zero-controversy recalls) head the list, then the top-N most expensive descriptions, then scattered distributions (one skill across several paths — consolidate to one). Every suggestion carries a verbatim runnable `undistribute` command including the required `--to` (and `--project` for project paths). `doctor` consumes the same core as a structured `residentCost` field and warns only on scattered duplicates; the dashboard consumes it via `GET /api/cost`. See [ADR-0018](adr/0018-resident-cost-ledger.md). The same doctor report also carries a structured `security` rollup (`scanner`, `scanned`, `high`, `skillsWithHigh`) and warns only when `high > 0`, pointing at `audit security --strict` and the copy-paste Action example.
 
+
+### audit overlap (skills competing for the same request)
+
+```sh
+skills-manager audit overlap                 # compare every non-archived hub skill
+skills-manager audit overlap a b c           # only these skills
+skills-manager audit overlap --threshold 0.5 # report fewer, closer pairs (default 0.3)
+skills-manager audit overlap --strict        # CI gate: exit 1 when any pair is reported
+skills-manager audit overlap --json
+```
+
+Agents choose a skill by matching your message against every skill's `name + description`. When two descriptions claim the same trigger words (say `jest-unit-tests` and `testing-conventions`), the agent may load the wrong one, or neither. `audit overlap` finds those pairs offline and deterministically, with no model and no network. It scores each pair with IDF-weighted Jaccard over description terms (ASCII words, light plural folding, CJK bigrams, common filler words dropped), so words every skill uses barely count and distinctive shared words dominate. Each pair lists its most distinctive shared terms and a suggested fix: write a boundary into each description ("For X, use the other skill instead"), or merge the two. It is report-only and never edits a description. `--json` gives `{ method: "idf-jaccard", threshold, scanned, pairs[] }`. With `--strict`, the verdict goes to stderr and stdout stays unchanged.
 
 ### audit security (install/update security scan MVP)
 

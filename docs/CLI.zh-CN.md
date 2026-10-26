@@ -54,6 +54,7 @@ skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
+skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -158,6 +159,18 @@ skills-manager update --check --fail-on-stale  # 任一 skill 过期时退出 1�
 
 建议**只报告不执行**——永远不会代为运行任何命令。三层：archived-but-distributed（零争议收回）置顶，其后是最贵 description top-N，最后是 scattered 分发（同一 skill 散布多条路径——归并到一条）。每条建议附逐字可运行的 `undistribute` 命令，含必需的 `--to`（project 路径带 `--project`）。`doctor` 消费同一核心，输出结构化 `residentCost` 字段且仅在 scattered 重复分发时告警；dashboard 经 `GET /api/cost` 消费。见 [ADR-0018](adr/0018-resident-cost-ledger.md)。同一份 doctor 报告还带结构化 `security` 汇总（`scanner`、`scanned`、`high`、`skillsWithHigh`），仅当 `high > 0` 时告警，并指向 `audit security --strict` 与可拷贝的 Action 示例。
 
+
+### audit overlap（争抢同一请求的 skill）
+
+```sh
+skills-manager audit overlap                 # 比较所有未归档 hub skill
+skills-manager audit overlap a b c           # 只比较这些 skill
+skills-manager audit overlap --threshold 0.5 # 只报更接近的对（默认 0.3）
+skills-manager audit overlap --strict        # CI 闸：报出任一对即退出 1
+skills-manager audit overlap --json
+```
+
+agent 选 skill 时，是拿你的消息去匹配每个 skill 的 `name + description`。两个 description 抢同一批触发词（比如 `jest-unit-tests` 与 `testing-conventions`）时，agent 可能加载错的那个，也可能一个都不加载。`audit overlap` 离线、确定性地找出这些对：不调模型、不联网。它对 description 词项（ASCII 单词、轻度复数归并、CJK 二元组，并去掉常见虚词）计算 IDF 加权 Jaccard 作为每对的分数，所以人人都用的词几乎不计分，起作用的是有区分度的共享词。每对列出最有区分度的共享词和一条修复建议：在双方 description 里写明边界（「X 的情况请用另一个 skill」），或者把两者合并。只报告，从不改 description。`--json` 输出 `{ method: "idf-jaccard", threshold, scanned, pairs[] }`。带 `--strict` 时结论写 stderr，stdout 不变。
 
 ### audit security（装前安全扫描 MVP）
 
