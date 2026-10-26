@@ -60,6 +60,20 @@ Then go back to your agent and say:
 
 Content moves into the hub, originals become symlinks (backed up first). Prefer to preview it yourself first? `skills-manager init --dry-run`.
 
+
+## Coming from `npx skills` or `gh skill`?
+
+You can keep installing with those tools. To consolidate into one hub (tree-SHA updates + the cost ledger) without re-downloading:
+
+```sh
+npx skills-manager-cli                 # bootstrap the hub + manager skill
+skills-manager init --dry-run          # preview importing existing runtime skills
+# or ask your agent: Import my existing skills into skills-manager
+skills-manager cost --share            # privacy-safe paste card of your resident skill tax
+```
+
+Runtime copies become hub-backed; originals are backed up first.
+
 ## How it works
 
 ```text

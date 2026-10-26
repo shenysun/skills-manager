@@ -41,7 +41,7 @@ skills-manager get <name>             # zero-retention read: full SKILL.md (fron
 skills-manager get <name> --path      # absolute hub dir, for read-only borrowing of sibling files
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source queue
-skills-manager cost [--top <n>] [--json]  # resident-cost ledger: per-path cost + report-only recall suggestions
+skills-manager cost [--top <n>] [--json] [--share]  # resident-cost ledger; --share = privacy-safe paste card
 skills-manager audit security [skill...]  # report-only install/update security scan (shell/network/credentials/secrets)
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)
 skills-manager catalog refresh        # re-pull the upstream agent table
@@ -281,6 +281,7 @@ Every distributed skill charges every message the tokens of its frontmatter `nam
 skills-manager cost --json                 # the full three-layer ledger — parse this in conversation
 skills-manager cost                        # human view: path groups → per-skill lines → total + unmanaged line → suggestions
 skills-manager cost --top 10               # widen the expensive-descriptions list (default 5)
+skills-manager cost --share               # privacy-safe paste card (no absolute paths) for the user to share
 ```
 
 The JSON carries `paths[]` (each with `runtimeDir`, `kind`, `agents`, per-skill lines), the top-level `totalTokens` and `method`, a three-layer `suggestions` object, an `unmanaged` count for foreign entries the ledger honestly omits, and an `errors` list for unreadable entries (counted 0; entries missing a description are flagged `incomplete`).

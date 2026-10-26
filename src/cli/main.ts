@@ -15,7 +15,7 @@ import { DetectionService, detectionLogPath } from '../core/services/detection-s
 import path from 'node:path';
 import { runBootstrap, managerSkillBundle } from './bootstrap.js';
 import type { AppliedCategorySet } from '../core/model/index.js';
-import { renderCostLedger, renderPresetCostLine } from './cost-output.js';
+import { renderCostLedger, renderCostShare, renderPresetCostLine } from './cost-output.js';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 const projectRoot = projectRootFromImportMeta(import.meta.url);
@@ -591,14 +591,16 @@ program.command('get')
 program.command('cost')
   .description('Show the resident context-cost ledger: per-runtime-path token cost of distributed skill frontmatter, with report-only recall suggestions')
   .option('--json', 'machine-readable output for agents')
+  .option('--share', 'privacy-safe paste card (no absolute paths) for X / HN / chat')
   .option('--top <n>', 'how many of the most expensive descriptions to list', '5')
   .action((opts, cmd) => {
     const s = services(cmd);
     const top = Number.parseInt(opts.top, 10);
     if (!Number.isInteger(top) || top < 0) throw new Error(`--top expects a non-negative integer, got "${opts.top}"`);
+    if (opts.json && opts.share) throw new Error('use either --json or --share, not both');
     const ledger = s.cost.ledger(top);
     if (opts.json) return print(ledger);
-    process.stdout.write(renderCostLedger(ledger));
+    process.stdout.write(opts.share ? renderCostShare(ledger) : renderCostLedger(ledger));
   });
 
 program.command('add')

@@ -154,6 +154,33 @@ describe('cost --top', () => {
   });
 });
 
+
+describe('cost --share', () => {
+  it('prints a privacy-safe paste card without absolute paths', () => {
+    run(['add', sourceRoot, '--all', '--yes']);
+    run(['distribute', '--to', 'user', '-a', 'zed', '-s', 'alpha', '-s', 'beta']);
+    run(['distribute', '--to', 'project', '--project', project, '-a', 'eve', '-s', 'gamma']);
+    mkdirSync(path.join(userHome, '.agents', 'skills', 'stranger'), { recursive: true });
+    const out = run(['cost', '--share']).stdout;
+    expect(out).toContain('Resident skill tax · char-approx · skills-manager');
+    expect(out).toMatch(/≈16 tokens \/ message · 3 skill\(s\) · 2 path\(s\)/);
+    expect(out).toMatch(/Paths:.*\bproject\/eve\b/);
+    expect(out).toMatch(/Paths:.*\buser\/zed\b/);
+    expect(out).toContain('Heaviest: gamma ≈11 · beta ≈3 · alpha ≈2');
+    expect(out).toContain('1 unmanaged skill(s) not counted');
+    expect(out).toContain('Share: skills-manager cost --share');
+    expect(out).toContain('https://github.com/shenysun/skills-manager');
+    expect(out).not.toContain(userHome);
+    expect(out).not.toContain(project);
+  });
+
+  it('rejects combining --share with --json', () => {
+    run(['add', sourceRoot, '--all', '--yes']);
+    run(['distribute', '--to', 'user', '-a', 'zed', '-s', 'alpha']);
+    expect(run(['cost', '--share', '--json']).status).toBe(1);
+  });
+});
+
 describe('v1 has no filter flags (filtering is --json\'s job)', () => {
   it('rejects --path and --skill as unknown options', () => {
     run(['add', sourceRoot, '--all', '--yes']);

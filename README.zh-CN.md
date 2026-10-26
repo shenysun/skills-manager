@@ -60,6 +60,20 @@ npx skills-manager-cli
 
 内容会移入库中，原位置变成软链接（先备份）。想先自己预览？`skills-manager init --dry-run`。
 
+
+## 从 `npx skills` 或 `gh skill` 过来？
+
+可以继续用它们安装。要把已有 skill 收进同一个 hub（树 SHA 更新 + 成本账本）、不必重下：
+
+```sh
+npx skills-manager-cli                 # 引导创建 hub + manager skill
+skills-manager init --dry-run          # 预览导入现有运行时 skill
+# 或对 agent 说：把我现有的 skills 导入 skills-manager
+skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡片（无绝对路径）
+```
+
+运行时副本改为由 hub 托管；原文件会先备份。
+
 ## 工作原理
 
 ```text

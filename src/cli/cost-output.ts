@@ -66,3 +66,45 @@ export function renderCostLedger(ledger: CostLedger): string {
 export function renderPresetCostLine(cost: ScopedPathCost): string {
   return `Resident cost: ${formatApproxTokens(cost.tokens)} tokens per message (${cost.method})`;
 }
+
+/**
+ * Privacy-safe paste card for `skills-manager cost --share` (growth wedge):
+ * no absolute paths, agent-family labels only, top skills by total tokens,
+ * a one-line CTA + repo URL. Same ledger, thinner surface.
+ */
+export function renderCostShare(ledger: CostLedger): string {
+  const skillTotals = new Map<string, number>();
+  for (const group of ledger.paths) {
+    for (const line of group.skills) {
+      skillTotals.set(line.skill, (skillTotals.get(line.skill) ?? 0) + line.tokens);
+    }
+  }
+  const skillCount = skillTotals.size;
+  const heaviest = [...skillTotals.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([skill, tokens]) => `${skill} ${formatApproxTokens(tokens)}`);
+
+  const pathBits = ledger.paths.map((group) => {
+    const agents = group.agents.length > 0 ? group.agents.join('+') : 'none';
+    return `${group.kind}/${agents}`;
+  });
+
+  const lines: string[] = [];
+  lines.push(`Resident skill tax · ${ledger.method} · skills-manager`);
+  lines.push(`${formatApproxTokens(ledger.totalTokens)} tokens / message · ${skillCount} skill(s) · ${ledger.paths.length} path(s)`);
+  if (pathBits.length > 0) lines.push(`Paths: ${pathBits.join(' · ')}`);
+  if (heaviest.length > 0) lines.push(`Heaviest: ${heaviest.join(' · ')}`);
+  const archived = ledger.suggestions.archived.length;
+  const scattered = ledger.suggestions.scattered.length;
+  if (archived > 0 || scattered > 0) {
+    const watch: string[] = [];
+    if (archived > 0) watch.push(`${archived} archived still distributed`);
+    if (scattered > 0) watch.push(`${scattered} scattered`);
+    lines.push(`Watch: ${watch.join(' · ')}`);
+  }
+  if (ledger.unmanaged > 0) lines.push(`${ledger.unmanaged} unmanaged skill(s) not counted`);
+  lines.push('Share: skills-manager cost --share');
+  lines.push('https://github.com/shenysun/skills-manager');
+  return `${lines.join('\n')}\n`;
+}
