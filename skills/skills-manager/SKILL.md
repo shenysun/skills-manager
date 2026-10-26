@@ -41,6 +41,7 @@ skills-manager get <name>             # zero-retention read: full SKILL.md (fron
 skills-manager get <name> --path      # absolute hub dir, for read-only borrowing of sibling files
 skills-manager status                 # distribution health: managed/outdated/foreign
 skills-manager doctor                 # warnings incl. imported-without-source + security high rollup
+skills-manager doctor --share         # privacy-safe hub health paste card (counts only)
 skills-manager cost [--top <n>] [--json] [--share] [--budget <tokens>]  # resident-cost ledger; --share = privacy-safe paste card
 skills-manager audit security [skill...] [--strict] [--format json|github]  # report-only; --strict = CI gate; --format github = Actions annotations
 skills-manager catalog info           # snapshot stamp + detected agents (each with its runtime dir)

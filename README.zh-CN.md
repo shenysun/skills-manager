@@ -70,6 +70,7 @@ npx skills-manager-cli                 # 引导创建 hub + manager skill
 skills-manager init --dry-run          # 预览导入现有运行时 skill
 # 或对 agent 说：把我现有的 skills 导入 skills-manager
 skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡片（无绝对路径）
+skills-manager doctor --share          # 可粘贴的 hub 健康卡片（仅计数，无路径/技能名）
 skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
 ```
 
@@ -147,6 +148,7 @@ apply 是显式的、可逆的快照：缺的分发、集合外（含未打标�
 npx skills-manager-cli                            # bootstrap（不带子命令时的默认行为）
 skills-manager bootstrap --agent claude-code      # 脚本化 bootstrap / 之后再挂载
 skills-manager doctor
+skills-manager doctor --share                     # 可粘贴的 hub 健康卡片（仅计数）
 skills-manager list
 skills-manager add owner/repo --all --yes
 skills-manager distribute --to user --skill my-skill --agent claude-code

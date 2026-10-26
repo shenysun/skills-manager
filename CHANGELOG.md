@@ -18,6 +18,13 @@
 - README 双语 Coming-from 块补示例粘贴卡形状；CLI 双语说明对齐。
 - 测试：断言锁定 Try/Reproduce，并拒绝旧 Share 行。
 
+## 2026-10-26 (doctor --share)
+
+- **`doctor --share`**：隐私安全的 hub 健康粘贴卡（仅计数与量级：skill/managed/outdated/foreign、常驻成本、security.high、告警条数）；绝不输出 `skillHome`、断链路径、技能名或告警原文。页脚 `Try:` / `Reproduce:` + 仓库链接。
+- 与 `--migrate-views` 互斥；默认 `doctor` JSON 不变。
+- 测试：隐私断言（无路径/技能名）+ 互斥 + 默认 JSON 仍带 skillHome。
+- 文档：CLI / README 双语、manager skill 词条、ROADMAP 增长楔子。
+
 
 ## 2026-10-26 (audit security --format github)
 
