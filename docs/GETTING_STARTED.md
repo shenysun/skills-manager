@@ -30,6 +30,13 @@ Bootstrap is the only step that creates a **skill home** — a local directory t
 
 The manager skill answers with your library's state and the natural next steps (importing existing skills, installing new ones). It drives the CLI underneath (`npx skills-manager-cli …`); you rarely need to type commands yourself.
 
+Bootstrap itself also prints two pasteable CLI demos after the starter prompt:
+
+```bash
+skills-manager cost --share   # privacy-safe resident skill tax card (share on HN / chat)
+skills-manager doctor         # health + security.high + residentCost rollup
+```
+
 ### Default locations
 
 Skills Manager checks these locations in order:

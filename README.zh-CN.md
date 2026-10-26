@@ -46,7 +46,7 @@ npx skills-manager-cli
 
 ![skills-manager demo](docs/assets/demo.gif)
 
-*演示：`--help` 与常驻上下文成本账本（`cost`）。*
+*演示：`--help` 与常驻上下文成本账本（`cost`）。bootstrap 结束后还会打印可粘贴的 `cost --share` 与 `doctor` demo。*
 
 这就是全部的安装步骤。bootstrap 会创建技能库（`~/.skills-manager`），从包内副本把 **manager skill** 种进库，并（以软链接）挂载到它检测到的 agent——展示一次多选让你确认清单。
 

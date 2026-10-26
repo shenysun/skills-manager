@@ -30,6 +30,13 @@ bootstrap 是唯一会创建**技能库（skill home）**的步骤 —— 一个
 
 manager skill 会汇报技能库现状和自然的下一步（导入现有技能、安装新技能）。它在底层驱动 CLI（`npx skills-manager-cli …`）；你几乎不需要自己敲命令。
 
+bootstrap 在起始提示词之后还会打印两行可粘贴 CLI demo：
+
+```bash
+skills-manager cost --share   # 可粘贴的常驻 skill 税卡片（HN / 聊天分享）
+skills-manager doctor         # 健康检查 + security.high + residentCost 汇总
+```
+
 ### 默认位置
 
 Skills Manager 按以下顺序查找技能库：

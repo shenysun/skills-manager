@@ -78,6 +78,11 @@ export async function runBootstrap(opts: BootstrapOptions, cmd: Command): Promis
   console.log('\nAll set. Go back to your agent and say:');
   console.log(`  “${STARTER_PROMPT_ZH}”`);
   console.log(`  (“${STARTER_PROMPT_EN}”)`);
+  // Growth wedge: surface the pasteable demos that land after the next npm cut
+  // (cost --share + doctor already ships security.high / residentCost rollups).
+  console.log('\nAlso try (CLI demos — paste anywhere):');
+  console.log('  skills-manager cost --share   # privacy-safe resident skill tax card');
+  console.log('  skills-manager doctor         # health + security.high + residentCost');
 }
 
 /** `--agent` wins; one detected agent needs no question; several get the picker in a TTY, all of them otherwise. */
