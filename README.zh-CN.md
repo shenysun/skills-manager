@@ -165,6 +165,7 @@ skills-manager backup list                       # 查看 init 备份
 skills-manager backup restore my-skill           # 回滚某次导入
 skills-manager edit my-skill --source-git owner/repo --subpath skills/my-skill
 skills-manager provenance list                   # 仍缺来源的技能清单
+skills-manager provenance list --fail-on-imported # 仍有「导入却无来源」的 skill 时失败（exit 1）
 skills-manager provenance adopt                  # 补采锁文件证据
 skills-manager categories set my-skill 前端       # 打领域类别标签
 skills-manager categories apply 前端 -a claude-code  # 只加载该领域

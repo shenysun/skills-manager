@@ -81,6 +81,32 @@ describe('provenance list', () => {
   });
 });
 
+
+describe('provenance list --fail-on-imported', () => {
+  it('exits 1 when imported-without-source skills remain (JSON stdout unchanged)', () => {
+    const result = run(['provenance', 'list', '--json', '--fail-on-imported']);
+    expect(result.status).toBe(1);
+    const pending = JSON.parse(result.stdout);
+    expect(pending.importedWithoutSource.length).toBeGreaterThan(0);
+    expect(result.stderr).toMatch(/imported skill\(s\) still missing a source/);
+  });
+
+  it('exits 0 when the imported-without-source queue is empty (locally authored alone is fine)', () => {
+    // Clear the three imported fixtures by adopting lock evidence where possible,
+    // then drop the remaining imported entries from the registry so only authored remains.
+    run(['provenance', 'adopt']);
+    const registryFile = path.join(home, 'registry.yaml');
+    const body = readFileSync(registryFile, 'utf8');
+    // Keep only the locally authored skill.
+    writeFileSync(registryFile, `skills:\n  authored:\n    path: skills/authored\n    title: authored\n    category: experimental\n    tags: []\n    consumers: []\n    source: {type: local, url: null, subpath: null, ref: null, upstream_commit: null, baseline_hash: null}\n    update_policy: manual\n    description: fixture\n`);
+    const result = run(['provenance', 'list', '--fail-on-imported']);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/Imported without source \(0\)/);
+    expect(result.stdout).toMatch(/authored/);
+    expect(result.stderr).toMatch(/within hygiene gate/);
+  });
+});
+
 describe('provenance adopt', () => {
   it('adopts lockfile evidence onto legacy imported skills and clears the doctor queue for them', () => {
     const before = run(['doctor']);
