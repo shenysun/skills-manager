@@ -168,8 +168,10 @@ describe('cost --share', () => {
     expect(out).toMatch(/Paths:.*\buser\/zed\b/);
     expect(out).toContain('Heaviest: gamma ≈11 · beta ≈3 · alpha ≈2');
     expect(out).toContain('1 unmanaged skill(s) not counted');
-    expect(out).toContain('Share: skills-manager cost --share');
+    expect(out).toContain('Try: npx skills-manager-cli');
+    expect(out).toContain('Reproduce: skills-manager cost --share');
     expect(out).toContain('https://github.com/shenysun/skills-manager');
+    expect(out).not.toContain('Share: skills-manager cost --share');
     expect(out).not.toContain(userHome);
     expect(out).not.toContain(project);
   });

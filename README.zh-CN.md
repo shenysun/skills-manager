@@ -73,6 +73,18 @@ skills-manager cost --share            # 可粘贴分享的常驻 skill 税卡�
 skills-manager audit security --strict  # CI 闸：仅 high 严重度发现时失败
 ```
 
+`cost --share` 输出可直接粘贴的卡片（不含绝对路径）。示例形状：
+
+```text
+Resident skill tax · char-approx · skills-manager
+≈1.2k tokens / message · 12 skill(s) · 2 path(s)
+Paths: user/claude-code+zed · project/cursor
+Heaviest: big-skill ≈400 · mid ≈200 · small ≈80
+Try: npx skills-manager-cli
+Reproduce: skills-manager cost --share
+https://github.com/shenysun/skills-manager
+```
+
 **上 CI？** 把 [`examples/github-actions/audit-security.yml`](examples/github-actions/audit-security.yml) 拷进 hub 仓库的 `.github/workflows/`（仓库根需是 `skills/` + `registry.yaml`）。PR/push 时跑 `audit security --strict --format github`——仅 high 严重度发现会失败，并在 PR Files 页打注解。
 
 运行时副本改为由 hub 托管；原文件会先备份。

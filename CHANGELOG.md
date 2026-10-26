@@ -12,6 +12,13 @@
 - 测试：bootstrap 输出含两条 demo，且位于起始提示词之后。
 - 文档：CLI / GETTING_STARTED / README 双语、manager skill 词条、ROADMAP 增长楔子。
 
+## 2026-10-26 (cost --share Try/Reproduce CTA)
+
+- **`cost --share` CTA**：粘贴卡页脚从循环的 `Share: skills-manager cost --share` 改为 `Try: npx skills-manager-cli` + `Reproduce: skills-manager cost --share` + 仓库链接，便于 HN / X 粘贴引流。
+- README 双语 Coming-from 块补示例粘贴卡形状；CLI 双语说明对齐。
+- 测试：断言锁定 Try/Reproduce，并拒绝旧 Share 行。
+
+
 ## 2026-10-26 (audit security --format github)
 
 - **`audit security --format github`**：stdout 输出 GitHub Actions 工作流命令（`::error` / `::warning` / `::notice`），`file=skills/<name>/…`，让 finding 直接亮在 PR Files 页；默认可选 `json` 不变。与 `--strict` 可联用。`%`/换行/回车按 Actions 规则百分号编码；未知 format → `invalid_format_flag`。
