@@ -1,0 +1,43 @@
+# Copy-paste CI gate: pin sample user phrasings to the skill they must pick.
+# Repo root (or `defaults.run.working-directory`) must already be a hub:
+#   skills/          +  registry.yaml
+# Do NOT pass `--home` here — an explicit home auto-creates a missing hub,
+# which would rank an empty hub and hide a misconfigured job.
+#
+# Requires skills-manager-cli with `trigger test` (shipped in PR #29 / after the
+# next npm cut that includes it — pin @latest once published, or install from
+# the commit that added the command).
+#
+# Edit the assertions below for YOUR hub: each line is a phrasing users actually
+# say, pinned with `--expect` to the skill you want. Use `--top N` when two
+# descriptions legitimately compete and either of the top N is acceptable.
+# Pair with hub-check.yml (security/provenance/budget) and optionally
+# `check --overlap --descriptions` for description-quality gates.
+
+name: skills-manager trigger test
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    # Nested hub? uncomment:
+    # defaults:
+    #   run:
+    #     working-directory: path/to/hub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Assert sample requests pick the right skill
+        run: |
+          set -euo pipefail
+          # --- edit these for your hub ---
+          npx --yes skills-manager-cli trigger test "fill PDF form fields from a scanned document" --expect pdf-forms
+          npx --yes skills-manager-cli trigger test "draft release notes from the merged pull requests" --expect release-notes
+          # Competing descriptions: allow a top-2 window instead of requiring #1.
+          npx --yes skills-manager-cli trigger test "write unit tests with Jest fixtures and mocks" --expect testing-conventions --top 2
