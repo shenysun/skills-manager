@@ -7,6 +7,7 @@ import { isUpdatableSourceType } from '../core/services/update-service.js';
 import { parseFormatFlag } from '../core/services/url-payload.js';
 import { findDescriptionOverlaps, renderOverlapReport } from '../core/services/description-overlap.js';
 import { lintDescriptions, renderDescriptionLint } from '../core/services/description-lint.js';
+import { boundaryProposals, fixDescriptions, renderProposals, replaceFrontmatterDescription, type DescriptionProposal } from '../core/services/description-fix.js';
 import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
@@ -820,13 +821,32 @@ audit.command('security')
     if (opts.strict && s.security.failsStrict(reports)) process.exitCode = 1;
   });
 
+/** `--fix` / `--write` for the description audits: print proposals, and write only when asked. */
+function applyDescriptionProposals(s: ReturnType<typeof services>, title: string, proposals: DescriptionProposal[], opts: { write?: boolean; json?: boolean }) {
+  const changed = proposals.filter((p) => p.after !== p.before);
+  if (opts.write) {
+    const fs = new NodeFileSystem();
+    for (const p of changed) {
+      const file = s.registry.skillMdPath(p.skill);
+      fs.writeText(file, replaceFrontmatterDescription(fs.readText(file), p.after));
+      s.registry.ensureEntry(p.skill, { description: p.after });
+    }
+    if (changed.length > 0) s.activity.record({ action: 'cli-audit-fix', summary: `${title}: rewrote ${changed.length} description(s)`, details: { skills: changed.map((p) => p.skill) } });
+  }
+  if (opts.json) print({ written: Boolean(opts.write), proposals });
+  else process.stdout.write(renderProposals(title, proposals, Boolean(opts.write)));
+}
+
 audit.command('overlap')
   .description('Find skills whose descriptions compete for the same trigger words (the agent may pick the wrong one); offline, report-only')
   .argument('[skills...]', 'canonical skill names; omit to compare every non-archived hub skill')
   .option('--threshold <score>', 'minimum overlap score from 0 to 1 to report', '0.3')
   .option('--strict', 'exit 1 when any pair is reported (CI gate)')
+  .option('--fix', 'propose a boundary line for each side of every pair, as a diff (writes nothing)')
+  .option('--write', 'with --fix: write the proposed descriptions into the hub SKILL.md files')
   .option('--json', 'machine-readable report')
-  .action((skills: string[], opts: { threshold: string; strict?: boolean; json?: boolean }, cmd) => {
+  .action((skills: string[], opts: { threshold: string; strict?: boolean; fix?: boolean; write?: boolean; json?: boolean }, cmd) => {
+    if (opts.write && !opts.fix) throw new Error('--write needs --fix (review the proposed diff first)');
     const threshold = Number(opts.threshold);
     if (!/^(0(\.\d+)?|1(\.0+)?|\.\d+)$/.test(opts.threshold) || !(threshold >= 0 && threshold <= 1)) {
       throw new Error(`--threshold expects a number from 0 to 1, got "${opts.threshold}"`);
@@ -836,6 +856,10 @@ audit.command('overlap')
     const missing = skills.filter((name) => !all.some((skill) => skill.name === name));
     if (missing.length > 0) throw new Error(`Skill not found: ${missing.join(', ')}. Run \`skills-manager list\` to see hub skills.`);
     const picked = skills.length > 0 ? all.filter((skill) => skills.includes(skill.name)) : all;
+    if (opts.fix) {
+      applyDescriptionProposals(s, 'Overlap boundaries', boundaryProposals(picked.map((skill) => ({ name: skill.name, description: skill.description })), threshold), opts);
+      return;
+    }
     const report = findDescriptionOverlaps(picked.map((skill) => ({ name: skill.name, description: skill.description })), threshold);
     if (opts.json) print(report);
     else process.stdout.write(renderOverlapReport(report));
@@ -848,13 +872,20 @@ audit.command('descriptions')
   .description('Lint skill descriptions for what makes them fail to trigger: missing, too long, no "use when", wrong point of view, vague; offline, report-only')
   .argument('[skills...]', 'canonical skill names; omit to lint every non-archived hub skill')
   .option('--strict', 'exit 1 when any error-level finding is present (warnings never fail)')
+  .option('--fix', 'propose template rewrites (trigger clause, third person, tag strip, trim to 1024) as a diff (writes nothing)')
+  .option('--write', 'with --fix: write the proposed descriptions into the hub SKILL.md files')
   .option('--json', 'machine-readable report')
-  .action((skills: string[], opts: { strict?: boolean; json?: boolean }, cmd) => {
+  .action((skills: string[], opts: { strict?: boolean; fix?: boolean; write?: boolean; json?: boolean }, cmd) => {
+    if (opts.write && !opts.fix) throw new Error('--write needs --fix (review the proposed diff first)');
     const s = services(cmd);
     const all = s.registry.listSkills();
     const missing = skills.filter((name) => !all.some((skill) => skill.name === name));
     if (missing.length > 0) throw new Error(`Skill not found: ${missing.join(', ')}. Run \`skills-manager list\` to see hub skills.`);
     const picked = skills.length > 0 ? all.filter((skill) => skills.includes(skill.name)) : all;
+    if (opts.fix) {
+      applyDescriptionProposals(s, 'Description fixes', fixDescriptions(picked.map((skill) => ({ name: skill.name, description: skill.description }))), opts);
+      return;
+    }
     const report = lintDescriptions(picked.map((skill) => ({ name: skill.name, description: skill.description })));
     if (opts.json) print(report);
     else process.stdout.write(renderDescriptionLint(report));

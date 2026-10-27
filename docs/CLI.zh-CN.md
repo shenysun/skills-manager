@@ -54,8 +54,8 @@ skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
-skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
-skills-manager audit descriptions [skills...] [--strict] [--json]
+skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--fix [--write]] [--json]
+skills-manager audit descriptions [skills...] [--strict] [--fix [--write]] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -197,6 +197,23 @@ agent 决定是否加载某个 skill 之前，只看得到它的 description，d
 | `vague` | warn | 少于 40 字符，或具体词少于 4 个（「Helps with documents」） |
 
 每个 skill 得一个 0–100 分（每个 error 扣 40，每个 warning 扣 15），每条发现都附修复建议。只报告，从不改 description。`--json` 输出 `{ scanned, errors, warnings, skills[] }`。带 `--strict` 时结论写 stderr。
+
+### audit … --fix（给出改写建议，只有 --write 才落盘）
+
+```sh
+skills-manager audit descriptions --fix          # 模板改写的 diff；不写任何文件
+skills-manager audit overlap --fix               # 为每一对冲突给出边界句的 diff
+skills-manager audit descriptions --fix --write  # 看过 diff 再应用
+```
+
+`--fix` 把两个 audit 都变成改写建议，按 skill 输出 `-` / `+` diff。它是 dry run，从不写入。只有 `--write` 才会应用；单独使用 `--write`（不带 `--fix`）会被拒绝。改写来自固定模板，离线、不调模型，同一个 hub 永远得到相同的建议：
+
+- `no-trigger` → 追加「Use when the user mentions <该 description 在本 hub 中最稀有的词>, or asks for <名字里的词>.」
+- `point-of-view` → 去掉开头的「I can …」/「You can use this to …」，并把动词首字母大写。
+- `xml-tag` → 去掉标签、保留文字。`too-long` → 在 1024 字符以内最后一个句号处截断，并保留结尾的「Use when …」。
+- overlap → 冲突对的双方各加一句「For <对方独有的词>, use the <对方> skill instead.」；如果对方没有独有词，就写成「For the same job without <我方独有的词>, …」。重复运行不会再加第二句。
+
+`missing`、`vague`、`name-format` 没有安全的模板，只列为 `needs you`，从不改动。模板只是起点，请自己读一遍、改一改。`--write` 只替换 hub SKILL.md frontmatter 里的 `description` 键（其他键和正文逐字节不变），并同步 registry 里的副本；各运行时副本照常随分发更新。改过的 hub skill 和任何手改一样，属于本地改动。`--json` 输出 `{ written, proposals[{ skill, before, after, applied, manual }] }`。
 
 ### audit security（装前安全扫描 MVP）
 

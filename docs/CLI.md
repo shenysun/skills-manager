@@ -54,8 +54,8 @@ skills-manager audit security
 skills-manager audit security my-skill
 skills-manager audit security --strict
 skills-manager audit security --strict --format github
-skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
-skills-manager audit descriptions [skills...] [--strict] [--json]
+skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--fix [--write]] [--json]
+skills-manager audit descriptions [skills...] [--strict] [--fix [--write]] [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -197,6 +197,23 @@ The description is all an agent sees before it decides to load a skill, so a wea
 | `vague` | warn | it is under 40 chars or has fewer than 4 concrete terms ("Helps with documents") |
 
 Each skill gets a 0–100 score (−40 per error, −15 per warning) and every finding comes with a fix. The lint is report-only and never edits a description. `--json` gives `{ scanned, errors, warnings, skills[] }`. With `--strict`, the verdict goes to stderr.
+
+### audit … --fix (proposed rewrites, written only with --write)
+
+```sh
+skills-manager audit descriptions --fix          # diff of template rewrites; writes nothing
+skills-manager audit overlap --fix               # diff of boundary lines for every competing pair
+skills-manager audit descriptions --fix --write  # apply after you have read the diff
+```
+
+`--fix` turns both audits into proposals, printed as a `-` / `+` diff per skill. It is a dry run and never writes. `--write` is the only way to apply them; on its own, without `--fix`, it is refused. The rewrites come from fixed templates, offline, with no model, so the same hub always gets the same proposals:
+
+- `no-trigger` → appends "Use when the user mentions <the description's rarest terms in this hub>, or asks for <name words>."
+- `point-of-view` → drops a leading "I can …" / "You can use this to …" and capitalises the verb.
+- `xml-tag` → strips the tags and keeps the text. `too-long` → cuts at the last sentence boundary under 1024 chars and keeps a trailing "Use when …".
+- overlap → each side of a pair gets "For <the other skill's distinctive terms>, use the <other> skill instead." If the other side has no extra terms, it becomes "For the same job without <my terms>, …". Re-running doesn't add a second line.
+
+`missing`, `vague` and `name-format` have no safe template. They are listed as `needs you` and never touched. The templates are a starting point, so read and edit them. `--write` replaces only the frontmatter `description` key in the hub SKILL.md (other keys and the body stay byte-for-byte) and updates the registry copy. Runtime copies follow through distribution as usual. An edited hub skill is a local change like any other edit. `--json` gives `{ written, proposals[{ skill, before, after, applied, manual }] }`.
 
 ### audit security (install/update security scan MVP)
 
