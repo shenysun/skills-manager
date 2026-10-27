@@ -9,6 +9,8 @@ import { findDescriptionOverlaps, renderOverlapReport } from '../core/services/d
 import { lintDescriptions, renderDescriptionLint } from '../core/services/description-lint.js';
 import { boundaryProposals, fixDescriptions, renderProposals, replaceFrontmatterDescription, type DescriptionProposal } from '../core/services/description-fix.js';
 import { rankTriggers, takeTop, expectSatisfied, renderTriggerRank } from '../core/services/trigger-rank.js';
+import { loadTriggerFixturesText, runTriggerFixtures, renderTriggerFixtures } from '../core/services/trigger-fixtures.js';
+import { readFileSync } from 'node:fs';
 import { confirmInsecureHttp } from './insecure-http-confirm.js';
 import { SkillsManagerError } from '../shared/errors.js';
 import { redactCheckout, redactDiscovered } from '../shared/redact.js';
@@ -899,19 +901,47 @@ audit.command('descriptions')
 
 const trigger = program.command('trigger').description('Offline checks for which hub skills a sample user request would match (reuse description-term IDF scoring)');
 trigger.command('test')
-  .description('Rank hub skills against a sample user request; with --expect, exit 1 unless that skill ranks first (or within --top N)')
-  .argument('<request>', 'sample user request / message to rank against')
-  .option('--expect <skill>', 'canonical skill name that must rank first (or within --top when set); CI assertion')
-  .option('--top <n>', 'only show / assert within the top N hits (integer ≥ 1)')
+  .description('Rank hub skills against a sample request, or run many assertions from a YAML/JSON fixtures file')
+  .argument('[request]', 'sample user request / message (omit when using --fixtures)')
+  .option('--fixtures <file>', 'YAML/JSON list of { request, expect, top? } — one command for many CI phrases')
+  .option('--expect <skill>', 'canonical skill name that must rank first (or within --top when set); CI assertion (single-request mode)')
+  .option('--top <n>', 'only show / assert within the top N hits (integer ≥ 1; single-request mode)')
   .option('--json', 'machine-readable report')
-  .action((request: string, opts: { expect?: string; top?: string; json?: boolean }, cmd) => {
+  .action((request: string | undefined, opts: { fixtures?: string; expect?: string; top?: string; json?: boolean }, cmd) => {
+    const s = services(cmd);
+    const skills = s.registry.listSkills().map((skill) => ({ name: skill.name, description: skill.description }));
+
+    if (opts.fixtures) {
+      if (request) throw new Error('Pass either a <request> or --fixtures, not both');
+      if (opts.expect !== undefined || opts.top !== undefined) {
+        throw new Error('--expect / --top belong on each fixtures entry (or use single-request mode without --fixtures)');
+      }
+      const filePath = path.resolve(opts.fixtures);
+      let text: string;
+      try {
+        text = readFileSync(filePath, 'utf8');
+      } catch (err) {
+        throw new Error(`Cannot read --fixtures ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const file = loadTriggerFixturesText(text, filePath);
+      const report = runTriggerFixtures(file, skills, { filePath });
+      if (opts.json) print(report);
+      else process.stdout.write(renderTriggerFixtures(report));
+      if (report.failed > 0) {
+        process.stderr.write(`Trigger fixtures: FAIL — ${report.failed}/${report.total} assertion(s)\n`);
+        process.exitCode = 1;
+      }
+      return;
+    }
+
+    if (!request || !request.trim()) {
+      throw new Error('Provide a <request> or --fixtures <file>');
+    }
     let top: number | undefined;
     if (opts.top !== undefined) {
       top = Number.parseInt(opts.top, 10);
       if (!Number.isInteger(top) || top < 1) throw new Error(`--top expects an integer ≥ 1, got "${opts.top}"`);
     }
-    const s = services(cmd);
-    const skills = s.registry.listSkills().map((skill) => ({ name: skill.name, description: skill.description }));
     if (opts.expect && !skills.some((skill) => skill.name === opts.expect)) {
       throw new Error(`Skill not found: ${opts.expect}. Run \`skills-manager list\` to see hub skills.`);
     }

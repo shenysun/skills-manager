@@ -1,0 +1,34 @@
+# Copy-paste CI gate: many sample phrasings in one file, one CLI invocation.
+# Prefer this over a long workflow of repeated `trigger test` lines.
+# Repo root (or `defaults.run.working-directory`) must already be a hub:
+#   skills/          +  registry.yaml
+# Do NOT pass `--home` here — an explicit home auto-creates a missing hub,
+# which would rank an empty hub and hide a misconfigured job.
+#
+# Requires skills-manager-cli with `trigger test --fixtures` (stacked on the
+# `trigger test` command). Pin @latest once published, or install from the
+# commit that added --fixtures.
+#
+# Edit examples/trigger-fixtures.yml (or your own path) for YOUR hub.
+
+name: skills-manager trigger fixtures
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    # Nested hub? uncomment:
+    # defaults:
+    #   run:
+    #     working-directory: path/to/hub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Assert fixture requests pick the right skills
+        run: npx --yes skills-manager-cli trigger test --fixtures examples/trigger-fixtures.yml

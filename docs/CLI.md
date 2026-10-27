@@ -59,6 +59,7 @@ skills-manager audit descriptions [skills...] [--strict] [--fix [--write]] [--js
 skills-manager audit overlap [skills...] [--threshold <0-1>] [--strict] [--json]
 skills-manager audit descriptions [skills...] [--strict] [--json]
 skills-manager trigger test "<request>" [--expect <skill>] [--top <n>] [--json]
+skills-manager trigger test --fixtures <file> [--json]
 skills-manager init --dry-run
 skills-manager init --agent claude-code --agent cursor
 skills-manager init --prefer claude-code ~/.agents/skills hub
@@ -249,12 +250,15 @@ skills-manager trigger test "fill PDF form fields"                 # rank every 
 skills-manager trigger test "write jest unit tests" --top 5        # only show the top 5
 skills-manager trigger test "draft release notes" --expect release-notes   # CI: exit 1 unless that skill is #1
 skills-manager trigger test "write unit tests with Jest" --expect testing-conventions --top 2  # allow a top-N window
+skills-manager trigger test --fixtures examples/trigger-fixtures.yml       # many phrases, one command (CI-friendly)
 skills-manager trigger test "…" --json
 ```
 
 Agents choose a skill by matching the user's message against every skill's `name + description`. `trigger test` does that match offline and deterministically: the same IDF-weighted Jaccard over `descriptionTerms` that `audit overlap` uses, scoring the request against each hub skill. Output is a ranked list (`#1`, `#2`, …) with the shared distinctive terms.
 
 `--expect <skill>` is the CI assertion. Without `--top`, that skill must rank first. With `--top N`, it must appear somewhere in the top N (and the listing is truncated to N). Unknown `--expect` names are refused up front. `--json` emits `{ method, request, scanned, hits[{ skill, score, shared, rank }], expect? }`. No network, no model — safe for pre-commit and Actions.
+
+`--fixtures <file>` is the multi-assertion form: a YAML (`.yaml`/`.yml`) or JSON file that is either a list of `{ request, expect, top? }` objects or `{ name?, fixtures: [...] }`. One invocation runs every case and exits 1 if any fails — so CI does not need a long workflow of repeated `trigger test` lines. Sample file: [`examples/trigger-fixtures.yml`](../examples/trigger-fixtures.yml); copy-paste workflow: [`examples/github-actions/trigger-fixtures.yml`](../examples/github-actions/trigger-fixtures.yml). Do not combine `--fixtures` with a positional `<request>` or with CLI-level `--expect`/`--top` (put those on each fixtures entry). `--json` emits `{ method, file, name?, scanned, total, passed, failed, results[] }`.
 
 ### check (all hub gates, one exit code)
 

@@ -132,3 +132,5 @@ export { fixDescription, fixDescriptions, boundaryProposals, renderProposals, re
 export type { DescriptionProposal } from './description-fix.js';
 export { rankTriggers, takeTop, expectSatisfied, renderTriggerRank } from './trigger-rank.js';
 export type { TriggerSkill, TriggerHit, TriggerRankReport } from './trigger-rank.js';
+export { parseTriggerFixtures, loadTriggerFixturesText, runTriggerFixtures, renderTriggerFixtures } from './trigger-fixtures.js';
+export type { TriggerFixtureCase, TriggerFixtureFile, TriggerFixtureResult, TriggerFixturesReport } from './trigger-fixtures.js';

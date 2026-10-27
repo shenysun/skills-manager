@@ -77,6 +77,7 @@ skills-manager audit overlap           # 哪些 skill 在抢同一个请求（�
 skills-manager audit descriptions      # 永远不会被触发的 description（缺「何时用」、太含糊、太长）
 skills-manager audit descriptions --fix # 以 diff 给出改写建议；加 --write 才应用
 skills-manager trigger test "…"         # 离线：这条请求会命中哪些 hub skill？（--expect 可做 CI）
+skills-manager trigger test --fixtures f.yml  # 一份 YAML/JSON 断言多条说法，一条命令跑完 CI
 skills-manager sync init --remote <url> # 多机 hub git 同步（相对安装器的差异化）
 skills-manager sync status --share      # 可粘贴分享的同步姿态卡片（无 hub 路径 / remote URL）
 ```
