@@ -76,6 +76,7 @@ skills-manager audit security --strict  # CI gate: fail only on high-severity fi
 skills-manager audit overlap           # which skills compete for the same request (wrong-skill triggers)
 skills-manager audit descriptions      # descriptions that will never trigger (no "use when", vague, too long)
 skills-manager audit descriptions --fix # proposed rewrites as a diff; --write applies them
+skills-manager trigger test "…"         # offline: which hub skills would this request match? (--expect for CI)
 skills-manager sync init --remote <url> # multi-machine hub git sync (unique vs installers)
 skills-manager sync status --share      # privacy-safe paste card of sync posture
 ```

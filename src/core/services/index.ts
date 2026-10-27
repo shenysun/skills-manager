@@ -130,3 +130,5 @@ export { lintDescription, lintDescriptions, renderDescriptionLint, DESCRIPTION_M
 export type { DescriptionLint, DescriptionLintReport, LintFinding } from './description-lint.js';
 export { fixDescription, fixDescriptions, boundaryProposals, renderProposals, replaceFrontmatterDescription } from './description-fix.js';
 export type { DescriptionProposal } from './description-fix.js';
+export { rankTriggers, takeTop, expectSatisfied, renderTriggerRank } from './trigger-rank.js';
+export type { TriggerSkill, TriggerHit, TriggerRankReport } from './trigger-rank.js';
