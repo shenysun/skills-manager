@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /** The README CI-gates table must list the same gate commands in EN and zh. */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const gates = ['audit security --strict', 'provenance list --fail-on-imported', 'cost --budget <tokens>', 'update --check --fail-on-stale', 'check [--budget <tokens>] [--freshness]'];
+const gates = ['audit security --strict', 'provenance list --fail-on-imported', 'cost --budget <tokens>', 'update --check --fail-on-stale', 'check [--budget] [--freshness] [--overlap] [--descriptions]', 'trigger test "<request>" --expect <skill> [--top N]'];
 
 function tableCommands(file: string): string[] {
   return readFileSync(path.join(root, file), 'utf8')
