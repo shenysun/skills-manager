@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-04 (bundled catalog path on Windows)
+
+### Fixed
+- 内置 `agent-catalog.json` 改用 `fileURLToPath` 解析。此前用 `URL.pathname` 当文件路径：Windows 下 `file:///D:/…` 得到 `/D:/…`，被当成「当前盘符根 + 该路径」拼成 `C:\D:\…`，导致 `distribute`、`catalog info` 与默认 agent 检测全部失败；含空格或中文的安装路径也会被百分号编码破坏（macOS/Linux 上仅因路径恰好合法而侥幸通过）
+
 ## 2026-10-27 (skill quality: audit overlap + audit descriptions + check)
 
 ### Added

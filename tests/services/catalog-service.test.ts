@@ -56,6 +56,23 @@ describe('CatalogService.load', () => {
     expect(bundled.source.license).toBe('MIT');
   });
 
+  it('hands the bundled snapshot path to the filesystem as a real path', () => {
+    // 回归：曾把 URL.pathname 当文件路径用。Windows 下 `file:///D:/…` 的 pathname 是 `/D:/…`，
+    // 被当成「当前盘符根 + 该路径」拼成 `C:\D:\…`；含空格/中文的安装路径还会留下 %XX 编码。
+    const home = tempHome();
+    const nodeFs = createNodeFileSystem();
+    const seen: string[] = [];
+    const spyFs = Object.create(nodeFs) as typeof nodeFs;
+    spyFs.readText = (target: string) => {
+      seen.push(target);
+      return nodeFs.readText(target);
+    };
+    new CatalogService(spyFs, home, {}).load();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toMatch(/%[0-9A-Fa-f]{2}/);
+    expect(existsSync(seen[0]!)).toBe(true);
+  });
+
   it('prefers a hub refresh override over the bundled snapshot', () => {
     const home = tempHome();
     const fs = createNodeFileSystem();

@@ -1,5 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { CatalogSnapshot } from '../model/catalog.js';
 import type { SkillHome } from '../model/index.js';
 import type { FileSystemPort } from '../ports/filesystem.js';
@@ -61,7 +62,7 @@ export class CatalogService {
       this.loadedFrom = 'hub';
       return this.loaded;
     }
-    this.loaded = validateCatalogSnapshot(this.parseJson(this.fs.readText(BUNDLED_SNAPSHOT_URL.pathname), 'bundled snapshot'));
+    this.loaded = validateCatalogSnapshot(this.parseJson(this.fs.readText(fileURLToPath(BUNDLED_SNAPSHOT_URL)), 'bundled snapshot'));
     this.loadedFrom = 'bundled';
     return this.loaded;
   }
